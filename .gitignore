@@ -1,0 +1,9 @@
+
+
+*.z64
+/build
+/filesystem
+/old
+/helpers
+Makefile
+*.n64
