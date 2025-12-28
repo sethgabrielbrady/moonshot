@@ -4,6 +4,6 @@
 /build
 /filesystem
 /old
-/helpers
+/oldX
 Makefile
 *.n64
