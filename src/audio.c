@@ -6,10 +6,12 @@ wav64_t bgm;
 bool bgm_playing = false;
 
 void play_sfx() {
-  // Audio handling
-  wav64_play(&sfx_mining, 2); // Play the shot sound effect
-  mixer_try_play();
+   if (!mixer_ch_playing(2)) {
+        wav64_play(&sfx_mining, 2);
+    }
+    mixer_try_play();
 }
+
 
 // Load and play background music
 void play_bgm(const char *filename) {
@@ -29,7 +31,6 @@ void stop_bgm(void) {
     wav64_close(&bgm);
     bgm_playing = false;
 }
-
 
 void set_bgm_volume(float volume) {
     // volume: 0.0 to 1.0

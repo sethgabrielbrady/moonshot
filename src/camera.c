@@ -39,12 +39,12 @@ void update_camera(T3DViewport *viewport, float cam_yaw, float delta_time, T3DVe
 
         if (fabsf(stick_x) > 0.1f) {
             float rotation_speed = FPS_ROTATION_SPEED * delta_time;
-            cursor_entity->rotation_y += stick_x * rotation_speed;
-            cursor_entity->rotation_y = normalize_angle(cursor_entity->rotation_y);
+            cursor_entity->rotation.v[1] += stick_x * rotation_speed;
+            cursor_entity->rotation.v[1] = normalize_angle(cursor_entity->rotation.v[1]);
 
             // Update look direction based on new rotation
-            cursor_look_direction.v[0] = sinf(cursor_entity->rotation_y);
-            cursor_look_direction.v[2] = -cosf(cursor_entity->rotation_y);
+            cursor_look_direction.v[0] = sinf(cursor_entity->rotation.v[1]);
+            cursor_look_direction.v[2] = -cosf(cursor_entity->rotation.v[1]);
         }
 
         // Look in same direction cursor is facing

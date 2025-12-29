@@ -48,9 +48,9 @@ static float last_thrust_z = 0.0f;
 T3DVec3 cursor_look_direction = {{0.0f, 0.0f, -1.0f}};
 static ColorFlash color_flashes[MAX_COLOR_FLASHES];
 
-
 static T3DBvh bvh;
 static bool use_culling = true;
+static bool drone_heal = false;
 
 
 
@@ -131,7 +131,7 @@ static void init_subsystems(void) {
     debug_init_usblog();
     asset_init_compression(2);
     dfs_init(DFS_DEFAULT_LOCATION);
-    // display_init(lo_res, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
+    // display_init(hi_res, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
     display_init(RESOLUTION_320x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
     // display_set_fps_limit(60);
     // display_set_fps_limit(30);
@@ -167,69 +167,79 @@ static void update_cursor(float delta_time, float cam_yaw) {
     joypad_inputs_t joypad = joypad_get_inputs(JOYPAD_PORT_1);
     joypad_buttons_t held = joypad_get_buttons_held(JOYPAD_PORT_1);
 
+    float yaw_rad = T3D_DEG_TO_RAD(cam_yaw);
+    float cos_yaw = cosf(yaw_rad);
+    float sin_yaw = sinf(yaw_rad);
+
+    float rotated_x = (joypad.stick_x * cos_yaw - joypad.stick_y * sin_yaw);
+    float rotated_z = (joypad.stick_x * sin_yaw + joypad.stick_y * cos_yaw);
+
+    float stick_magnitude = sqrtf(joypad.stick_x * joypad.stick_x +
+                                  joypad.stick_y * joypad.stick_y);
 
     if (fps_mode) {
-        joypad.stick_y = 0;
-    }
+        // FPS mode: thrust relative to cursor facing direction
+        float stick_y = joypad.stick_y / 128.0f;
+        float stick_x = joypad.stick_x / 128.0f;
 
-    if (!held.r) {
-        float yaw_rad = T3D_DEG_TO_RAD(cam_yaw);
-        float cos_yaw = cosf(yaw_rad);
-        float sin_yaw = sinf(yaw_rad);
+        if (fabsf(stick_y) > 0.1f && cursor_entity) {
+            // Forward/backward thrust in cursor facing direction
+            float thrust_x = -sinf(cursor_entity->rotation.v[1]) * stick_y * 128.0f;
+            float thrust_z = -cosf(cursor_entity->rotation.v[1]) * stick_y * 128.0f;
+            cursor_velocity.v[0] += thrust_x * CURSOR_THRUST * delta_time;
+            cursor_velocity.v[2] -= thrust_z * CURSOR_THRUST * delta_time;
+        }
 
-        float rotated_x = (joypad.stick_x * cos_yaw - joypad.stick_y * sin_yaw);
-        float rotated_z = (joypad.stick_x * sin_yaw + joypad.stick_y * cos_yaw);
+        // Optional: Strafe with stick X
+        if (fabsf(stick_x) > 0.1f && cursor_entity) {
+            // Strafe perpendicular to cursor facing direction
+            float strafe_x = -cosf(cursor_entity->rotation.v[1]) * stick_x * 128.0f;
+            float strafe_z = sinf(cursor_entity->rotation.v[1]) * stick_x * 128.0f;
+            cursor_velocity.v[0] += strafe_x * CURSOR_THRUST * delta_time;
+            cursor_velocity.v[2] -= strafe_z * CURSOR_THRUST * delta_time;
+        }
 
-        float stick_magnitude = sqrtf(joypad.stick_x * joypad.stick_x +
-                                      joypad.stick_y * joypad.stick_y);
-
-        // Only rotate cursor to face stick direction in isometric mode
-        if (!fps_mode && stick_magnitude > CURSOR_DEADZONE && cursor_entity) {
+    } else {
+        // Isometric mode: rotate cursor to face stick direction
+        if (stick_magnitude > CURSOR_DEADZONE && cursor_entity) {
             cursor_entity->rotation.v[1] = atan2f(-rotated_x, -rotated_z);
 
             cursor_look_direction.v[0] = -rotated_x / stick_magnitude;
             cursor_look_direction.v[2] = rotated_z / stick_magnitude;
         }
 
-        // Thrust with B (works in both modes)
-        if (held.b) {
-            if (stick_magnitude > CURSOR_DEADZONE) {
-                cursor_velocity.v[0] += rotated_x * CURSOR_THRUST * delta_time;
-                cursor_velocity.v[2] -= rotated_z * CURSOR_THRUST * delta_time;
-            } else if (cursor_entity) {
-                float thrust_x = -sinf(cursor_entity->rotation.v[1]) * 128.0f;
-                float thrust_z = -cosf(cursor_entity->rotation.v[1]) * 128.0f;
-                cursor_velocity.v[0] += thrust_x * CURSOR_THRUST * delta_time;
-                cursor_velocity.v[2] -= thrust_z * CURSOR_THRUST * delta_time;
-            }
+        // Thrust in joystick direction
+        if (stick_magnitude > CURSOR_DEADZONE) {
+            cursor_velocity.v[0] += rotated_x * CURSOR_THRUST * delta_time;
+            cursor_velocity.v[2] -= rotated_z * CURSOR_THRUST * delta_time;
         }
-
-        // Apply drag
-        float drag = CURSOR_DRAG * delta_time;
-        if (drag > 1.0f) drag = 1.0f;
-
-        cursor_velocity.v[0] *= (1.0f - drag);
-        cursor_velocity.v[2] *= (1.0f - drag);
-
-        // Clamp velocity to max speed
-        float speed = sqrtf(cursor_velocity.v[0] * cursor_velocity.v[0] +
-                            cursor_velocity.v[2] * cursor_velocity.v[2]);
-        if (speed > CURSOR_MAX_SPEED) {
-            float scale = CURSOR_MAX_SPEED / speed;
-            cursor_velocity.v[0] *= scale;
-            cursor_velocity.v[2] *= scale;
-        }
-
-        // Stop completely if very slow
-        if (speed < 0.1f) {
-            cursor_velocity.v[0] = 0.0f;
-            cursor_velocity.v[2] = 0.0f;
-        }
-
-        // Apply velocity to position
-        cursor_position.v[0] += cursor_velocity.v[0] * delta_time;
-        cursor_position.v[2] += cursor_velocity.v[2] * delta_time;
     }
+
+    // Apply drag
+    float drag = CURSOR_DRAG * delta_time;
+    if (drag > 1.0f) drag = 1.0f;
+
+    cursor_velocity.v[0] *= (1.0f - drag);
+    cursor_velocity.v[2] *= (1.0f - drag);
+
+    // Clamp velocity to max speed
+    float speed = sqrtf(cursor_velocity.v[0] * cursor_velocity.v[0] +
+                        cursor_velocity.v[2] * cursor_velocity.v[2]);
+    if (speed > CURSOR_MAX_SPEED) {
+        float scale = CURSOR_MAX_SPEED / speed;
+        cursor_velocity.v[0] *= scale;
+        cursor_velocity.v[2] *= scale;
+    }
+
+    // Stop completely if very slow
+    if (speed < 0.1f) {
+        cursor_velocity.v[0] = 0.0f;
+        cursor_velocity.v[2] = 0.0f;
+    }
+
+    // Apply velocity to position
+    cursor_position.v[0] += cursor_velocity.v[0] * delta_time;
+    cursor_position.v[2] += cursor_velocity.v[2] * delta_time;
 
     if (cursor_entity) {
         cursor_entity->position = cursor_position;
@@ -410,11 +420,12 @@ static void drone_mine_resource(Entity *entity, Entity *resource, float delta_ti
     drone_mining_accumulated += amount;
 
     // Only transfer whole units
-    if (drone_mining_accumulated >= 1.0f) {
+    if (drone_mining_accumulated >= 1.0f && drone_resource_val < DRONE_MAX_RESOURCES) {
         int transfer = (int)drone_mining_accumulated;
         resource->value -= transfer;
         // entity->value += transfer;
         drone_resource_val += transfer;
+        entity->value = drone_resource_val;
         drone_mining_accumulated -= transfer;
     }
 
@@ -449,7 +460,7 @@ static void check_drone_resource_collisions(Entity *entity, Entity *resources, i
     mining_resource = -1;
 
     for (int i = 0; i < count; i++) {
-        if (check_entity_intersection(entity, &resources[i])) {
+        if (check_entity_intersection(entity, &resources[i]) && drone_resource_val < DRONE_MAX_RESOURCES) {
             resource_intersection = true;
             entity->position.v[1] = resources[i].position.v[1] + 5.0f; // hover above resource
             entity->position.v[0] = resources[i].position.v[0];
@@ -458,15 +469,32 @@ static void check_drone_resource_collisions(Entity *entity, Entity *resources, i
             play_sfx();
             mining_resource = i;
             drone_mine_resource(entity, &resources[i], delta_time);
+
             break;  // Only mine one at a time
         }
-
     }
-    // entity->position.v[0] = last_drone_position.v[0];
-    // entity->position.v[1] = last_drone_position.v[1];
-    // entity->position.v[2] = last_drone_position.v[2];
-    // last_drone_position = entity->position;
 }
+
+static void check_drone_station_collisions(Entity *drone, Entity *station, int count) {
+        if (check_entity_intersection(drone, station)) {
+            // entity_array[i].value += drone->value;
+            // drone->value = 0;
+            station->value += drone_resource_val;
+            drone_resource_val = 0;
+            start_entity_color_flash(station, RGBA32(0, 255, 0, 255), 0.5f);
+        }
+
+}
+static void check_drone_cursor_collisions(Entity *drone, Entity *cursor, int count) {
+        if (check_entity_intersection(drone, cursor)) {
+            cursor->value += drone_resource_val;
+            drone_resource_val = 0;
+            start_entity_color_flash(cursor, RGBA32(0, 255, 0, 255), 0.5f);
+        }
+}
+
+
+
 
 static void reset_resource_colors(Entity *resources, int count) {
     for (int i = 0; i < count; i++) {
@@ -508,41 +536,55 @@ static void process_input(float delta_time, float *cam_yaw) {
     joypad_buttons_t held = joypad_get_buttons_held(JOYPAD_PORT_1);
     joypad_buttons_t pressed = joypad_get_buttons_pressed(JOYPAD_PORT_1);
 
-    // if (held.r) {
+    // if (held.r && fps_mode) {
     //     float rotation_speed = CAM_ROTATION_SPEED * delta_time;
     //     if (joypad.stick_x < 0) *cam_yaw -= rotation_speed;
     //     else if (joypad.stick_x > 0) *cam_yaw += rotation_speed;
     // }
 
-      // Camera rotation with R + stick (only in isometric mode)
-    if (held.r && !fps_mode) {
+
+    if (!fps_mode) {
         float rotation_speed = CAM_ROTATION_SPEED * delta_time;
-        if (joypad.stick_x < 0) *cam_yaw -= rotation_speed;
-        else if (joypad.stick_x > 0) *cam_yaw += rotation_speed;
+        if (held.r) *cam_yaw -= rotation_speed;  // Rotate right
+        if (held.z) *cam_yaw += rotation_speed;  // Rotate left
     }
 
-     if (!held.r && pressed.c_up) {
+    if (!held.r && pressed.c_up) {
         fps_mode = !fps_mode;
     }
 
     if (pressed.l) reset_fps_stats();
 
-    if (held.r) {
-        if (pressed.c_up) teleport_to_position(-576.6f, 276.0f, cam_yaw, &cursor_position);
-        else if (pressed.c_right) teleport_to_position(-489.6f, -470.0f, cam_yaw, &cursor_position);
-        else if (pressed.c_down) teleport_to_position(690.6f, -519.0f, cam_yaw, &cursor_position);
-        else if (pressed.c_left) teleport_to_position(730.6f, 378.0f, cam_yaw, &cursor_position);
-        else if (pressed.z) teleport_to_position(0.0f, 0.0f, cam_yaw, &cursor_position);
-    }
+    // if (held.r) {
+    //     if (pressed.c_up) teleport_to_position(-576.6f, 276.0f, cam_yaw, &cursor_position);
+    //     else if (pressed.c_right) teleport_to_position(-489.6f, -470.0f, cam_yaw, &cursor_position);
+    //     else if (pressed.c_down) teleport_to_position(690.6f, -519.0f, cam_yaw, &cursor_position);
+    //     else if (pressed.c_left) teleport_to_position(730.6f, 378.0f, cam_yaw, &cursor_position);
+    //     else if (pressed.z) teleport_to_position(0.0f, 0.0f, cam_yaw, &cursor_position);
+    // }
 
     if (pressed.start) render_debug = !render_debug;
 
-    if (pressed.z && cursor_entity) {
+    drone_heal = false;
+    if (held.c_left) {
+       drone_heal = true;
+    }
+    if (pressed.c_left && cursor_entity) {
         target_rotation = cursor_entity->rotation.v[1];
         target_position = cursor_position;
         move_drone = true;
     }
+
+    if (pressed.c_down && cursor_entity) {
+        // move drone to station
+        target_rotation = 0.0f;
+        target_position.v[0] = 0.0f;
+        target_position.v[2] = 0.0f;
+        move_drone = true;
+
+    }
 }
+
 
 
 static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset, const char *label) {
@@ -587,10 +629,13 @@ static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset
     // Label
     rdpq_sync_pipe();
     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, x + bar_width + 5, y + bar_height, "%s", label);
+
 }
+
 static void draw_health_bars(void) {
     draw_entity_health_bar(&entities[ENTITY_STATION], STATION_MAX_HEALTH, 0, "STATION");
     draw_entity_health_bar(cursor_entity, CURSOR_MAX_HEALTH, 15, "CURSOR");
+    draw_entity_health_bar(&entities[ENTITY_DRONE], DRONE_MAX_RESOURCES, 30, "DRONE");
 }
 
 // =============================================================================
@@ -666,13 +711,13 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
 // Main
 // =============================================================================
 
+
 int main(void) {
     init_subsystems();
     T3DViewport viewport = t3d_viewport_create();
 
     sprite_t *background = sprite_load("rom:/bg1024.sprite");
 
-    // entities[ENTITY_CURSOR] = create_entity("rom:/miner.t3dm", cursor_position, 0.9625f, COLOR_CURSOR, DRAW_TEXTURED_LIT, 10.0f);
     // decrease the size of asteroids and resources - increase station size
     entities[ENTITY_CURSOR] = create_entity("rom:/miner.t3dm", cursor_position, 0.5625f, COLOR_CURSOR, DRAW_TEXTURED_LIT, 10.0f);
     entities[ENTITY_CURSOR].value = CURSOR_MAX_HEALTH;
@@ -727,6 +772,10 @@ int main(void) {
 
         check_entity_resource_collisions(&entities[ENTITY_CURSOR], resources, RESOURCE_COUNT, delta_time);
         check_drone_resource_collisions(&entities[ENTITY_DRONE], resources, RESOURCE_COUNT, delta_time);
+        check_drone_station_collisions(&entities[ENTITY_DRONE], &entities[ENTITY_STATION], 1);
+        if (drone_heal  ) {
+            check_drone_cursor_collisions(&entities[ENTITY_DRONE], &entities[ENTITY_CURSOR], 1);
+        }
         check_station_asteroid_collisions(&entities[ENTITY_STATION], asteroids, ASTEROID_COUNT);
         check_cursor_station_collision(&entities[ENTITY_CURSOR], &entities[ENTITY_STATION]);
         check_cursor_asteroid_collisions(&entities[ENTITY_CURSOR], asteroids, ASTEROID_COUNT);

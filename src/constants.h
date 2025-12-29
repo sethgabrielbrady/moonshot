@@ -28,6 +28,7 @@
 #define DRONE_ROTATION_SPEED  5.0f
 #define DRONE_MOVE_SPEED      1.0f
 #define DRONE_ARRIVE_THRESHOLD 1.0f
+#define DRONE_MAX_RESOURCES      50.0f // not actually health b
 
 // Cursor
 #define CURSOR_SPEED       5.0f
@@ -49,7 +50,7 @@
 #define RESOURCE_POOL_MAX  1000.0f
 #define RESOURCE_POOL_MIN  000.0f
 #define MINING_RATE        20.0f // per second
-# define DRONE_MINING_RATE  5.0f  // per second
+#define DRONE_MINING_RATE  5.0f  // per second
 
 // Debug UI
 #define DEBUG_TEXT_X       16
@@ -79,7 +80,7 @@
 
 
  // Cursor physics
-#define CURSOR_THRUST       10.0f      // Acceleration when B is held
+#define CURSOR_THRUST        8.0f      // Acceleration when B is held
 #define CURSOR_DRAG          1.150f      // How quickly velocity decays
 #define CURSOR_MAX_SPEED     300.0f    // Maximum velocity
 #define FPS_ROTATION_SPEED   3.0f  // Adjust for faster/slower rotation

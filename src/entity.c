@@ -10,12 +10,9 @@ Entity create_entity(const char *model_path, T3DVec3 position, float scale, colo
         .scale = scale,
         .color = color,
         .rotation = {{0.0f, 0.0f, 0.0f}},
-        // .rotation_x = 0.0f,
-        // .rotation_y = 0.0f,
-        // .rotation_z = 0.0f,
         .speed = 1.0f,
         .collision_radius = collision_radius,
-        .value = RESOURCE_VALUE,
+        .value = 0,
         .draw_type = draw_type
     };
     return entity;

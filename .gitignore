@@ -5,5 +5,11 @@
 /filesystem
 /old
 /oldX
+/libdragon
+.libdragon
+/.vscode
+/.tool-versions
+/tiny3d
+.gitmodules
 Makefile
 *.n64

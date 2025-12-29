@@ -83,7 +83,7 @@ void render_debug_ui(T3DVec3 cursor_position, Entity *cursor_entity, bool move_d
 
      y += DEBUG_LINE_HEIGHT;
     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
-                     "drone_resource_val: %d", entities[ENTITY_CURSOR].value);
+                     "cursor_health: %d", entities[ENTITY_CURSOR].value);
 
     y += DEBUG_LINE_HEIGHT;
     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
