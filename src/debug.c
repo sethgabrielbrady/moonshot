@@ -101,6 +101,9 @@ void render_debug_ui(T3DVec3 cursor_position, Entity *cursor_entity, bool move_d
     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
                  "drone_resource_val: %d", drone_resource_val);
 
+    y += DEBUG_LINE_HEIGHT;
+    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
+                 "frames 30: %d", limit30hz);
 //      y += DEBUG_LINE_HEIGHT;
 
 //     if (fabsf(cursor_velocity.v[0]) > 0.01f || fabsf(cursor_velocity.v[2]) > 0.01f) {

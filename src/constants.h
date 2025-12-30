@@ -38,8 +38,8 @@
 #define CURSOR_RESOURCE_CAPACITY 100.0f
 
 // Asteroid
-#define ASTEROID_BOUND_X   800.0f
-#define ASTEROID_BOUND_Z   700.0f
+#define ASTEROID_BOUND_X   900.0f
+#define ASTEROID_BOUND_Z   900.0f
 #define ASTEROID_PADDING   100.0f
 
 
@@ -95,5 +95,17 @@
 
 #define FONT_TEXT           1
 
+
+static bool game_paused = false;
+static int menu_selection = 0;
+
+#define MENU_OPTION_RESUME   0
+#define MENU_OPTION_CAMERA   1
+#define MENU_OPTION_DEBUG    2
+#define MENU_OPTION_AUDIO    3
+#define MENU_OPTION_30HZ     4
+#define MENU_OPTIONS_COUNT   5
+
+static bool limit30hz = false;
 
 #endif

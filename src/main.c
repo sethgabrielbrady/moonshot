@@ -14,20 +14,7 @@
 #include "audio.h"
 #include "debug.h"
 
-// Fast inverse square root for efficient normalization
-static inline float fast_inv_sqrt(float x) {
-    // Quake III algorithm with union to avoid strict-aliasing issues
-    union {
-        float f;
-        int32_t i;
-    } conv;
 
-    float halfx = 0.5f * x;
-    conv.f = x;
-    conv.i = 0x5f3759df - (conv.i >> 1);
-    conv.f = conv.f * (1.5f - (halfx * conv.f * conv.f));
-    return conv.f;
-}
 
 // =============================================================================
 // Global State
@@ -68,14 +55,79 @@ static T3DBvh bvh;
 static bool use_culling = true;
 static bool drone_heal = false;
 static bool drone_collecting_resource = false;
+static bool drone_moving_to_resource = false;
+static bool drone_moving_to_station = false;
+// static bool pause_menu = false;
 
 // float delta_time = 0.0f;
 
+// Fast inverse square root for efficient normalization
+static inline float fast_inv_sqrt(float x) {
+    // Quake III algorithm with union to avoid strict-aliasing issues
+    union {
+        float f;
+        int32_t i;
+    } conv;
 
+    float halfx = 0.5f * x;
+    conv.f = x;
+    conv.i = 0x5f3759df - (conv.i >> 1);
+    conv.f = conv.f * (1.5f - (halfx * conv.f * conv.f));
+    return conv.f;
+}
 
+void draw_pause_menu(void) {
+    int padding_x = SCREEN_WIDTH * 0.2f;
+    int padding_y = SCREEN_HEIGHT * 0.15f;
 
+    int x1 = padding_x;
+    int y1 = padding_y;
+    int x2 = SCREEN_WIDTH - padding_x;
+    int y2 = SCREEN_HEIGHT - padding_y;
 
+    rdpq_sync_pipe();
+    rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
 
+    // Draw teal box
+    rdpq_set_prim_color(RGBA32(0, 128, 128, 255));
+    rdpq_fill_rectangle(x1, y1, x2, y2);
+
+    // Draw border
+    rdpq_set_prim_color(RGBA32(0, 200, 200, 255));
+    rdpq_fill_rectangle(x1, y1, x2, y1 + 2);
+    rdpq_fill_rectangle(x1, y2 - 2, x2, y2);
+    rdpq_fill_rectangle(x1, y1, x1 + 2, y2);
+    rdpq_fill_rectangle(x2 - 2, y1, x2, y2);
+
+    int menu_x = x1 + 15;
+    int menu_y = y1 + 40;
+    int line_height = 18;
+
+    // Draw highlight box behind selected option
+    rdpq_set_prim_color(RGBA32(0, 180, 180, 255));
+    rdpq_fill_rectangle(menu_x - 5, menu_y + (menu_selection * line_height) - 10,
+                        x2 - 15, menu_y + (menu_selection * line_height) + 5);
+
+    rdpq_sync_pipe();
+
+    // Title
+    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, 120, y1 + 15, "=== PAUSED ===");
+
+    // Menu options
+    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, menu_x, menu_y, "Resume");
+    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, menu_x, menu_y + line_height,
+                     "Camera: %s", fps_mode ? "FPS" : "ISO");
+    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, menu_x, menu_y + line_height * 2,
+                     "Debug: %s", render_debug ? "ON" : "OFF");
+    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, menu_x, menu_y + line_height * 3,
+                     "Music: %s", bgm_playing ? "ON" : "OFF");
+    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, menu_x, menu_y + line_height * 4,
+                     "FPS Limit: %s", limit30hz ? "30" : "60");
+
+    // Controls hint
+    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, menu_x, y2 - 20,
+                     "Up/Down: Select  A: Toggle");
+}
 
 static bool is_entity_in_frustum(Entity *entity, T3DVec3 cam_position, T3DVec3 cam_target, float fov_degrees) {
     // Direction from camera to entity
@@ -155,7 +207,12 @@ static void init_subsystems(void) {
     dfs_init(DFS_DEFAULT_LOCATION);
     // display_init(hi_res, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
     display_init(RESOLUTION_320x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
-    display_set_fps_limit(60);
+    if (limit30hz) {
+        display_set_fps_limit(30);
+    }else {
+        display_set_fps_limit(60);
+    }
+
     // display_set_fps_limit(30);
     rdpq_init();
 
@@ -397,6 +454,8 @@ static void move_drone_elsewhere(Entity *drone, float delta_time, bool base_retu
 
     if (distance_sq < DRONE_ARRIVE_THRESHOLD * DRONE_ARRIVE_THRESHOLD) {
         move_drone = false;
+        drone_moving_to_resource = move_drone;
+        drone_moving_to_station = move_drone;
         return;
     }
 
@@ -429,7 +488,6 @@ static void mine_resource(Entity *entity, Entity *resource, float delta_time) { 
     if (mining_accumulated >= 1.0f) {
         int transfer = (int)mining_accumulated;
         resource->value -= transfer;
-        // entity->value += transfer;
         cursor_resource_val += transfer;
         mining_accumulated -= transfer;
     }
@@ -539,8 +597,6 @@ static void reset_resource_colors(Entity *resources, int count) {
 
 void check_cursor_station_collision(Entity *cursor, Entity *station) {
     if (check_entity_intersection(cursor, station)) {
-        // station->value += cursor->value;
-        // cursor->value = 0;
         station->value += cursor_resource_val;
         cursor_resource_val = 0;
         start_entity_color_flash(station, RGBA32(0, 255, 0, 255), 0.5f);
@@ -559,17 +615,65 @@ static void update_tile_visibility(Entity *tile) {
 // Input
 // =============================================================================
 
+static int menu_input_delay = 0;
+
 static void process_input(float delta_time, float *cam_yaw) {
     joypad_inputs_t joypad = joypad_get_inputs(JOYPAD_PORT_1);
     joypad_buttons_t held = joypad_get_buttons_held(JOYPAD_PORT_1);
     joypad_buttons_t pressed = joypad_get_buttons_pressed(JOYPAD_PORT_1);
 
-    // if (held.r && fps_mode) {
-    //     float rotation_speed = CAM_ROTATION_SPEED * delta_time;
-    //     if (joypad.stick_x < 0) *cam_yaw -= rotation_speed;
-    //     else if (joypad.stick_x > 0) *cam_yaw += rotation_speed;
-    // }
+    // Toggle pause with START
+    if (pressed.start) {
+        game_paused = !game_paused;
+        menu_selection = 0;
+        menu_input_delay = 0;
+        return;
+    }
 
+    if (game_paused) {
+        // Decrease delay timer
+        if (menu_input_delay > 0) menu_input_delay--;
+
+        // Navigate up
+        if (menu_input_delay == 0 && (pressed.d_up || pressed.c_up || joypad.stick_y > 50)) {
+            menu_selection--;
+            if (menu_selection < 0) menu_selection = MENU_OPTIONS_COUNT - 1;
+            menu_input_delay = 10;  // Delay before next input
+        }
+
+        // Navigate down
+        if (menu_input_delay == 0 && (pressed.d_down || pressed.c_down || joypad.stick_y < -50)) {
+            menu_selection++;
+            if (menu_selection >= MENU_OPTIONS_COUNT) menu_selection = 0;
+            menu_input_delay = 10;
+        }
+
+        // Select with A (no delay needed for button press)
+        if (pressed.a) {
+            switch (menu_selection) {
+                case MENU_OPTION_RESUME:
+                    game_paused = false;
+                    break;
+                case MENU_OPTION_CAMERA:
+                    fps_mode = !fps_mode;
+                    break;
+                case MENU_OPTION_DEBUG:
+                    render_debug = !render_debug;
+                    break;
+                case MENU_OPTION_AUDIO:
+                    if (bgm_playing) {
+                        stop_bgm();
+                    } else {
+                        play_bgm("rom:/bgm_loop.wav64");
+                    }
+                    break;
+                case MENU_OPTION_30HZ:
+                    limit30hz = !limit30hz;
+                    break;
+            }
+        }
+        return;
+    }
 
     if (!fps_mode) {
         float rotation_speed = CAM_ROTATION_SPEED * delta_time;
@@ -583,7 +687,8 @@ static void process_input(float delta_time, float *cam_yaw) {
 
     if (pressed.l) reset_fps_stats();
 
-    if (pressed.start) render_debug = !render_debug;
+    if (pressed.d_up) render_debug = !render_debug;
+
 
     drone_heal = held.a;
 
@@ -595,6 +700,8 @@ static void process_input(float delta_time, float *cam_yaw) {
         target_position.v[1] = cursor_position.v[1];
         target_position.v[2] = cursor_position.v[2] - cursor_look_direction.v[2] * offset_distance;
         move_drone = true;
+        drone_moving_to_resource = move_drone;
+        drone_moving_to_station = false;
     }
 
     if (pressed.c_down && cursor_entity) {
@@ -604,6 +711,8 @@ static void process_input(float delta_time, float *cam_yaw) {
         target_position.v[2] = 0.0f;
         move_drone = true;
 
+        drone_moving_to_station = move_drone;
+        drone_moving_to_resource = false;
     }
 }
 
@@ -652,17 +761,107 @@ static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset
     rdpq_sync_pipe();
     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, x + bar_width + 5, y + bar_height, "%s", label);
 
-    if (drone_collecting_resource) {
-        rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, x + bar_width + 50, y + bar_height, " Drilling");
+}
+
+static int blink_timer = 0;
+
+static void draw_triangle_indicator(int x, int y) {
+    rdpq_set_prim_color(RGBA32(255, 165, 0, 255));  // Orange
+
+    // Bigger triangle pointing right (10 pixels tall)
+    rdpq_fill_rectangle(x, y + 4, x + 2, y + 6);
+    rdpq_fill_rectangle(x + 2, y + 3, x + 4, y + 7);
+    rdpq_fill_rectangle(x + 4, y + 2, x + 6, y + 8);
+    rdpq_fill_rectangle(x + 6, y + 1, x + 8, y + 9);
+    rdpq_fill_rectangle(x + 8, y, x + 10, y + 10);
+}
+
+static void draw_circle_indicator(int x, int y) {
+    rdpq_set_prim_color(RGBA32(0, 255, 25, 255));  // blue-green
+    //circle   (15 pixels tall) // can we make it smoother?
+    rdpq_fill_rectangle(x + 4, y + 2, x + 6, y + 8);
+    rdpq_fill_rectangle(x + 2, y + 4, x + 8, y + 6);
+    rdpq_fill_rectangle(x + 4, y, x + 6, y + 2);
+    rdpq_fill_rectangle(x + 2, y + 2, x + 8, y + 4);
+    rdpq_fill_rectangle(x, y + 4, x + 10, y + 6);
+    rdpq_fill_rectangle(x + 2, y + 6, x + 8, y + 8);
+    rdpq_fill_rectangle(x + 4, y + 8, x + 6, y + 10);
+}
+
+static void draw_station_indicator(int x, int y) {
+    rdpq_set_prim_color(RGBA32(244, 0, 125, 255));  // green
+    //(10 pixels tall) // can we make this an lowercase t  with a square at the top?
+
+    rdpq_fill_rectangle(x + 4, y, x + 6, y + 10);
+    rdpq_fill_rectangle(x + 2, y, x + 8, y + 2);
+
+}
+
+static void draw_entity_resource_bar(int resource_val, float max_value, int y_offset, const char *label, bool show_triangle) {
+    int bar_width = 40;
+    int bar_height = 4;
+
+    // Position in lower right
+    int x = SCREEN_WIDTH - bar_width - 60;
+    int y = SCREEN_HEIGHT - 20 - y_offset;
+
+    float resource_percent = resource_val / max_value;
+
+    if (resource_percent > 1.0f) resource_percent = 1.0f;
+    if (resource_percent < 0.0f) resource_percent = 0.0f;
+
+    int fill_width = (int)(bar_width * resource_percent);
+
+    color_t bar_color = RGBA32(0, 191, 255, 255);
+
+    rdpq_sync_pipe();
+    rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
+
+    // Draw resource fill
+    if (fill_width > 0) {
+        rdpq_set_prim_color(bar_color);
+        rdpq_fill_rectangle(x, y, x + fill_width, y + bar_height);
     }
 
+    // Draw empty portion in gray
+    if (fill_width < bar_width) {
+        rdpq_set_prim_color(RGBA32(50, 50, 50, 255));
+        rdpq_fill_rectangle(x + fill_width, y, x + bar_width, y + bar_height);
+    }
+
+    // Label
+    rdpq_sync_pipe();
+    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, x + bar_width + 5, y + bar_height, "%s", label);
+
+    // Triangle indicator only for drone when collecting
+    if (show_triangle && drone_collecting_resource && blink_timer < 10) {
+        rdpq_sync_pipe();
+        rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
+        draw_triangle_indicator(x - 15, y - 3);
+        drone_moving_to_resource = false;
+        drone_moving_to_station = false;
+    } else if (show_triangle && drone_moving_to_resource && blink_timer < 10) {
+        rdpq_sync_pipe();
+        rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
+        draw_circle_indicator(x - 15, y - 3);
+        drone_collecting_resource = false;
+        drone_moving_to_station = false;
+    } else if (show_triangle && drone_moving_to_station && blink_timer < 10) {
+        rdpq_sync_pipe();
+        rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
+        draw_station_indicator(x - 15, y - 3);
+        drone_collecting_resource = false;
+        drone_moving_to_resource = false;
+    }
 }
 
-static void draw_health_bars(void) {
+static void draw_info_bars(void) {
     draw_entity_health_bar(&entities[ENTITY_STATION], STATION_MAX_HEALTH, 0, "STATION");
     draw_entity_health_bar(cursor_entity, CURSOR_MAX_HEALTH, 15, "CURSOR");
-    draw_entity_health_bar(&entities[ENTITY_DRONE], DRONE_MAX_RESOURCES, 30, "DRONE");
+    draw_entity_resource_bar(cursor_resource_val, CURSOR_RESOURCE_CAPACITY, 15, "CURSOR RES", false);
+    draw_entity_resource_bar(drone_resource_val, DRONE_MAX_RESOURCES, 30, "DRONE RES", true);
 }
+
 
 // =============================================================================
 // Rendering
@@ -724,11 +923,15 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     draw_entities_culled(asteroids, ASTEROID_COUNT, NULL);
     draw_entities_culled(resources, RESOURCE_COUNT, NULL);
 
-    draw_health_bars();
+    draw_info_bars();
 
     if (render_debug) {
         render_debug_ui(cursor_position, cursor_entity, move_drone, resource_val, entities, ENTITY_COUNT, resources, RESOURCE_COUNT, culled_count, cursor_resource_val, drone_resource_val);
     }
+    if (game_paused) {
+        draw_pause_menu();
+     }
+
 
 
     rdpq_detach_show();
@@ -766,6 +969,7 @@ int main(void) {
     float cam_yaw = CAM_ANGLE_YAW;
 
     wav64_open(&sfx_mining, "rom:/ploop.wav64");
+
     // Start background music
     play_bgm("rom:/bgm_loop.wav64");
 
@@ -777,47 +981,50 @@ int main(void) {
         joypad_poll();
         process_input(delta_time, &cam_yaw);
 
+        if (!game_paused) {
+            update_cursor(delta_time, cam_yaw);
+            update_camera(&viewport, cam_yaw, delta_time, cursor_position, fps_mode, cursor_entity);
+            update_tile_visibility(&entities[ENTITY_TILE]);
+            // update_audio();
 
-        // #define FIXED_TIMESTEP (1.0f / 60.0f)
+            if (move_drone) {
+                move_drone_elsewhere(&entities[ENTITY_DRONE], delta_time, false);
+            }
 
+            update_asteroids(asteroids, ASTEROID_COUNT, delta_time);
+            update_resources(resources, RESOURCE_COUNT, delta_time);
+            rotate_entity(&entities[ENTITY_STATION], delta_time, 0.250f);
 
-        // // Use fixed timestep for physics
-        // float physics_dt = FIXED_TIMESTEP;
-        // update_cursor(physics_dt, cam_yaw);
-        update_cursor(delta_time, cam_yaw);
-        update_camera(&viewport, cam_yaw, delta_time, cursor_position, fps_mode, cursor_entity);
+            update_entity_matrices(entities, ENTITY_COUNT);
+            update_entity_matrices(asteroids, ASTEROID_COUNT);
+            update_entity_matrices(resources, RESOURCE_COUNT);
 
-        update_tile_visibility(&entities[ENTITY_TILE]);
+            reset_resource_colors(resources, RESOURCE_COUNT);
+
+            check_cursor_resource_collisions(&entities[ENTITY_CURSOR], resources, RESOURCE_COUNT, delta_time);
+            check_drone_resource_collisions(&entities[ENTITY_DRONE], resources, RESOURCE_COUNT, delta_time);
+            check_drone_station_collisions(&entities[ENTITY_DRONE], &entities[ENTITY_STATION], 1);
+            if (drone_heal  ) {
+                check_drone_cursor_collisions(&entities[ENTITY_DRONE], &entities[ENTITY_CURSOR], 1);
+            }
+            check_station_asteroid_collisions(&entities[ENTITY_STATION], asteroids, ASTEROID_COUNT, delta_time);
+            check_cursor_station_collision(&entities[ENTITY_CURSOR], &entities[ENTITY_STATION]);
+            check_cursor_asteroid_collisions(&entities[ENTITY_CURSOR], asteroids, ASTEROID_COUNT);
+
+            update_color_flashes(delta_time);
+            update_fps_stats(delta_time);
+            // Call this in your update loop
+            blink_timer++;
+            if (blink_timer > 20) blink_timer = 0;
+            // render_frame(&viewport, background, cam_yaw);
+        }
+
+         // Always render
+        render_frame(&viewport, background, cam_yaw);
+        // Draw pause menu on top if paused
+
         update_audio();
 
-
-        if (move_drone) {
-            move_drone_elsewhere(&entities[ENTITY_DRONE], delta_time, false);
-        }
-
-        update_asteroids(asteroids, ASTEROID_COUNT, delta_time);
-        update_resources(resources, RESOURCE_COUNT, delta_time);
-        rotate_entity(&entities[ENTITY_STATION], delta_time, 0.250f);
-
-        update_entity_matrices(entities, ENTITY_COUNT);
-        update_entity_matrices(asteroids, ASTEROID_COUNT);
-        update_entity_matrices(resources, RESOURCE_COUNT);
-
-        reset_resource_colors(resources, RESOURCE_COUNT);
-
-        check_cursor_resource_collisions(&entities[ENTITY_CURSOR], resources, RESOURCE_COUNT, delta_time);
-        check_drone_resource_collisions(&entities[ENTITY_DRONE], resources, RESOURCE_COUNT, delta_time);
-        check_drone_station_collisions(&entities[ENTITY_DRONE], &entities[ENTITY_STATION], 1);
-        if (drone_heal  ) {
-            check_drone_cursor_collisions(&entities[ENTITY_DRONE], &entities[ENTITY_CURSOR], 1);
-        }
-        check_station_asteroid_collisions(&entities[ENTITY_STATION], asteroids, ASTEROID_COUNT, delta_time);
-        check_cursor_station_collision(&entities[ENTITY_CURSOR], &entities[ENTITY_STATION]);
-        check_cursor_asteroid_collisions(&entities[ENTITY_CURSOR], asteroids, ASTEROID_COUNT);
-
-        update_color_flashes(delta_time);
-        update_fps_stats(delta_time);
-        render_frame(&viewport, background, cam_yaw);
     }
 
     stop_bgm();
