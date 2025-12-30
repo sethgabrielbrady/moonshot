@@ -75,11 +75,11 @@ void render_debug_ui(T3DVec3 cursor_position, Entity *cursor_entity, bool move_d
     //                  "resource_val: %d", resource_val);
 
     //for each resource, print its value
-    for (int i = 0; i < resource_count; i++) {
-        y += DEBUG_LINE_HEIGHT;
-        rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
-                         "resource %d val: %d", i, resources[i].value);
-    }
+    // for (int i = 0; i < resource_count; i++) {
+    //     y += DEBUG_LINE_HEIGHT;
+    //     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
+    //                      "resource %d val: %d", i, resources[i].value);
+    // }
 
      y += DEBUG_LINE_HEIGHT;
     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
@@ -100,6 +100,13 @@ void render_debug_ui(T3DVec3 cursor_position, Entity *cursor_entity, bool move_d
      y += DEBUG_LINE_HEIGHT;
     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
                  "drone_resource_val: %d", drone_resource_val);
+
+//      y += DEBUG_LINE_HEIGHT;
+
+//     if (fabsf(cursor_velocity.v[0]) > 0.01f || fabsf(cursor_velocity.v[2]) > 0.01f) {
+//         debugf("vel: %.4f, %.4f dt: %.4f\n",
+//            cursor_velocity.v[0], cursor_velocity.v[2], delta_time);
+// }
 
 
 }

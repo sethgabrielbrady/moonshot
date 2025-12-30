@@ -9,6 +9,7 @@ void play_sfx() {
    if (!mixer_ch_playing(2)) {
         wav64_play(&sfx_mining, 2);
     }
+    mixer_ch_set_vol(2, 0.3, 0.3);  // Left, Right
     mixer_try_play();
 }
 

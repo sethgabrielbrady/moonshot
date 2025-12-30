@@ -19,11 +19,11 @@ Entity create_entity(const char *model_path, T3DVec3 position, float scale, colo
 }
 
 void update_entity_matrix(Entity *entity) {
-    float scale[3] = {entity->scale, entity->scale, entity->scale};
-     //float rotation[3] = {entity->rotation_x, entity->rotation_y, entity->rotation_z};
-
-    float rotation[3] = {entity->rotation.v[0], entity->rotation.v[1], entity->rotation.v[2]};
-    t3d_mat4fp_from_srt_euler(entity->matrix, scale, rotation, entity->position.v);
+    // Use compound literals to avoid temporary array allocations
+    t3d_mat4fp_from_srt_euler(entity->matrix,
+        (float[3]){entity->scale, entity->scale, entity->scale},
+        (float[3]){entity->rotation.v[0], entity->rotation.v[1], entity->rotation.v[2]},
+        entity->position.v);
 }
 
 void update_entity_matrices(Entity *entity_array, int count) {
@@ -32,12 +32,9 @@ void update_entity_matrices(Entity *entity_array, int count) {
     }
 }
 
-void rotate_entity(Entity *entity, float delta_time, float speed) {
-    // entity->rotation_y += delta_time * speed;
-    // if (entity->rotation_y > TWO_PI) {
-    //     entity->rotation_y -= TWO_PI;
-    // }
+inline void rotate_entity(Entity *entity, float delta_time, float speed) {
     entity->rotation.v[1] += delta_time * speed;
+    // Normalize to [0, TWO_PI) range
     if (entity->rotation.v[1] > TWO_PI) {
         entity->rotation.v[1] -= TWO_PI;
     }
@@ -47,6 +44,7 @@ void draw_entity(Entity *entity) {
     t3d_matrix_push(entity->matrix);
     rdpq_set_prim_color(entity->color);
 
+    // Set combiner mode based on draw type
     if (entity->draw_type == DRAW_SHADED) {
         rdpq_mode_combiner(RDPQ_COMBINER1((PRIM, 0, SHADE, 0), (PRIM, 0, SHADE, 0)));
     } else {
@@ -63,17 +61,18 @@ void draw_entities(Entity *entity_array, int count) {
     }
 }
 
-bool check_entity_intersection(Entity *a, Entity *b) {
-    float combined_radius = a->collision_radius + b->collision_radius;
+inline bool check_entity_intersection(Entity *a, Entity *b) {
+    // Early exit if either has no collision radius
+    if (a->collision_radius <= 0.0f || b->collision_radius <= 0.0f) return false;
 
-    // Skip if either has no collision
-    if (combined_radius <= 0) return false;
+    float combined_radius = a->collision_radius + b->collision_radius;
+    float combined_radius_sq = combined_radius * combined_radius;
 
     float dx = a->position.v[0] - b->position.v[0];
     float dz = a->position.v[2] - b->position.v[2];
 
     float distance_sq = dx * dx + dz * dz;
-    return distance_sq < (combined_radius * combined_radius);
+    return distance_sq < combined_radius_sq;
 }
 
 void free_entity(Entity *entity) {

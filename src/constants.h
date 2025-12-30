@@ -32,9 +32,10 @@
 
 // Cursor
 #define CURSOR_SPEED       5.0f
-#define CURSOR_DEADZONE    10.0f
+#define CURSOR_DEADZONE    15.0f
 #define CURSOR_HEIGHT      10.0f
 #define CURSOR_MAX_HEALTH  100.0f
+#define CURSOR_RESOURCE_CAPACITY 100.0f
 
 // Asteroid
 #define ASTEROID_BOUND_X   800.0f
@@ -43,14 +44,14 @@
 
 
 //Resource
-#define RESOURCE_BOUND_X   800.0f
-#define RESOURCE_BOUND_Z   700.0f
+#define RESOURCE_BOUND_X   700.0f
+#define RESOURCE_BOUND_Z   800.0f
 #define RESOURCE_PADDING   100.0f
 #define RESOURCE_VALUE     100.0f // This will get multiplied by the scale to determine value
 #define RESOURCE_POOL_MAX  1000.0f
 #define RESOURCE_POOL_MIN  000.0f
-#define MINING_RATE        20.0f // per second
-#define DRONE_MINING_RATE  5.0f  // per second
+#define MINING_RATE        10.0f // per second
+#define DRONE_MINING_RATE  2.50f  // per second
 
 // Debug UI
 #define DEBUG_TEXT_X       16
@@ -76,12 +77,12 @@
  #define DAMAGE_MULTIPLIER 0.001f
  #define VALUE_MULTIPLIER 20.0f
  #define STATION_MAX_HEALTH 100.0f
- #define MAX_DAMAGE 25.0f
+ #define MAX_DAMAGE 17.0f
 
 
  // Cursor physics
-#define CURSOR_THRUST        8.0f      // Acceleration when B is held
-#define CURSOR_DRAG          1.150f      // How quickly velocity decays
+#define CURSOR_THRUST        10.0f      // Acceleration when B is held
+#define CURSOR_DRAG          1.110f      // How quickly velocity decays
 #define CURSOR_MAX_SPEED     300.0f    // Maximum velocity
 #define FPS_ROTATION_SPEED   3.0f  // Adjust for faster/slower rotation
 

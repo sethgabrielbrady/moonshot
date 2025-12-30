@@ -11,6 +11,21 @@ Camera camera = {
     .rotation_y = 0.0f
 };
 
+// Cache for isometric camera calculations
+static float cached_horizontal_dist = 0.0f;
+static float cached_vertical_dist = 0.0f;
+static float cached_pitch_rad = 0.0f;
+static bool cache_initialized = false;
+
+static inline void init_camera_cache(void) {
+    if (!cache_initialized) {
+        cached_pitch_rad = T3D_DEG_TO_RAD(CAM_ANGLE_PITCH);
+        cached_horizontal_dist = CAM_DISTANCE * cosf(cached_pitch_rad);
+        cached_vertical_dist = CAM_DISTANCE * sinf(cached_pitch_rad);
+        cache_initialized = true;
+    }
+}
+
 void reset_cam_yaw(float *cam_yaw) {
     *cam_yaw = CAM_ANGLE_YAW;
 }
@@ -24,41 +39,47 @@ void teleport_to_position(float x, float z, float *cam_yaw, T3DVec3 *cursor_posi
 }
 
 void update_camera(T3DViewport *viewport, float cam_yaw, float delta_time, T3DVec3 cursor_position, bool fps_mode, Entity *cursor_entity) {
-    if (fps_mode && cursor_entity) {
-        float eye_height = 15.0f;
-        float look_distance = 100.0f;
 
-        // Camera position at cursor
-        camera.position.v[0] = cursor_position.v[0];
-        camera.position.v[1] = cursor_position.v[1] + eye_height;
-        camera.position.v[2] = cursor_position.v[2];
+if (fps_mode && cursor_entity) {
+    const float eye_height = 13.0f;
+    const float look_distance = 100.0f;
+    const float camera_offset = 8.0f;
 
-        // Rotate cursor with stick X axis
-        joypad_inputs_t joypad = joypad_get_inputs(JOYPAD_PORT_1);
-        float stick_x = joypad.stick_x / 128.0f;
+    // Rotate with joystick X
+    joypad_inputs_t joypad = joypad_get_inputs(JOYPAD_PORT_1);
+    float stick_x = joypad.stick_x / 128.0f;
 
-        if (fabsf(stick_x) > 0.1f) {
-            float rotation_speed = FPS_ROTATION_SPEED * delta_time;
-            cursor_entity->rotation.v[1] += stick_x * rotation_speed;
-            cursor_entity->rotation.v[1] = normalize_angle(cursor_entity->rotation.v[1]);
+    if (fabsf(stick_x) > 0.1f) {
+        float rotation_delta = stick_x * FPS_ROTATION_SPEED * delta_time;
+        cursor_entity->rotation.v[1] = normalize_angle(cursor_entity->rotation.v[1] + rotation_delta);
 
-            // Update look direction based on new rotation
-            cursor_look_direction.v[0] = sinf(cursor_entity->rotation.v[1]);
-            cursor_look_direction.v[2] = -cosf(cursor_entity->rotation.v[1]);
-        }
+        // Update look direction - cache sin/cos for reuse
+        float rotation = cursor_entity->rotation.v[1];
+        cursor_look_direction.v[0] = sinf(rotation);
+        cursor_look_direction.v[2] = -cosf(rotation);
+    }
 
-        // Look in same direction cursor is facing
-        camera.target.v[0] = cursor_position.v[0] - cursor_look_direction.v[0] * look_distance;
-        camera.target.v[1] = cursor_position.v[1] + eye_height;
-        camera.target.v[2] = cursor_position.v[2] - cursor_look_direction.v[2] * look_distance;
+    // Cache cursor position Y + eye height (used twice)
+    float eye_y = cursor_position.v[1] + eye_height;
+
+    // Camera position offset behind cursor
+    camera.position.v[0] = cursor_position.v[0] + cursor_look_direction.v[0] * camera_offset;
+    camera.position.v[1] = eye_y;
+    camera.position.v[2] = cursor_position.v[2] + cursor_look_direction.v[2] * camera_offset;
+
+    // Look in same direction cursor is facing
+    camera.target.v[0] = cursor_position.v[0] - cursor_look_direction.v[0] * look_distance;
+    camera.target.v[1] = eye_y;
+    camera.target.v[2] = cursor_position.v[2] - cursor_look_direction.v[2] * look_distance;
+
 
     } else {
-        // Isometric mode: original camera behavior
-        float pitch_rad = T3D_DEG_TO_RAD(CAM_ANGLE_PITCH);
-        float yaw_rad = T3D_DEG_TO_RAD(cam_yaw);
+        // Isometric mode: original camera behavior with cached values
+        init_camera_cache();
 
-        float horizontal_dist = CAM_DISTANCE * cosf(pitch_rad);
-        float vertical_dist = CAM_DISTANCE * sinf(pitch_rad);
+        float yaw_rad = T3D_DEG_TO_RAD(cam_yaw);
+        float sin_yaw = sinf(yaw_rad);
+        float cos_yaw = cosf(yaw_rad);
 
         float follow_speed = CAM_FOLLOW_SPEED * delta_time;
         if (follow_speed > 1.0f) follow_speed = 1.0f;
@@ -69,9 +90,9 @@ void update_camera(T3DViewport *viewport, float cam_yaw, float delta_time, T3DVe
         camera.target.v[0] = clampf(camera.target.v[0], -PLAY_AREA_HALF_X, PLAY_AREA_HALF_X);
         camera.target.v[2] = clampf(camera.target.v[2], -PLAY_AREA_HALF_Z, PLAY_AREA_HALF_Z);
 
-        camera.position.v[0] = camera.target.v[0] + horizontal_dist * sinf(yaw_rad);
-        camera.position.v[1] = camera.target.v[1] + vertical_dist;
-        camera.position.v[2] = camera.target.v[2] + horizontal_dist * cosf(yaw_rad);
+        camera.position.v[0] = camera.target.v[0] + cached_horizontal_dist * sin_yaw;
+        camera.position.v[1] = camera.target.v[1] + cached_vertical_dist;
+        camera.position.v[2] = camera.target.v[2] + cached_horizontal_dist * cos_yaw;
     }
 
     t3d_viewport_set_perspective(viewport, T3D_DEG_TO_RAD(CAM_DEFAULT_FOV),

@@ -3,6 +3,22 @@
 #include "utils.h"
 #include "entity.h"
 #include <math.h>
+#include <stdint.h>
+
+// Fast inverse square root for efficient normalization
+static inline float fast_inv_sqrt(float x) {
+    // Quake III algorithm with union to avoid strict-aliasing issues
+    union {
+        float f;
+        int32_t i;
+    } conv;
+
+    float halfx = 0.5f * x;
+    conv.f = x;
+    conv.i = 0x5f3759df - (conv.i >> 1);
+    conv.f = conv.f * (1.5f - (halfx * conv.f * conv.f));
+    return conv.f;
+}
 
 
 void get_asteroid_velocity_and_scale (Entity *asteroid, T3DVec3 *out_velocity) {
@@ -62,62 +78,61 @@ void reset_entity(Entity *entity, EntityType type ) {
             break;
     }
 
-    float len = sqrtf(entity->velocity.v[0] * entity->velocity.v[0] +
-                      entity->velocity.v[2] * entity->velocity.v[2]);
-    if (len > 0) {
-        entity->velocity.v[0] /= len;
-        entity->velocity.v[2] /= len;
+    // Normalize velocity using fast inverse sqrt
+    float len_sq = entity->velocity.v[0] * entity->velocity.v[0] +
+                   entity->velocity.v[2] * entity->velocity.v[2];
+    if (len_sq > 0.0001f) {
+        float inv_len = fast_inv_sqrt(len_sq);
+        entity->velocity.v[0] *= inv_len;
+        entity->velocity.v[2] *= inv_len;
     }
 }
 
 
 void move_entity(Entity *entity, float delta_time, EntityType type) {
-    entity->velocity.v[0] += randomize_float(-0.1f, 0.1f) * delta_time;
-    entity->velocity.v[2] += randomize_float(-0.1f, 0.1f) * delta_time;
+    // Removed per-frame randomization for performance
+    // Velocity direction remains constant for smoother, faster movement
 
-    float len = sqrtf(entity->velocity.v[0] * entity->velocity.v[0] +
-                      entity->velocity.v[2] * entity->velocity.v[2]);
-    if (len > 0.1f) {
-        entity->velocity.v[0] /= len;
-        entity->velocity.v[2] /= len;
+    // Normalize velocity only if needed using fast inverse sqrt
+    float len_sq = entity->velocity.v[0] * entity->velocity.v[0] +
+                   entity->velocity.v[2] * entity->velocity.v[2];
+    if (len_sq > 1.01f) {  // Only normalize if significantly denormalized
+        float inv_len = fast_inv_sqrt(len_sq);
+        entity->velocity.v[0] *= inv_len;
+        entity->velocity.v[2] *= inv_len;
     }
 
+    // Cache frequently used value
     float move_amount = entity->speed * delta_time;
     entity->position.v[0] += entity->velocity.v[0] * move_amount;
     entity->position.v[2] += entity->velocity.v[2] * move_amount;
 
-    // entity->rotation_x += delta_time * entity->speed * 0.05f;
-    // entity->rotation_y += delta_time * entity->speed * 0.03f;
-    // entity->rotation_z += delta_time * entity->speed * 0.02f;
-    entity->rotation.v[0] += delta_time * entity->speed * 0.05f;
-    entity->rotation.v[1] += delta_time * entity->speed * 0.03f;
-    entity->rotation.v[2] += delta_time * entity->speed * 0.02f;
+    // Update rotation with cached value
+    entity->rotation.v[0] += move_amount * 0.05f;
+    entity->rotation.v[1] += move_amount * 0.03f;
+    entity->rotation.v[2] += move_amount * 0.02f;
 
-    bool out_of_bounds =
-        entity->position.v[0] < -(ASTEROID_BOUND_X + ASTEROID_PADDING) ||
-        entity->position.v[0] > (ASTEROID_BOUND_X + ASTEROID_PADDING) ||
-        entity->position.v[2] < -(ASTEROID_BOUND_Z + ASTEROID_PADDING) ||
-        entity->position.v[2] > (ASTEROID_BOUND_Z + ASTEROID_PADDING);
+    // Early exit boundary check with optimized pattern
+    float bound_x = ASTEROID_BOUND_X + ASTEROID_PADDING;
+    float bound_z = ASTEROID_BOUND_Z + ASTEROID_PADDING;
 
-    if (out_of_bounds && type == ASTEROID ) {
-       reset_entity(entity, ASTEROID);
-    }
-    if (out_of_bounds && type == RESOURCE ) {
-       reset_entity(entity, RESOURCE);
+    if (entity->position.v[0] < -bound_x || entity->position.v[0] > bound_x ||
+        entity->position.v[2] < -bound_z || entity->position.v[2] > bound_z) {
+        reset_entity(entity, type);
     }
 }
 
 
 
-//consolidate
+// Optimized update functions
 void update_asteroids(Entity *asteroids, int count, float delta_time) {
     for (int i = 0; i < count; i++) {
         move_entity(&asteroids[i], delta_time, ASTEROID);
     }
 }
+
 void update_resources(Entity *resources, int count, float delta_time) {
     for (int i = 0; i < count; i++) {
-        // scale_resource_based_on_value(&resources[i]);
         move_entity(&resources[i], delta_time, RESOURCE);
     }
 }

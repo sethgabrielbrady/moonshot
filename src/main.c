@@ -3,6 +3,7 @@
 #include <t3d/t3ddebug.h>
 #include <rdpq.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 #include "types.h"
 #include "constants.h"
@@ -12,6 +13,21 @@
 #include "asteroid.h"
 #include "audio.h"
 #include "debug.h"
+
+// Fast inverse square root for efficient normalization
+static inline float fast_inv_sqrt(float x) {
+    // Quake III algorithm with union to avoid strict-aliasing issues
+    union {
+        float f;
+        int32_t i;
+    } conv;
+
+    float halfx = 0.5f * x;
+    conv.f = x;
+    conv.i = 0x5f3759df - (conv.i >> 1);
+    conv.f = conv.f * (1.5f - (halfx * conv.f * conv.f));
+    return conv.f;
+}
 
 // =============================================================================
 // Global State
@@ -51,6 +67,11 @@ static ColorFlash color_flashes[MAX_COLOR_FLASHES];
 static T3DBvh bvh;
 static bool use_culling = true;
 static bool drone_heal = false;
+static bool drone_collecting_resource = false;
+
+// float delta_time = 0.0f;
+
+
 
 
 
@@ -62,12 +83,12 @@ static bool is_entity_in_frustum(Entity *entity, T3DVec3 cam_position, T3DVec3 c
     float dy = entity->position.v[1] - cam_position.v[1];
     float dz = entity->position.v[2] - cam_position.v[2];
 
-    // Distance to entity
-    float distance = sqrtf(dx * dx + dy * dy + dz * dz);
-    if (distance < 0.001f) return true;  // Entity at camera position
+    // Squared distance to entity
+    float distance_sq = dx * dx + dy * dy + dz * dz;
+    if (distance_sq < 0.000001f) return true;  // Entity at camera position
 
-    // Normalize direction to entity
-    float inv_dist = 1.0f / distance;
+    // Normalize direction to entity using fast inverse sqrt
+    float inv_dist = fast_inv_sqrt(distance_sq);
     dx *= inv_dist;
     dy *= inv_dist;
     dz *= inv_dist;
@@ -77,10 +98,10 @@ static bool is_entity_in_frustum(Entity *entity, T3DVec3 cam_position, T3DVec3 c
     float fy = cam_target.v[1] - cam_position.v[1];
     float fz = cam_target.v[2] - cam_position.v[2];
 
-    float forward_len = sqrtf(fx * fx + fy * fy + fz * fz);
-    if (forward_len < 0.001f) return true;
+    float forward_len_sq = fx * fx + fy * fy + fz * fz;
+    if (forward_len_sq < 0.000001f) return true;
 
-    float inv_forward = 1.0f / forward_len;
+    float inv_forward = fast_inv_sqrt(forward_len_sq);
     fx *= inv_forward;
     fy *= inv_forward;
     fz *= inv_forward;
@@ -97,7 +118,8 @@ static bool is_entity_in_frustum(Entity *entity, T3DVec3 cam_position, T3DVec3 c
         return false;
     }
 
-    // Distance culling
+    // Distance culling - compute actual distance only when needed
+    float distance = 1.0f / inv_dist;
     float radius = entity->scale * 50.0f;
     if (distance - radius > CAM_FAR_PLANE) {
         return false;
@@ -133,7 +155,7 @@ static void init_subsystems(void) {
     dfs_init(DFS_DEFAULT_LOCATION);
     // display_init(hi_res, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
     display_init(RESOLUTION_320x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
-    // display_set_fps_limit(60);
+    display_set_fps_limit(60);
     // display_set_fps_limit(30);
     rdpq_init();
 
@@ -157,11 +179,10 @@ static void init_subsystems(void) {
 // Cursor
 // =============================================================================
 
-static void clamp_cursor_position(void) {
+static inline void clamp_cursor_position(void) {
     cursor_position.v[0] = clampf(cursor_position.v[0], -PLAY_AREA_HALF_X, PLAY_AREA_HALF_X);
     cursor_position.v[2] = clampf(cursor_position.v[2], -PLAY_AREA_HALF_Z, PLAY_AREA_HALF_Z);
 }
-
 
 static void update_cursor(float delta_time, float cam_yaw) {
     joypad_inputs_t joypad = joypad_get_inputs(JOYPAD_PORT_1);
@@ -174,34 +195,25 @@ static void update_cursor(float delta_time, float cam_yaw) {
     float rotated_x = (joypad.stick_x * cos_yaw - joypad.stick_y * sin_yaw);
     float rotated_z = (joypad.stick_x * sin_yaw + joypad.stick_y * cos_yaw);
 
-    float stick_magnitude = sqrtf(joypad.stick_x * joypad.stick_x +
-                                  joypad.stick_y * joypad.stick_y);
+    float stick_magnitude_sq = joypad.stick_x * joypad.stick_x +
+                               joypad.stick_y * joypad.stick_y;
+    float deadzone_sq = CURSOR_DEADZONE * CURSOR_DEADZONE;
 
     if (fps_mode) {
-        // FPS mode: thrust relative to cursor facing direction
+        // FPS mode: thrust forward/backward only
         float stick_y = joypad.stick_y / 128.0f;
-        float stick_x = joypad.stick_x / 128.0f;
 
         if (fabsf(stick_y) > 0.1f && cursor_entity) {
-            // Forward/backward thrust in cursor facing direction
             float thrust_x = -sinf(cursor_entity->rotation.v[1]) * stick_y * 128.0f;
             float thrust_z = -cosf(cursor_entity->rotation.v[1]) * stick_y * 128.0f;
             cursor_velocity.v[0] += thrust_x * CURSOR_THRUST * delta_time;
             cursor_velocity.v[2] -= thrust_z * CURSOR_THRUST * delta_time;
         }
 
-        // Optional: Strafe with stick X
-        if (fabsf(stick_x) > 0.1f && cursor_entity) {
-            // Strafe perpendicular to cursor facing direction
-            float strafe_x = -cosf(cursor_entity->rotation.v[1]) * stick_x * 128.0f;
-            float strafe_z = sinf(cursor_entity->rotation.v[1]) * stick_x * 128.0f;
-            cursor_velocity.v[0] += strafe_x * CURSOR_THRUST * delta_time;
-            cursor_velocity.v[2] -= strafe_z * CURSOR_THRUST * delta_time;
-        }
-
     } else {
         // Isometric mode: rotate cursor to face stick direction
-        if (stick_magnitude > CURSOR_DEADZONE && cursor_entity) {
+        if (stick_magnitude_sq > deadzone_sq && cursor_entity) {
+            float stick_magnitude = sqrtf(stick_magnitude_sq);
             cursor_entity->rotation.v[1] = atan2f(-rotated_x, -rotated_z);
 
             cursor_look_direction.v[0] = -rotated_x / stick_magnitude;
@@ -209,7 +221,7 @@ static void update_cursor(float delta_time, float cam_yaw) {
         }
 
         // Thrust in joystick direction
-        if (stick_magnitude > CURSOR_DEADZONE) {
+        if (stick_magnitude_sq > deadzone_sq) {
             cursor_velocity.v[0] += rotated_x * CURSOR_THRUST * delta_time;
             cursor_velocity.v[2] -= rotated_z * CURSOR_THRUST * delta_time;
         }
@@ -222,17 +234,20 @@ static void update_cursor(float delta_time, float cam_yaw) {
     cursor_velocity.v[0] *= (1.0f - drag);
     cursor_velocity.v[2] *= (1.0f - drag);
 
-    // Clamp velocity to max speed
-    float speed = sqrtf(cursor_velocity.v[0] * cursor_velocity.v[0] +
-                        cursor_velocity.v[2] * cursor_velocity.v[2]);
-    if (speed > CURSOR_MAX_SPEED) {
+    // Clamp velocity to max speed using squared comparison
+    float speed_sq = cursor_velocity.v[0] * cursor_velocity.v[0] +
+                     cursor_velocity.v[2] * cursor_velocity.v[2];
+    float max_speed_sq = CURSOR_MAX_SPEED * CURSOR_MAX_SPEED;
+
+    if (speed_sq > max_speed_sq) {
+        float speed = sqrtf(speed_sq);
         float scale = CURSOR_MAX_SPEED / speed;
         cursor_velocity.v[0] *= scale;
         cursor_velocity.v[2] *= scale;
     }
 
-    // Stop completely if very slow
-    if (speed < 0.1f) {
+    // Stop completely if very slow (0.1f * 0.1f = 0.01f)
+    if (speed_sq < 0.01f) {
         cursor_velocity.v[0] = 0.0f;
         cursor_velocity.v[2] = 0.0f;
     }
@@ -297,27 +312,41 @@ static float calculate_asteroid_damage(Entity *asteroid) {
     float mass = asteroid->scale * asteroid->scale * asteroid->scale;
 
     // Kinetic energy = 0.5 * mass * velocity^2
-    float kinetic_energy = 0.5f * mass * asteroid->speed * asteroid->speed;
+    float kinetic_energy = 0.25f * mass * asteroid->speed * asteroid->speed;
 
     return kinetic_energy * DAMAGE_MULTIPLIER;
 }
 
-static void check_station_asteroid_collisions(Entity *station, Entity *asteroids, int count) {
+static float station_iframe_timer = 0.0f;
+static const float STATION_IFRAME_DURATION = 1.0f;  // 1 second invincibility
+
+static void check_station_asteroid_collisions(Entity *station, Entity *asteroids, int count, float delta_time) {
+    // Update iframe timer
+    if (station_iframe_timer > 0.0f) {
+        station_iframe_timer -= delta_time;
+    }
+
     for (int i = 0; i < count; i++) {
         if (check_entity_intersection(station, &asteroids[i])) {
-            float damage = calculate_asteroid_damage(&asteroids[i]);
-            if (damage <= MAX_DAMAGE) {
-                damage = MAX_DAMAGE;
-            }
-            station->value -= damage;
-            // Clamp to zero
-            if (station->value < 0) {
-                station->value = 0;
-            }
-            // Visual feedback
-            start_entity_color_flash(station, RGBA32(255, 0, 0, 255), 0.5f);
+            // Only apply damage if not in iframe period
+            if (station_iframe_timer <= 0.0f) {
+                float damage = calculate_asteroid_damage(&asteroids[i]);
+                if (damage <= MAX_DAMAGE) {
+                    damage = MAX_DAMAGE;
+                }
+                station->value -= damage;
+                // Clamp to zero
+                if (station->value < 0) {
+                    station->value = 0;
+                }
+                // Visual feedback
+                start_entity_color_flash(station, RGBA32(255, 0, 0, 255), 0.5f);
 
-            // Reset asteroid so it doesn't keep hitting
+                // Start iframe period
+                station_iframe_timer = STATION_IFRAME_DURATION;
+            }
+
+            // Always reset asteroid to prevent multiple collisions
             reset_entity(&asteroids[i], ASTEROID);
         }
     }
@@ -327,8 +356,8 @@ static void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, 
     for (int i = 0; i < count; i++) {
         if (check_entity_intersection(cursor, &asteroids[i])) {
             float damage = calculate_asteroid_damage(&asteroids[i]);
-            if (damage <= MAX_DAMAGE) {
-                damage = MAX_DAMAGE;
+            if (damage <= MAX_DAMAGE/1.5f) {
+                damage = MAX_DAMAGE/1.5f;
             }
             cursor->value -= damage;
 
@@ -407,11 +436,11 @@ static void mine_resource(Entity *entity, Entity *resource, float delta_time) { 
 
     resource_val = resource->value;
 
-    if (resource->value <= 0 || resource->value == 0) {
+    if (resource->value <= 0) {
         mining_accumulated = 0.0f;  // Reset accumulator
         resource->value = 0;
         resource->color = COLOR_ASTEROID;
-        // move_drone_elsewhere(drone, delta_time, true);
+        entity->value += 5; // replenish some energy on resource depletion
         reset_entity(resource, RESOURCE);
     }
 }
@@ -431,25 +460,24 @@ static void drone_mine_resource(Entity *entity, Entity *resource, float delta_ti
 
     resource_val = resource->value;
 
-    if (resource->value <= 0 || resource->value == 0) {
+    if (resource->value <= 0) {
         drone_mining_accumulated = 0.0f;  // Reset accumulator
         resource->value = 0;
         resource->color = COLOR_ASTEROID;
-        // move_drone_elsewhere(drone, delta_time, true);
         reset_entity(resource, RESOURCE);
     }
 }
 
-static void check_entity_resource_collisions(Entity *entity, Entity *resources, int count, float delta_time) {
+static void check_cursor_resource_collisions(Entity *cursor, Entity *resources, int count, float delta_time) {
     mining_resource = -1;
 
     for (int i = 0; i < count; i++) {
-        if (check_entity_intersection(entity, &resources[i])) {
+        if (check_entity_intersection(cursor, &resources[i]) && (cursor_resource_val < CURSOR_RESOURCE_CAPACITY)) {
             resource_intersection = true;
             resources[i].color = RGBA32(255, 149, 5, 255);  // orange for mining
             play_sfx();
             mining_resource = i;
-            mine_resource(entity, &resources[i], delta_time);
+            mine_resource(cursor, &resources[i], delta_time);
             break;  // Only mine one at a time
         }
     }
@@ -458,10 +486,12 @@ static void check_entity_resource_collisions(Entity *entity, Entity *resources, 
 static T3DVec3 last_drone_position = {{0.0f, 0.0f, 0.0f}};
 static void check_drone_resource_collisions(Entity *entity, Entity *resources, int count, float delta_time) {
     mining_resource = -1;
+    drone_collecting_resource = false;  // Reset flag each frame
 
     for (int i = 0; i < count; i++) {
         if (check_entity_intersection(entity, &resources[i]) && drone_resource_val < DRONE_MAX_RESOURCES) {
             resource_intersection = true;
+            drone_collecting_resource = true;
             entity->position.v[1] = resources[i].position.v[1] + 5.0f; // hover above resource
             entity->position.v[0] = resources[i].position.v[0];
             entity->position.v[2] = resources[i].position.v[2];
@@ -477,10 +507,9 @@ static void check_drone_resource_collisions(Entity *entity, Entity *resources, i
 
 static void check_drone_station_collisions(Entity *drone, Entity *station, int count) {
         if (check_entity_intersection(drone, station)) {
-            // entity_array[i].value += drone->value;
-            // drone->value = 0;
             station->value += drone_resource_val;
             drone_resource_val = 0;
+            drone->value = drone_resource_val;
             start_entity_color_flash(station, RGBA32(0, 255, 0, 255), 0.5f);
         }
 
@@ -489,6 +518,7 @@ static void check_drone_cursor_collisions(Entity *drone, Entity *cursor, int cou
         if (check_entity_intersection(drone, cursor)) {
             cursor->value += drone_resource_val;
             drone_resource_val = 0;
+            drone->value = drone_resource_val;
             start_entity_color_flash(cursor, RGBA32(0, 255, 0, 255), 0.5f);
         }
 }
@@ -515,9 +545,7 @@ void check_cursor_station_collision(Entity *cursor, Entity *station) {
         cursor_resource_val = 0;
         start_entity_color_flash(station, RGBA32(0, 255, 0, 255), 0.5f);
     }
-
 }
-
 
 static void update_tile_visibility(Entity *tile) {
     tile->position.v[0] = move_drone ? target_position.v[0] : 0.0f;
@@ -555,23 +583,17 @@ static void process_input(float delta_time, float *cam_yaw) {
 
     if (pressed.l) reset_fps_stats();
 
-    // if (held.r) {
-    //     if (pressed.c_up) teleport_to_position(-576.6f, 276.0f, cam_yaw, &cursor_position);
-    //     else if (pressed.c_right) teleport_to_position(-489.6f, -470.0f, cam_yaw, &cursor_position);
-    //     else if (pressed.c_down) teleport_to_position(690.6f, -519.0f, cam_yaw, &cursor_position);
-    //     else if (pressed.c_left) teleport_to_position(730.6f, 378.0f, cam_yaw, &cursor_position);
-    //     else if (pressed.z) teleport_to_position(0.0f, 0.0f, cam_yaw, &cursor_position);
-    // }
-
     if (pressed.start) render_debug = !render_debug;
 
-    drone_heal = false;
-    if (held.c_left) {
-       drone_heal = true;
-    }
-    if (pressed.c_left && cursor_entity) {
+    drone_heal = held.a;
+
+    if (pressed.a && cursor_entity) {
         target_rotation = cursor_entity->rotation.v[1];
-        target_position = cursor_position;
+        // target_position = cursor_position;
+        float offset_distance = 30.0f;  // How far in front of cursor
+        target_position.v[0] = cursor_position.v[0] - cursor_look_direction.v[0] * offset_distance;
+        target_position.v[1] = cursor_position.v[1];
+        target_position.v[2] = cursor_position.v[2] - cursor_look_direction.v[2] * offset_distance;
         move_drone = true;
     }
 
@@ -630,6 +652,10 @@ static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset
     rdpq_sync_pipe();
     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, x + bar_width + 5, y + bar_height, "%s", label);
 
+    if (drone_collecting_resource) {
+        rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, x + bar_width + 50, y + bar_height, " Drilling");
+    }
+
 }
 
 static void draw_health_bars(void) {
@@ -687,11 +713,12 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     t3d_screen_clear_depth();
     setup_lighting();
 
-
     // // Skip culling for specific entities
     bool entity_skip_culling[ENTITY_COUNT] = {false};
     entity_skip_culling[ENTITY_GRID] = true;     // Always draw grid
     entity_skip_culling[ENTITY_STATION] = false;  // Always draw station (optional)
+    entity_skip_culling[ENTITY_CURSOR] = true;  // Always draw station (optional)
+
 
     draw_entities_culled(entities, ENTITY_COUNT, entity_skip_culling);
     draw_entities_culled(asteroids, ASTEROID_COUNT, NULL);
@@ -725,6 +752,7 @@ int main(void) {
     entities[ENTITY_DRONE] = create_entity("rom:/drone.t3dm", (T3DVec3){{20.0f, DEFAULT_HEIGHT, 29.0f}}, 0.25f, COLOR_DRONE, DRAW_TEXTURED_LIT, 30.0f);
     entities[ENTITY_TILE] = create_entity("rom:/tile.t3dm", (T3DVec3){{0, 1000, 0}}, 1.0f, COLOR_TILE, DRAW_SHADED, 0.0f);
     entities[ENTITY_STATION] = create_entity("rom:/station2.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}}, 1.00f, COLOR_STATION, DRAW_SHADED, 30.0f);
+
     entities[ENTITY_STATION].value = STATION_MAX_HEALTH;
 
     init_asteroids(asteroids, ASTEROID_COUNT);
@@ -749,6 +777,13 @@ int main(void) {
         joypad_poll();
         process_input(delta_time, &cam_yaw);
 
+
+        // #define FIXED_TIMESTEP (1.0f / 60.0f)
+
+
+        // // Use fixed timestep for physics
+        // float physics_dt = FIXED_TIMESTEP;
+        // update_cursor(physics_dt, cam_yaw);
         update_cursor(delta_time, cam_yaw);
         update_camera(&viewport, cam_yaw, delta_time, cursor_position, fps_mode, cursor_entity);
 
@@ -770,22 +805,19 @@ int main(void) {
 
         reset_resource_colors(resources, RESOURCE_COUNT);
 
-        check_entity_resource_collisions(&entities[ENTITY_CURSOR], resources, RESOURCE_COUNT, delta_time);
+        check_cursor_resource_collisions(&entities[ENTITY_CURSOR], resources, RESOURCE_COUNT, delta_time);
         check_drone_resource_collisions(&entities[ENTITY_DRONE], resources, RESOURCE_COUNT, delta_time);
         check_drone_station_collisions(&entities[ENTITY_DRONE], &entities[ENTITY_STATION], 1);
         if (drone_heal  ) {
             check_drone_cursor_collisions(&entities[ENTITY_DRONE], &entities[ENTITY_CURSOR], 1);
         }
-        check_station_asteroid_collisions(&entities[ENTITY_STATION], asteroids, ASTEROID_COUNT);
+        check_station_asteroid_collisions(&entities[ENTITY_STATION], asteroids, ASTEROID_COUNT, delta_time);
         check_cursor_station_collision(&entities[ENTITY_CURSOR], &entities[ENTITY_STATION]);
         check_cursor_asteroid_collisions(&entities[ENTITY_CURSOR], asteroids, ASTEROID_COUNT);
 
         update_color_flashes(delta_time);
         update_fps_stats(delta_time);
         render_frame(&viewport, background, cam_yaw);
-        update_audio();
-
-
     }
 
     stop_bgm();
