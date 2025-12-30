@@ -13,3 +13,4 @@ const char* get_compass_direction(float angle) {
     if (angle < 13.0f * T3D_PI / 8.0f) return "W";
     return "NW";
 }
+

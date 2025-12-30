@@ -25,5 +25,19 @@ static inline float randomize_float(float min, float max) {
 
 const char* get_compass_direction(float angle);
 
+static inline float fast_inv_sqrt(float x) {
+    // Quake III algorithm with union to avoid strict-aliasing issues
+    union {
+        float f;
+        int32_t i;
+    } conv;
+
+    float halfx = 0.5f * x;
+    conv.f = x;
+    conv.i = 0x5f3759df - (conv.i >> 1);
+    conv.f = conv.f * (1.5f - (halfx * conv.f * conv.f));
+    return conv.f;
+}
+
 
 #endif

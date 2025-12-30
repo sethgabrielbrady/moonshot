@@ -62,13 +62,15 @@
 #define TWO_PI             (2.0f * T3D_PI)
 
 // Colors
-#define COLOR_MAP          RGBA32(150, 150, 150, 5)
+#define COLOR_MAP          RGBA32(150, 150, 150, 25)
 #define COLOR_CURSOR       RGBA32(220, 220, 220, 255)
-#define COLOR_DRONE        RGBA32(137, 252, 0, 255)
+#define COLOR_DRONE        RGBA32(255, 0, 155, 255)
 #define COLOR_STATION      RGBA32(200, 200, 200, 255)
 #define COLOR_RING         RGBA32(150, 150, 150, 255)
-#define COLOR_TILE         RGBA32(255, 149, 5, 150)
-#define COLOR_ASTEROID     RGBA32(78, 56, 34, 255)
+#define COLOR_TILE         RGBA32(255, 149, 5, 120)
+#define COLOR_ASTEROID     RGBA32(108, 136, 64, 255)
+// #define COLOR_ASTEROID     RGBA32(78, 56, 34, 255)
+
 #define COLOR_RESOURCE     RGBA32(27, 154, 170, 255)
 
 

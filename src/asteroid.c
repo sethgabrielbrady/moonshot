@@ -5,20 +5,7 @@
 #include <math.h>
 #include <stdint.h>
 
-// Fast inverse square root for efficient normalization
-static inline float fast_inv_sqrt(float x) {
-    // Quake III algorithm with union to avoid strict-aliasing issues
-    union {
-        float f;
-        int32_t i;
-    } conv;
 
-    float halfx = 0.5f * x;
-    conv.f = x;
-    conv.i = 0x5f3759df - (conv.i >> 1);
-    conv.f = conv.f * (1.5f - (halfx * conv.f * conv.f));
-    return conv.f;
-}
 
 
 void get_asteroid_velocity_and_scale (Entity *asteroid, T3DVec3 *out_velocity) {
@@ -140,7 +127,7 @@ void update_resources(Entity *resources, int count, float delta_time) {
 void init_asteroids(Entity *asteroids, int count) {
     for (int i = 0; i < count; i++) {
         asteroids[i] = create_entity("rom:/asteroid2.t3dm", (T3DVec3){{0, 10, 0}},
-                                      randomize_float(0.1f, 1.3f), COLOR_ASTEROID, DRAW_SHADED, 10.0f);
+                                      randomize_float(0.1f, 1.3f), COLOR_ASTEROID, DRAW_TEXTURED_LIT, 10.0f);
         // Set up velocity and speed first
        reset_entity(&asteroids[i], ASTEROID);
         // Then override position to scatter them across the field initially

@@ -61,20 +61,20 @@ static bool drone_moving_to_station = false;
 
 // float delta_time = 0.0f;
 
-// Fast inverse square root for efficient normalization
-static inline float fast_inv_sqrt(float x) {
-    // Quake III algorithm with union to avoid strict-aliasing issues
-    union {
-        float f;
-        int32_t i;
-    } conv;
+// // Fast inverse square root for efficient normalization
+// static inline float fast_inv_sqrt(float x) {
+//     // Quake III algorithm with union to avoid strict-aliasing issues
+//     union {
+//         float f;
+//         int32_t i;
+//     } conv;
 
-    float halfx = 0.5f * x;
-    conv.f = x;
-    conv.i = 0x5f3759df - (conv.i >> 1);
-    conv.f = conv.f * (1.5f - (halfx * conv.f * conv.f));
-    return conv.f;
-}
+//     float halfx = 0.5f * x;
+//     conv.f = x;
+//     conv.i = 0x5f3759df - (conv.i >> 1);
+//     conv.f = conv.f * (1.5f - (halfx * conv.f * conv.f));
+//     return conv.f;
+// }
 
 void draw_pause_menu(void) {
     int padding_x = SCREEN_WIDTH * 0.2f;
@@ -802,8 +802,8 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
     int bar_height = 4;
 
     // Position in lower right
-    int x = SCREEN_WIDTH - bar_width - 60;
-    int y = SCREEN_HEIGHT - 20 - y_offset;
+    int x = SCREEN_WIDTH - bar_width - 80;
+    int y = SCREEN_HEIGHT - y_offset;
 
     float resource_percent = resource_val / max_value;
 
@@ -918,11 +918,9 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     entity_skip_culling[ENTITY_STATION] = false;  // Always draw station (optional)
     entity_skip_culling[ENTITY_CURSOR] = true;  // Always draw station (optional)
 
-
     draw_entities_culled(entities, ENTITY_COUNT, entity_skip_culling);
     draw_entities_culled(asteroids, ASTEROID_COUNT, NULL);
     draw_entities_culled(resources, RESOURCE_COUNT, NULL);
-
     draw_info_bars();
 
     if (render_debug) {
@@ -931,8 +929,6 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     if (game_paused) {
         draw_pause_menu();
      }
-
-
 
     rdpq_detach_show();
 }
@@ -951,8 +947,7 @@ int main(void) {
     // decrease the size of asteroids and resources - increase station size
     entities[ENTITY_CURSOR] = create_entity("rom:/miner.t3dm", cursor_position, 0.5625f, COLOR_CURSOR, DRAW_TEXTURED_LIT, 10.0f);
     entities[ENTITY_CURSOR].value = CURSOR_MAX_HEALTH;
-
-    entities[ENTITY_DRONE] = create_entity("rom:/drone.t3dm", (T3DVec3){{20.0f, DEFAULT_HEIGHT, 29.0f}}, 0.25f, COLOR_DRONE, DRAW_TEXTURED_LIT, 30.0f);
+    entities[ENTITY_DRONE] = create_entity("rom:/drone.t3dm", (T3DVec3){{20.0f, DEFAULT_HEIGHT, 29.0f}}, 0.35f, COLOR_DRONE, DRAW_TEXTURED_LIT, 30.0f);
     entities[ENTITY_TILE] = create_entity("rom:/tile.t3dm", (T3DVec3){{0, 1000, 0}}, 1.0f, COLOR_TILE, DRAW_SHADED, 0.0f);
     entities[ENTITY_STATION] = create_entity("rom:/station2.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}}, 1.00f, COLOR_STATION, DRAW_SHADED, 30.0f);
 
