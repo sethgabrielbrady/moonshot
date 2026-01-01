@@ -38,14 +38,14 @@
 #define CURSOR_RESOURCE_CAPACITY 100.0f
 
 // Asteroid
-#define ASTEROID_BOUND_X   900.0f
-#define ASTEROID_BOUND_Z   900.0f
+#define ASTEROID_BOUND_X   1000.0f
+#define ASTEROID_BOUND_Z   800.0f
 #define ASTEROID_PADDING   100.0f
 
 
 //Resource
-#define RESOURCE_BOUND_X   700.0f
-#define RESOURCE_BOUND_Z   800.0f
+#define RESOURCE_BOUND_X   600.0f
+#define RESOURCE_BOUND_Z   500.0f
 #define RESOURCE_PADDING   100.0f
 #define RESOURCE_VALUE     100.0f // This will get multiplied by the scale to determine value
 #define RESOURCE_POOL_MAX  1000.0f
@@ -79,7 +79,7 @@
  #define DAMAGE_MULTIPLIER 0.001f
  #define VALUE_MULTIPLIER 20.0f
  #define STATION_MAX_HEALTH 100.0f
- #define MAX_DAMAGE 17.0f
+ #define MAX_DAMAGE 20.0f
 
 
  // Cursor physics
@@ -95,12 +95,17 @@
 #define BG_WIDTH  1024
 #define BG_HEIGHT 240
 
-#define FONT_TEXT           1
+#define FONT_CUSTOM           2
+// #define FONT_CUSTOM_TWO       3
+
+static rdpq_font_t *custom_font = NULL;
+// static rdpq_font_t *custom_font_two = NULL;
+
+
 
 
 static bool game_paused = false;
 static int menu_selection = 0;
-
 #define MENU_OPTION_RESUME   0
 #define MENU_OPTION_CAMERA   1
 #define MENU_OPTION_DEBUG    2
@@ -109,5 +114,21 @@ static int menu_selection = 0;
 #define MENU_OPTIONS_COUNT   5
 
 static bool limit30hz = false;
+static int blink_timer = 0;
+static int station_last_damage = 0;
+static int cursor_last_damage = 0;
+
+static sprite_t *station_icon = NULL;
+static sprite_t *tile_icon = NULL;
+static sprite_t *drill_icon = NULL;
+static sprite_t *drone_icon = NULL;
+static sprite_t *ship_icon = NULL;
+static sprite_t *health_icon = NULL;
+
+
+
+// Fixed timestep variables
+#define FIXED_TIMESTEP (1.0f / 60.0f)
+static float accumulator = 0.0f;
 
 #endif

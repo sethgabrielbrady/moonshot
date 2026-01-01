@@ -11,26 +11,6 @@ static float fps_avg = 0.0f;
 static float fps_total = 0.0f;
 static int fps_frame_count = 0;
 
-void reset_fps_stats(void) {
-    fps_min = 9999.0f;
-    fps_max = 0.0f;
-    fps_total = 0.0f;
-    fps_frame_count = 0;
-    fps_avg = 0.0f;
-}
-
-void update_fps_stats(float delta_time) {
-    fps_current = 1.0f / delta_time;
-
-    if (fps_current > 1.0f && fps_current < 1000.0f) {
-        if (fps_current < fps_min) fps_min = fps_current;
-        if (fps_current > fps_max) fps_max = fps_current;
-
-        fps_total += fps_current;
-        fps_frame_count++;
-        fps_avg = fps_total / fps_frame_count;
-    }
-}
 
 void render_debug_ui(T3DVec3 cursor_position, Entity *cursor_entity, bool move_drone, int resource_val, Entity entities[], int entity_count, Entity resources[], int resource_count, int culled_count, int cursor_resource_val, int drone_resource_val) {
     rdpq_sync_pipe();
@@ -40,16 +20,7 @@ void render_debug_ui(T3DVec3 cursor_position, Entity *cursor_entity, bool move_d
 
     int y = DEBUG_TEXT_Y_START;
 
-    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
-                     "fps: %.0f avg: %.0f", fps_current, fps_avg);
 
-    y += DEBUG_LINE_HEIGHT;
-    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
-                     "min: %.0f max: %.0f", fps_min, fps_max);
-
-    // y += DEBUG_LINE_HEIGHT;
-    // rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
-    //                  "ram: %dKB / %dKB", stats.used / 1024, stats.total / 1024);
 
     // y += DEBUG_LINE_HEIGHT;
     // rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
