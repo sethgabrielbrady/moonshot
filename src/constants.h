@@ -45,8 +45,8 @@
 
 
 //Resource
-#define RESOURCE_BOUND_X   600.0f
-#define RESOURCE_BOUND_Z   500.0f
+#define RESOURCE_BOUND_X   800.0f
+#define RESOURCE_BOUND_Z   600.0f
 #define RESOURCE_PADDING   100.0f
 #define RESOURCE_VALUE     100.0f // This will get multiplied by the scale to determine value
 #define RESOURCE_POOL_MAX  1000.0f

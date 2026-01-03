@@ -49,6 +49,12 @@ static float drone_mining_accumulated = 0.0f;
 
 static int frame_count = 0;
 
+// Time accumulators for consistent update rates at any FPS
+static float particle_render_timer = 0.0f;
+static float ambient_particle_timer = 0.0f;
+static float asteroid_matrix_timer = 0.0f;
+static float collision_timer = 0.0f;
+
 // Culling state arrays - computed once per frame
 static bool asteroid_visible[ASTEROID_COUNT];
 static bool resource_visible[RESOURCE_COUNT];
@@ -61,7 +67,7 @@ static bool drone_collecting_resource = false;
 static bool drone_moving_to_resource = false;
 static bool drone_moving_to_station = false;
 
-static int fps_limit = 1;  // 0=30fps, 1=60fps, 2=uncapped
+static int fps_limit = 0;  // 0=30fps, 1=60fps, 2=uncapped
 static bool render_background_enabled = false;
 static bool is_pal_system = false;  // Detected TV type
 
@@ -329,9 +335,9 @@ static void init_subsystems(void) {
     is_pal_system = (tv == TV_PAL);
 
     if (is_pal_system) {
-        display_set_fps_limit(50);  // PAL default
+        display_set_fps_limit(25);  // PAL default (30fps mode)
     } else {
-        display_set_fps_limit(60);  // NTSC/MPAL default
+        display_set_fps_limit(30);  // NTSC/MPAL default (30fps mode)
     }
     // display_set_fps_limit(30);
 
@@ -525,16 +531,13 @@ static void update_color_flashes(float delta_time) {
 static float calculate_asteroid_damage(Entity *asteroid) {
     // Mass approximation (volume scales with cube of size)
     float mass = asteroid->scale * asteroid->scale * asteroid->scale;
-
-    // Kinetic energy = 0.5 * mass * velocity^2
     float kinetic_energy = 0.25f * mass * asteroid->speed * asteroid->speed;
-
     return kinetic_energy * DAMAGE_MULTIPLIER;
 }
 
+
 static float station_iframe_timer = 0.0f;
 static const float STATION_IFRAME_DURATION = 1.0f;  // 1 second invincibility
-
 static void check_station_asteroid_collisions(Entity *station, Entity *asteroids, int count, float delta_time) {
     // Update iframe timer
     if (station_iframe_timer > 0.0f) {
@@ -564,10 +567,7 @@ static void check_station_asteroid_collisions(Entity *station, Entity *asteroids
                     station->value = 0;
                 }
                 // Visual feedback
-
-
                 // start_entity_color_flash(station, RGBA32(255, 0, 0, 255), 0.5f);
-
                 // Start iframe period
                 station_iframe_timer = STATION_IFRAME_DURATION;
             }
@@ -603,8 +603,8 @@ static void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, 
                 cursor->value = 0;
             }
 
-            // start_entity_color_flash(cursor, RGBA32(255, 0, 0, 255), 0.5f);
 
+            // start_entity_color_flash(cursor, RGBA32(255, 0, 0, 255), 0.5f);
             // Add asteroid velocity to cursor velocity (knockback)
             cursor_velocity.v[0] += asteroids[i].velocity.v[0] * KNOCKBACK_STRENGTH;
             cursor_velocity.v[2] += asteroids[i].velocity.v[2] * KNOCKBACK_STRENGTH;
@@ -1289,7 +1289,7 @@ static void render_background(sprite_t *background, float cam_yaw) {
 }
 
 
-static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_yaw) {
+static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_yaw, float delta_time) {
     culled_count = 0;
     rdpq_attach(display_get(), display_get_zbuf());
 
@@ -1325,26 +1325,45 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     // // Skip culling for specific entities
     bool entity_skip_culling[ENTITY_COUNT] = {false};
     entity_skip_culling[ENTITY_GRID] = true;     // Always draw grid
-    entity_skip_culling[ENTITY_STATION] = false;  // Always draw station (optional)
-    entity_skip_culling[ENTITY_CURSOR] = true;  // Always draw station (optional)
+    entity_skip_culling[ENTITY_CURSOR] = true;   // Always draw cursor
 
      // Draw particles
 
-    draw_entities_culled(entities, ENTITY_COUNT, entity_skip_culling, NULL);
-    // draw_entities_culled(asteroids, ASTEROID_COUNT, NULL, asteroid_visible);
-    // draw_entities_culled(resources, RESOURCE_COUNT, NULL, resource_visible);
+    // Draw opaque entities first (skip station and grid - draw them at end)
+    for (int i = 0; i < ENTITY_COUNT; i++) {
+        if (i == ENTITY_STATION || i == ENTITY_GRID) continue;  // Skip, draw at end
+
+        if (entity_skip_culling[i]) {
+            // Always draw without culling
+            draw_entity(&entities[i]);
+        } else if (is_entity_in_frustum(&entities[i], camera.position, camera.target, CAM_DEFAULT_FOV)) {
+            draw_entity(&entities[i]);
+        } else {
+            culled_count++;
+        }
+    }
 
     // Draw asteroids and resources with distance sorting for better Z-culling (disabled - better framerate without it)
     draw_entities_sorted(asteroids, ASTEROID_COUNT, NULL, asteroid_visible);
     draw_entities_sorted(resources, RESOURCE_COUNT, NULL, resource_visible);
 
-     // Only render particles every other frame for performance
-    if (frame_count % 2 == 0) {
-        draw_particles(viewport);
+    // Draw station SECOND TO LAST with transparency so other objects show through
+    if (is_entity_in_frustum(&entities[ENTITY_STATION], camera.position, camera.target, CAM_DEFAULT_FOV)) {
+        draw_entity_with_fade(&entities[ENTITY_STATION], 300.0f);
+    } else {
+        culled_count++;
+    }
 
+    // Draw grid LAST (always visible)
+    draw_entity(&entities[ENTITY_GRID]);
+
+     // Render particles at ~30Hz for performance
+    particle_render_timer += delta_time;
+    if (particle_render_timer >= 0.033f) {  // 30Hz = 1/30 = 0.033s
+        draw_particles(viewport);
+        particle_render_timer = 0.0f;
     }
     frame_count++;
-
 
     draw_fps_display(); // remove this
 
@@ -1358,7 +1377,6 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     if (game_paused) {
         draw_pause_menu();
      }
-
     rdpq_detach_show();
 }
 
@@ -1379,14 +1397,15 @@ int main(void) {
     ship_icon = sprite_load("rom:/ship.sprite");
     health_icon = sprite_load("rom:/health.sprite");
 
+    entities[ENTITY_STATION] = create_entity("rom:/stationew.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}}, 4.000f, COLOR_STATION, DRAW_TEXTURED_LIT, 30.0f);
+    entities[ENTITY_STATION].value = STATION_MAX_HEALTH;
+
     entities[ENTITY_CURSOR] = create_entity("rom:/miner.t3dm", cursor_position, 0.562605f, COLOR_CURSOR, DRAW_TEXTURED_LIT, 10.0f);
     entities[ENTITY_CURSOR].value = CURSOR_MAX_HEALTH;
-    entities[ENTITY_DRONE] = create_entity("rom:/drone.t3dm", (T3DVec3){{20.0f, DEFAULT_HEIGHT, 29.0f}}, 0.75f, COLOR_DRONE, DRAW_TEXTURED_LIT, 30.0f);
+    entities[ENTITY_DRONE] = create_entity("rom:/dronenew.t3dm", (T3DVec3){{20.0f, DEFAULT_HEIGHT, 29.0f}}, 0.55f, COLOR_DRONE, DRAW_SHADED, 30.0f);
     entities[ENTITY_TILE] = create_entity("rom:/tile.t3dm", (T3DVec3){{0, 1000, 0}}, 1.0f, COLOR_TILE, DRAW_SHADED, 0.0f);
-    entities[ENTITY_STATION] = create_entity("rom:/stationew.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}}, 0.000f, COLOR_STATION, DRAW_TEXTURED_LIT, 30.0f);
 
     // entities[ENTITY_STATION] = create_entity("rom:/ringalt.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}}, 1.0f, COLOR_STATION, DRAW_SHADED, 30.0f);
-    entities[ENTITY_STATION].value = STATION_MAX_HEALTH;
 
     init_asteroids(asteroids, ASTEROID_COUNT);
     init_resources(resources, RESOURCE_COUNT);
@@ -1429,9 +1448,11 @@ int main(void) {
 
             update_particles(delta_time);
 
-            // Update ambient particles every 3 frames for performance
-            if (frame_count % 3 == 0) {
-                update_ambient_particles(delta_time * 3.0f);  // Scale delta_time to compensate
+            // Update ambient particles at ~20Hz for performance
+            ambient_particle_timer += delta_time;
+            if (ambient_particle_timer >= 0.05f) {  // 20Hz = 1/20 = 0.05s
+                update_ambient_particles(ambient_particle_timer);
+                ambient_particle_timer = 0.0f;
             }
 
             // Update entity matrices - always update main entities
@@ -1441,13 +1462,15 @@ int main(void) {
             compute_visibility(asteroids, asteroid_visible, ASTEROID_COUNT);
             compute_visibility(resources, resource_visible, RESOURCE_COUNT);
 
-            // Update asteroid matrices only for visible ones, every other frame
-            if (frame_count % 2 == 0) {
+            // Update asteroid matrices only for visible ones at ~30Hz
+            asteroid_matrix_timer += delta_time;
+            if (asteroid_matrix_timer >= 0.033f) {  // 30Hz = 1/30 = 0.033s
                 for (int i = 0; i < ASTEROID_COUNT; i++) {
                     if (asteroid_visible[i]) {
                         update_entity_matrix(&asteroids[i]);
                     }
                 }
+                asteroid_matrix_timer = 0.0f;
             }
 
             // Update resource matrices only for visible ones
@@ -1471,10 +1494,12 @@ int main(void) {
                 check_drone_cursor_collisions(&entities[ENTITY_DRONE], &entities[ENTITY_CURSOR], 1);
             }
 
-            // Check asteroid collisions every other frame for performance
-            if (frame_count % 2 == 0) {
+            // Check asteroid collisions at ~30Hz for performance
+            collision_timer += delta_time;
+            if (collision_timer >= 0.033f) {  // 30Hz = 1/30 = 0.033s
                 check_cursor_asteroid_collisions(&entities[ENTITY_CURSOR], asteroids, ASTEROID_COUNT);
                 check_station_asteroid_collisions(&entities[ENTITY_STATION], asteroids, ASTEROID_COUNT, delta_time);
+                collision_timer = 0.0f;
             }
 
             update_color_flashes(delta_time);
@@ -1485,7 +1510,7 @@ int main(void) {
         }
 
          // Render while RSP/RDP are working
-        render_frame(&viewport, background, cam_yaw);
+        render_frame(&viewport, background, cam_yaw, delta_time);
 
         // Do audio update while waiting for rendering
         update_audio();

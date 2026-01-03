@@ -5,7 +5,24 @@
 #include <math.h>
 #include <stdint.h>
 
+// Pre-computed rotation lookup tables (eliminates all trig operations)
+#define ROTATION_TABLE_SIZE 360
+static float rotation_sin[ROTATION_TABLE_SIZE];
+static float rotation_cos[ROTATION_TABLE_SIZE];
+static bool rotation_tables_initialized = false;
 
+
+
+static void init_rotation_tables(void) {
+    if (rotation_tables_initialized) return;
+
+    for (int i = 0; i < ROTATION_TABLE_SIZE; i++) {
+        float angle = i * M_PI / 180.0f;
+        rotation_sin[i] = sinf(angle);
+        rotation_cos[i] = cosf(angle);
+    }
+    rotation_tables_initialized = true;
+}
 
 void get_asteroid_velocity_and_scale (Entity *asteroid, T3DVec3 *out_velocity) {
     asteroid->speed = randomize_float(200.0f, 450.0f);
@@ -37,28 +54,32 @@ void reset_entity(Entity *entity, EntityType type ) {
     }
     // asteroid->scale = randomize_float(0.1f, 1.3f);
 
+    // Use smaller bounds for resources (800, 600 instead of 1000, 800)
+    float bound_x = (type == RESOURCE) ? RESOURCE_BOUND_X : ASTEROID_BOUND_X;
+    float bound_z = (type == RESOURCE) ? RESOURCE_BOUND_Z : ASTEROID_BOUND_Z;
+
     switch (edge) {
         case 0:
-            entity->position.v[0] = randomize_float(-ASTEROID_BOUND_X, ASTEROID_BOUND_X);
-            entity->position.v[2] = -ASTEROID_BOUND_Z;
+            entity->position.v[0] = randomize_float(-bound_x, bound_x);
+            entity->position.v[2] = -bound_z;
             entity->velocity.v[0] = randomize_float(-0.5f, 0.5f);
             entity->velocity.v[2] = randomize_float(0.3f, 1.0f);
             break;
         case 1:
-            entity->position.v[0] = randomize_float(-ASTEROID_BOUND_X, ASTEROID_BOUND_X);
-            entity->position.v[2] = ASTEROID_BOUND_Z;
+            entity->position.v[0] = randomize_float(-bound_x, bound_x);
+            entity->position.v[2] = bound_z;
             entity->velocity.v[0] = randomize_float(-0.5f, 0.5f);
             entity->velocity.v[2] = randomize_float(-1.0f, -0.3f);
             break;
         case 2:
-            entity->position.v[0] = ASTEROID_BOUND_X;
-            entity->position.v[2] = randomize_float(-ASTEROID_BOUND_Z, ASTEROID_BOUND_Z);
+            entity->position.v[0] = bound_x;
+            entity->position.v[2] = randomize_float(-bound_z, bound_z);
             entity->velocity.v[0] = randomize_float(-1.0f, -0.3f);
             entity->velocity.v[2] = randomize_float(-0.5f, 0.5f);
             break;
         case 3:
-            entity->position.v[0] = -ASTEROID_BOUND_X;
-            entity->position.v[2] = randomize_float(-ASTEROID_BOUND_Z, ASTEROID_BOUND_Z);
+            entity->position.v[0] = -bound_x;
+            entity->position.v[2] = randomize_float(-bound_z, bound_z);
             entity->velocity.v[0] = randomize_float(0.3f, 1.0f);
             entity->velocity.v[2] = randomize_float(-0.5f, 0.5f);
             break;
@@ -93,10 +114,11 @@ void move_entity(Entity *entity, float delta_time, EntityType type) {
     entity->position.v[0] += entity->velocity.v[0] * move_amount;
     entity->position.v[2] += entity->velocity.v[2] * move_amount;
 
-    // Update rotation with cached value
-    entity->rotation.v[0] += move_amount * 0.05f;
+    // Pre-computed Y rotation (eliminates trig operations completely)
     entity->rotation.v[1] += move_amount * 0.03f;
-    entity->rotation.v[2] += move_amount * 0.02f;
+    // Keep rotation in valid range for lookup table
+    while (entity->rotation.v[1] >= 360.0f) entity->rotation.v[1] -= 360.0f;
+    while (entity->rotation.v[1] < 0.0f) entity->rotation.v[1] += 360.0f;
 
     // Early exit boundary check with optimized pattern
     float bound_x = ASTEROID_BOUND_X + ASTEROID_PADDING;
@@ -124,6 +146,9 @@ void update_resources(Entity *resources, int count, float delta_time) {
 }
 
 void init_asteroids(Entity *asteroids, int count) {
+    // Initialize rotation lookup tables once
+    init_rotation_tables();
+
     for (int i = 0; i < count; i++) {
         asteroids[i] = create_entity("rom:/asteroid.t3dm", (T3DVec3){{0, 10, 0}},
                                       randomize_float(0.1f, 1.3f), COLOR_ASTEROID, DRAW_SHADED, 10.0f);
@@ -138,6 +163,9 @@ void init_asteroids(Entity *asteroids, int count) {
 
 
 void init_resources(Entity *resources, int count) {
+    // Initialize rotation lookup tables once
+    init_rotation_tables();
+
     for (int i = 0; i < count; i++) {
         resources[i] = create_entity("rom:/asteroid.t3dm", (T3DVec3){{0, 10, 0}},
                                       1.0f, COLOR_RESOURCE, DRAW_SHADED, 10.0f);
