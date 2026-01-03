@@ -132,6 +132,17 @@ typedef struct {
   color_t color;
 } PointLight;
 
+
+typedef struct {
+    T3DVec3 position;
+    T3DVec3 velocity;
+    color_t color;
+    float size;
+    float lifetime;
+    float max_lifetime;
+    bool active;
+} ParticleData;
+
 // resolution_t hi_res = {
 //   .width = 640,
 //   .height = 480,

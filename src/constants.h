@@ -62,7 +62,7 @@
 #define TWO_PI             (2.0f * T3D_PI)
 
 // Colors
-#define COLOR_MAP          RGBA32(150, 150, 150, 25)
+#define COLOR_MAP          RGBA32(255, 255, 255, 35)
 #define COLOR_CURSOR       RGBA32(220, 220, 220, 255)
 #define COLOR_DRONE        RGBA32(255, 0, 155, 255)
 #define COLOR_STATION      RGBA32(200, 200, 200, 255)

@@ -2,6 +2,7 @@
 #include "constants.h"
 #include "utils.h"
 #include "camera.h"
+#include "types.h"
 #include <rdpq.h>
 
 static float fps_min = 9999.0f;
@@ -12,7 +13,7 @@ static float fps_total = 0.0f;
 static int fps_frame_count = 0;
 
 
-void render_debug_ui(T3DVec3 cursor_position, Entity *cursor_entity, bool move_drone, int resource_val, Entity entities[], int entity_count, Entity resources[], int resource_count, int culled_count, int cursor_resource_val, int drone_resource_val) {
+void render_debug_ui(T3DVec3 cursor_position, Entity entities[], Entity resources[], int resource_count, int culled_count, int cursor_resource_val, int drone_resource_val) {
     rdpq_sync_pipe();
 
     heap_stats_t stats;
@@ -27,9 +28,9 @@ void render_debug_ui(T3DVec3 cursor_position, Entity *cursor_entity, bool move_d
     //                  "cam: %.0f %.0f %.0f",
     //                  camera.position.v[0], camera.position.v[1], camera.position.v[2]);
 
-    // y += DEBUG_LINE_HEIGHT;
-    // rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
-    //                  "cursor: %.0f %.0f", cursor_position.v[0], cursor_position.v[2]);
+    y += DEBUG_LINE_HEIGHT;
+    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
+                     "cursor: %.0f %.0f", cursor_position.v[0], cursor_position.v[2]);
 
     // if (cursor_entity) {
     //     y += DEBUG_LINE_HEIGHT;
@@ -41,9 +42,6 @@ void render_debug_ui(T3DVec3 cursor_position, Entity *cursor_entity, bool move_d
     // rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
     //                  "drone: %s", move_drone ? "moving" : "idle");
 
-    // y += DEBUG_LINE_HEIGHT;
-    // rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
-    //                  "resource_val: %d", resource_val);
 
     //for each resource, print its value
     // for (int i = 0; i < resource_count; i++) {
@@ -60,9 +58,9 @@ void render_debug_ui(T3DVec3 cursor_position, Entity *cursor_entity, bool move_d
     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
                      "station value: %d", entities[ENTITY_STATION].value);
 
-    y += DEBUG_LINE_HEIGHT;
-    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
-                 "culled: %d", culled_count);
+    // y += DEBUG_LINE_HEIGHT;
+    // rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
+    //              "culled: %d", culled_count);
 
      y += DEBUG_LINE_HEIGHT;
     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
@@ -72,9 +70,6 @@ void render_debug_ui(T3DVec3 cursor_position, Entity *cursor_entity, bool move_d
     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
                  "drone_resource_val: %d", drone_resource_val);
 
-    y += DEBUG_LINE_HEIGHT;
-    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
-                 "frames 30: %d", limit30hz);
 //      y += DEBUG_LINE_HEIGHT;
 
 //     if (fabsf(cursor_velocity.v[0]) > 0.01f || fabsf(cursor_velocity.v[2]) > 0.01f) {
