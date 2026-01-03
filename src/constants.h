@@ -21,6 +21,7 @@
 // Playable Area
 #define PLAY_AREA_HALF_X   832.0f
 #define PLAY_AREA_HALF_Z   640.0f
+#define PLAY_AREA_SIZE     840.0f  // Used for particle boundaries
 
 
 // Drone
@@ -62,13 +63,14 @@
 #define TWO_PI             (2.0f * T3D_PI)
 
 // Colors
-#define COLOR_MAP          RGBA32(255, 255, 255, 35)
-#define COLOR_CURSOR       RGBA32(220, 220, 220, 255)
+#define COLOR_MAP          RGBA32(255, 255, 255, 55)
+#define COLOR_CURSOR       RGBA32(240, 240, 240, 255)
 #define COLOR_DRONE        RGBA32(255, 0, 155, 255)
-#define COLOR_STATION      RGBA32(200, 200, 200, 255)
+#define COLOR_STATION      RGBA32(220, 220, 220, 255)
 #define COLOR_RING         RGBA32(150, 150, 150, 255)
 #define COLOR_TILE         RGBA32(255, 149, 5, 120)
 #define COLOR_ASTEROID     RGBA32(108, 136, 64, 255)
+#define COLOR_SPARKS       RGBA32(255, 220, 0, 255)
 // #define COLOR_ASTEROID     RGBA32(78, 56, 34, 255)
 
 #define COLOR_RESOURCE     RGBA32(27, 154, 170, 255)
@@ -88,7 +90,7 @@
 #define CURSOR_MAX_SPEED     300.0f    // Maximum velocity
 #define FPS_ROTATION_SPEED   3.0f  // Adjust for faster/slower rotation
 
-#define KNOCKBACK_STRENGTH 300.5f
+#define KNOCKBACK_STRENGTH   500.5f
 
 
 // background
@@ -111,7 +113,9 @@ static int menu_selection = 0;
 #define MENU_OPTION_DEBUG    2
 #define MENU_OPTION_AUDIO    3
 #define MENU_OPTION_30HZ     4
-#define MENU_OPTIONS_COUNT   5
+#define MENU_OPTION_BG       5
+#define MENU_OPTIONS_COUNT   6
+
 
 static bool limit30hz = false;
 static int blink_timer = 0;

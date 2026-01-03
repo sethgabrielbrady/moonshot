@@ -143,17 +143,4 @@ typedef struct {
     bool active;
 } ParticleData;
 
-// resolution_t hi_res = {
-//   .width = 640,
-//   .height = 480,
-//   .interlaced = true
-// };
-
-// resolution_t lo_res = {
-//   .width = 320,
-//   .height = 240,
-//   .interlaced = false
-// };
-
-
 #endif

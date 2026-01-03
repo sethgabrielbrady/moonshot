@@ -48,8 +48,9 @@ if (fps_mode && cursor_entity) {
     // Rotate with joystick X
     joypad_inputs_t joypad = joypad_get_inputs(JOYPAD_PORT_1);
     float stick_x = joypad.stick_x / 128.0f;
+    float abs_stick_x = fabsf(stick_x);
 
-    if (fabsf(stick_x) > 0.1f) {
+    if (abs_stick_x > 0.1f) {
         float rotation_delta = stick_x * FPS_ROTATION_SPEED * delta_time;
         cursor_entity->rotation.v[1] = normalize_angle(cursor_entity->rotation.v[1] + rotation_delta);
 

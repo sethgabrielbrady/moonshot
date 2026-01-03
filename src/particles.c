@@ -2,12 +2,25 @@
 #include <t3d/t3d.h>
 #include <t3d/tpx.h>
 #include <stdlib.h>
+#include <math.h>
 #include "types.h"
 #include "constants.h"
+#include "camera.h"
 
-#define MAX_PARTICLES 256
+#define MAX_PARTICLES 384
+#define MAX_AMBIENT_PARTICLES 256
 
 int debug_particle_count = 0;
+
+typedef struct {
+    T3DVec3 position;
+    T3DVec3 velocity;
+    float speed;
+    float size;
+    bool active;
+} AmbientParticle;
+
+static AmbientParticle ambient_particles[MAX_AMBIENT_PARTICLES];
 
 
 // typedef struct {
@@ -64,23 +77,23 @@ static void spawn_particle(T3DVec3 position, T3DVec3 velocity, color_t color, fl
 }
 
 void spawn_explosion(T3DVec3 position) {
-    for (int i = 0; i < 20; i++) {  // 20 is even
+    for (int i = 0; i < 16; i++) {  // 20 is even
         T3DVec3 velocity = {{
-            (rand() % 200 - 100) * 1.0f,
-            (rand() % 150 + 50) * 1.0f,
-            (rand() % 200 - 100) * 1.0f
+            (rand() % 250 - 100) * 1.0f,
+            (rand() % 80 + 20) * 1.0f,
+            (rand() % 250 - 100) * 1.0f
         }};
         // color_t color = RGBA32(255, 150 + (rand() % 105), 50, 255);
         // float size = 0.010f + (rand() % 20) * 0.01f;
 
 
         // if fps_mode is enabled, make particles smaller
-        spawn_particle(position, velocity, COLOR_CURSOR, 0.04f , 0.8f + (rand() % 5) * 0.1f);
+        spawn_particle(position, velocity, COLOR_SPARKS, 0.04f , 0.4f);
     }
 }
 
 void spawn_mining_sparks(T3DVec3 position) {
-    for (int i = 0; i < 6; i++) {  // Changed from 5 to 6 (even)
+    for (int i = 0; i < 4; i++) {  // Changed from 5 to 6 (even)
         T3DVec3 velocity = {{
             (rand() % 200 - 100) * 0.75f,
             // (rand() % 60 + 30) * 0.75f,
@@ -143,6 +156,13 @@ void draw_particles(T3DViewport *viewport) {
         if (!particle_data[i].active) continue;
 
         ParticleData *p = &particle_data[i];
+
+        // Frustum culling - skip particles far off-screen
+        float dx = p->position.v[0] - camera.position.v[0];
+        float dz = p->position.v[2] - camera.position.v[2];
+        float dist_sq = dx * dx + dz * dz;
+        if (dist_sq > 1000000.0f) continue;  // Skip particles >1000 units away
+
         float life_ratio = p->lifetime / p->max_lifetime;
 
         // Fade alpha based on lifetime
@@ -164,10 +184,47 @@ void draw_particles(T3DViewport *viewport) {
         tpx->posA[2] = tpx->posB[2] = pz;
         tpx->sizeA = tpx->sizeB = size_fp;
 
-        tpx->colorA[0] = tpx->colorB[0] = p->color.r;
-        tpx->colorA[1] = tpx->colorB[1] = p->color.g;
-        tpx->colorA[2] = tpx->colorB[2] = p->color.b;
+        // Fill color arrays efficiently
+        uint8_t r = p->color.r, g = p->color.g, b = p->color.b;
+        tpx->colorA[0] = tpx->colorB[0] = r;
+        tpx->colorA[1] = tpx->colorB[1] = g;
+        tpx->colorA[2] = tpx->colorB[2] = b;
         tpx->colorA[3] = tpx->colorB[3] = alpha;
+
+        tpx++;
+        active_count++;
+    }
+
+    // Add ambient particles
+    for (int i = 0; i < MAX_AMBIENT_PARTICLES; i++) {
+        AmbientParticle *ap = &ambient_particles[i];
+        if (!ap->active) continue;
+
+        // Frustum culling - skip particles far from camera
+        float dx = ap->position.v[0] - camera.position.v[0];
+        float dz = ap->position.v[2] - camera.position.v[2];
+        float dist_sq = dx * dx + dz * dz;
+        if (dist_sq > 1500000.0f) continue;  // Skip particles >1225 units away
+
+        // Use particle's random size
+        int8_t size_fp = (int8_t)(ap->size * 64);
+
+        // Position - scale down to fit in int8_t range
+        int8_t px = (int8_t)(ap->position.v[0] * 0.1f);
+        int8_t py = (int8_t)(ap->position.v[1] * 0.1f);
+        int8_t pz = (int8_t)(ap->position.v[2] * 0.1f);
+
+        // Fill both A and B
+        tpx->posA[0] = tpx->posB[0] = px;
+        tpx->posA[1] = tpx->posB[1] = py;
+        tpx->posA[2] = tpx->posB[2] = pz;
+        tpx->sizeA = tpx->sizeB = size_fp;
+
+        // Magenta color
+        tpx->colorA[0] = tpx->colorB[0] = 101;
+        tpx->colorA[1] = tpx->colorB[1] = 67;
+        tpx->colorA[2] = tpx->colorB[2] = 33;
+        tpx->colorA[3] = tpx->colorB[3] = 255;
 
         tpx++;
         active_count++;
@@ -245,5 +302,83 @@ void cleanup_particles(void) {
     if (particle_matrix) {
         free_uncached(particle_matrix);
         particle_matrix = NULL;
+    }
+}
+
+void init_ambient_particles(void) {
+    for (int i = 0; i < MAX_AMBIENT_PARTICLES; i++) {
+        AmbientParticle *p = &ambient_particles[i];
+        p->active = true;
+
+        // Random position across the play area
+        p->position.v[0] = (rand() % ((int)PLAY_AREA_SIZE * 2)) - PLAY_AREA_SIZE;
+        p->position.v[1] = 24.0f + (rand() % 77);  // Random height between 24 and 100
+        p->position.v[2] = (rand() % ((int)PLAY_AREA_SIZE * 2)) - PLAY_AREA_SIZE;
+
+        // Random direction
+        float angle = (rand() % 360) * (3.14159f / 180.0f);
+        p->velocity.v[0] = cosf(angle);
+        p->velocity.v[1] = 0;
+        p->velocity.v[2] = sinf(angle);
+
+        // Random speed between 10-30 units
+        p->speed = 10.0f + (rand() % 20);
+
+        // Random size from 0.01f to 0.04f (half to double the base 0.02f)
+        p->size = (10 + (rand() % 31)) * 0.001f;
+    }
+}
+
+void update_ambient_particles(float delta_time) {
+    for (int i = 0; i < MAX_AMBIENT_PARTICLES; i++) {
+        AmbientParticle *p = &ambient_particles[i];
+        if (!p->active) continue;
+
+        // Move particle
+        p->position.v[0] += p->velocity.v[0] * p->speed * delta_time;
+        p->position.v[2] += p->velocity.v[2] * p->speed * delta_time;
+
+        // Check if out of bounds and respawn at random edge
+        bool out_of_bounds = false;
+
+        if (p->position.v[0] > PLAY_AREA_SIZE || p->position.v[0] < -PLAY_AREA_SIZE ||
+            p->position.v[2] > PLAY_AREA_SIZE || p->position.v[2] < -PLAY_AREA_SIZE) {
+            out_of_bounds = true;
+        }
+
+        if (out_of_bounds) {
+            // Respawn at a random edge
+            int edge = rand() % 4;
+            switch (edge) {
+                case 0: // Top edge
+                    p->position.v[0] = (rand() % ((int)PLAY_AREA_SIZE * 2)) - PLAY_AREA_SIZE;
+                    p->position.v[1] = 5.0f + (rand() % 77);  // Random height
+                    p->position.v[2] = -PLAY_AREA_SIZE;
+                    break;
+                case 1: // Bottom edge
+                    p->position.v[0] = (rand() % ((int)PLAY_AREA_SIZE * 2)) - PLAY_AREA_SIZE;
+                    p->position.v[1] = 5.0f + (rand() % 77);  // Random height
+                    p->position.v[2] = PLAY_AREA_SIZE;
+                    break;
+                case 2: // Left edge
+                    p->position.v[0] = -PLAY_AREA_SIZE;
+                    p->position.v[1] = 5.0f + (rand() % 77);  // Random height
+                    p->position.v[2] = (rand() % ((int)PLAY_AREA_SIZE * 2)) - PLAY_AREA_SIZE;
+                    break;
+                case 3: // Right edge
+                    p->position.v[0] = PLAY_AREA_SIZE;
+                    p->position.v[1] = 5.0f + (rand() % 77);  // Random height
+                    p->position.v[2] = (rand() % ((int)PLAY_AREA_SIZE * 2)) - PLAY_AREA_SIZE;
+                    break;
+            }
+
+
+            // New random direction
+            float angle = (rand() % 360) * (3.14159f / 180.0f);
+            p->velocity.v[0] = cosf(angle);
+            p->velocity.v[2] = sinf(angle);
+            p->speed = 10.0f + (rand() % 20);
+            p->size = (10 + (rand() % 31)) * 0.001f;
+        }
     }
 }

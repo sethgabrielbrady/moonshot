@@ -32,7 +32,7 @@ void update_entity_matrices(Entity *entity_array, int count) {
     }
 }
 
-inline void rotate_entity(Entity *entity, float delta_time, float speed) {
+void rotate_entity(Entity *entity, float delta_time, float speed) {
     entity->rotation.v[1] += delta_time * speed;
     // Normalize to [0, TWO_PI) range
     if (entity->rotation.v[1] > TWO_PI) {
@@ -61,7 +61,7 @@ void draw_entities(Entity *entity_array, int count) {
     }
 }
 
-inline bool check_entity_intersection(Entity *a, Entity *b) {
+bool check_entity_intersection(Entity *a, Entity *b) {
     // Early exit if either has no collision radius
     if (a->collision_radius <= 0.0f || b->collision_radius <= 0.0f) return false;
 

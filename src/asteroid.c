@@ -7,7 +7,6 @@
 
 
 
-
 void get_asteroid_velocity_and_scale (Entity *asteroid, T3DVec3 *out_velocity) {
     asteroid->speed = randomize_float(200.0f, 450.0f);
     asteroid->scale = randomize_float(0.1f, 1.3f);
@@ -83,7 +82,7 @@ void move_entity(Entity *entity, float delta_time, EntityType type) {
     // Normalize velocity only if needed using fast inverse sqrt
     float len_sq = entity->velocity.v[0] * entity->velocity.v[0] +
                    entity->velocity.v[2] * entity->velocity.v[2];
-    if (len_sq > 1.01f) {  // Only normalize if significantly denormalized
+    if (len_sq > 1.1f) {  // Only normalize if significantly denormalized
         float inv_len = fast_inv_sqrt(len_sq);
         entity->velocity.v[0] *= inv_len;
         entity->velocity.v[2] *= inv_len;
@@ -126,8 +125,8 @@ void update_resources(Entity *resources, int count, float delta_time) {
 
 void init_asteroids(Entity *asteroids, int count) {
     for (int i = 0; i < count; i++) {
-        asteroids[i] = create_entity("rom:/asteroid2.t3dm", (T3DVec3){{0, 10, 0}},
-                                      randomize_float(0.1f, 1.3f), COLOR_ASTEROID, DRAW_TEXTURED_LIT, 10.0f);
+        asteroids[i] = create_entity("rom:/asteroid.t3dm", (T3DVec3){{0, 10, 0}},
+                                      randomize_float(0.1f, 1.3f), COLOR_ASTEROID, DRAW_SHADED, 10.0f);
         // Set up velocity and speed first
        reset_entity(&asteroids[i], ASTEROID);
         // Then override position to scatter them across the field initially

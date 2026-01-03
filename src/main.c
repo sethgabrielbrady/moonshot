@@ -23,6 +23,7 @@
 // Global State
 // =============================================================================
 
+
 static Entity entities[ENTITY_COUNT];
 static Entity asteroids[ASTEROID_COUNT];
 static Entity resources[RESOURCE_COUNT];
@@ -36,8 +37,6 @@ static float target_rotation = 0.0f;
 static T3DVec3 target_position;
 
 static bool render_debug = false;
-static bool resource_intersection = false;
-static bool b_press = false;
 static bool fps_mode = false;
 
 static int resource_val = 0;
@@ -48,18 +47,23 @@ static int highlighted_resource = -1;
 static float cursor_mining_accumulated = 0.0f;
 static float drone_mining_accumulated = 0.0f;
 
-static float last_thrust_x = 0.0f;
-static float last_thrust_z = 0.0f;
+static int frame_count = 0;
+
+// Culling state arrays - computed once per frame
+static bool asteroid_visible[ASTEROID_COUNT];
+static bool resource_visible[RESOURCE_COUNT];
 
 T3DVec3 cursor_look_direction = {{0.0f, 0.0f, -1.0f}};
 static ColorFlash color_flashes[MAX_COLOR_FLASHES];
 
-static T3DBvh bvh;
-static bool use_culling = true;
 static bool drone_heal = false;
 static bool drone_collecting_resource = false;
 static bool drone_moving_to_resource = false;
 static bool drone_moving_to_station = false;
+
+static int fps_limit = 1;  // 0=30fps, 1=60fps, 2=uncapped
+static bool render_background_enabled = false;
+static bool is_pal_system = false;  // Detected TV type
 
 
 static float fps_min = 9999.0f;
@@ -154,8 +158,21 @@ void draw_pause_menu(void) {
                      "Debug: %s", render_debug ? "ON" : "OFF");
     rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 3,
                      "Music: %s", bgm_playing ? "ON" : "OFF");
+
+    const char *fps_text;
+    if (is_pal_system) {
+        if (fps_limit == 0) fps_text = "25";
+        else if (fps_limit == 1) fps_text = "50";
+        else fps_text = "Uncapped";
+    } else {
+        if (fps_limit == 0) fps_text = "30";
+        else if (fps_limit == 1) fps_text = "60";
+        else fps_text = "Uncapped";
+    }
     rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 4,
-                     "FPS Limit: %s", limit30hz ? "30" : "60");
+                     "FPS Limit: %s", fps_text);
+    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 5,
+                     "Background: %s", render_background_enabled ? "ON" : "OFF");
 
     // Controls hint
     rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, y2 - 20,
@@ -215,16 +232,81 @@ static bool is_entity_in_frustum(Entity *entity, T3DVec3 cam_position, T3DVec3 c
 
 static int culled_count = 0;
 
-static void draw_entities_culled(Entity *entity_array, int count, bool *skip_culling) {
+static void draw_entities_culled(Entity *entity_array, int count, bool *skip_culling, bool *visibility) {
     for (int i = 0; i < count; i++) {
         if (skip_culling != NULL && skip_culling[i]) {
             // Always draw, don't cull
             draw_entity(&entity_array[i]);
-        } else if (is_entity_in_frustum(&entity_array[i], camera.position, camera.target, CAM_DEFAULT_FOV)) {
+        } else if (visibility != NULL && visibility[i]) {
+            // Use pre-computed visibility
+            draw_entity(&entity_array[i]);
+        } else if (visibility == NULL && is_entity_in_frustum(&entity_array[i], camera.position, camera.target, CAM_DEFAULT_FOV)) {
+            // Fall back to live check if no visibility array provided
             draw_entity(&entity_array[i]);
         } else {
             culled_count++;
         }
+    }
+}
+
+// Pre-compute frustum visibility for all entities
+static void compute_visibility(Entity *entity_array, bool *visibility, int count) {
+    for (int i = 0; i < count; i++) {
+        visibility[i] = is_entity_in_frustum(&entity_array[i], camera.position, camera.target, CAM_DEFAULT_FOV);
+    }
+}
+
+// Helper structure for distance sorting
+typedef struct {
+    int index;
+    float distance_sq;
+} EntityDistance;
+
+// Comparison function for sorting by distance (front to back)
+static int compare_distance(const void *a, const void *b) {
+    const EntityDistance *ea = (const EntityDistance *)a;
+    const EntityDistance *eb = (const EntityDistance *)b;
+    if (ea->distance_sq < eb->distance_sq) return -1;
+    if (ea->distance_sq > eb->distance_sq) return 1;
+    return 0;
+}
+
+// Optimized draw with distance sorting for better Z-culling
+static void draw_entities_sorted(Entity *entity_array, int count, bool *skip_culling, bool *visibility) {
+    static EntityDistance sorted_indices[32];  // Max entities in any array
+    int visible_count = 0;
+
+    // Build list of visible entities with distances
+    for (int i = 0; i < count; i++) {
+        bool should_draw = false;
+
+        if (skip_culling != NULL && skip_culling[i]) {
+            should_draw = true;
+        } else if (visibility != NULL && visibility[i]) {
+            should_draw = true;
+        } else if (visibility == NULL && is_entity_in_frustum(&entity_array[i], camera.position, camera.target, CAM_DEFAULT_FOV)) {
+            should_draw = true;
+        } else {
+            culled_count++;
+        }
+
+        if (should_draw) {
+            float dx = entity_array[i].position.v[0] - camera.position.v[0];
+            float dz = entity_array[i].position.v[2] - camera.position.v[2];
+            sorted_indices[visible_count].index = i;
+            sorted_indices[visible_count].distance_sq = dx * dx + dz * dz;
+            visible_count++;
+        }
+    }
+
+    // Sort by distance (front to back for better Z-culling)
+    if (visible_count > 1) {
+        qsort(sorted_indices, visible_count, sizeof(EntityDistance), compare_distance);
+    }
+
+    // Draw in sorted order
+    for (int i = 0; i < visible_count; i++) {
+        draw_entity(&entity_array[sorted_indices[i].index]);
     }
 }
 
@@ -240,11 +322,18 @@ static void init_subsystems(void) {
     dfs_init(DFS_DEFAULT_LOCATION);
     // display_init(hi_res, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
     // display_init(RESOLUTION_320x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_DISABLED);
-    display_init(RESOLUTION_320x240, DEPTH_16_BPP, 3, GAMMA_CORRECT, FILTERS_RESAMPLE_ANTIALIAS);
+    display_init(RESOLUTION_320x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
 
+    // Detect TV type and set appropriate default FPS
+    tv_type_t tv = get_tv_type();
+    is_pal_system = (tv == TV_PAL);
 
-    // display_set_fps_limit(60);
-    display_set_fps_limit(30);
+    if (is_pal_system) {
+        display_set_fps_limit(50);  // PAL default
+    } else {
+        display_set_fps_limit(60);  // NTSC/MPAL default
+    }
+    // display_set_fps_limit(30);
 
     rdpq_init();
 
@@ -387,6 +476,7 @@ static void update_cursor(float delta_time, float cam_yaw) {
 
 
 static void start_entity_color_flash(Entity *entity, color_t flash_color, float duration_seconds) {
+    // Single pass: update existing or find free slot
     for (int i = 0; i < MAX_COLOR_FLASHES; i++) {
         if (color_flashes[i].active && color_flashes[i].entity == entity) {
             color_flashes[i].timer = 0.0f;
@@ -396,6 +486,7 @@ static void start_entity_color_flash(Entity *entity, color_t flash_color, float 
         }
     }
 
+    // Find free slot (only if existing flash not found)
     for (int i = 0; i < MAX_COLOR_FLASHES; i++) {
         if (!color_flashes[i].active) {
             color_flashes[i].entity = entity;
@@ -451,6 +542,13 @@ static void check_station_asteroid_collisions(Entity *station, Entity *asteroids
     }
 
     for (int i = 0; i < count; i++) {
+        // Distance-based early rejection - skip if too far away
+        float dx = station->position.v[0] - asteroids[i].position.v[0];
+        float dz = station->position.v[2] - asteroids[i].position.v[2];
+        float dist_sq = dx * dx + dz * dz;
+        float max_range = station->collision_radius + asteroids[i].collision_radius + 50.0f;
+        if (dist_sq > max_range * max_range) continue;
+
         if (check_entity_intersection(station, &asteroids[i])) {
             // Only apply damage if not in iframe period
             if (station_iframe_timer <= 0.0f) {
@@ -482,6 +580,16 @@ static void check_station_asteroid_collisions(Entity *station, Entity *asteroids
 
 static void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, int count) {
     for (int i = 0; i < count; i++) {
+        // Skip culled asteroids
+        if (!asteroid_visible[i]) continue;
+
+        // Distance-based early rejection
+        float dx = cursor->position.v[0] - asteroids[i].position.v[0];
+        float dz = cursor->position.v[2] - asteroids[i].position.v[2];
+        float dist_sq = dx * dx + dz * dz;
+        float max_range = cursor->collision_radius + asteroids[i].collision_radius + 30.0f;
+        if (dist_sq > max_range * max_range) continue;
+
         if (check_entity_intersection(cursor, &asteroids[i])) {
             float damage = calculate_asteroid_damage(&asteroids[i]);
             if (damage >= MAX_DAMAGE) {
@@ -495,13 +603,11 @@ static void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, 
                 cursor->value = 0;
             }
 
-
             // start_entity_color_flash(cursor, RGBA32(255, 0, 0, 255), 0.5f);
 
             // Add asteroid velocity to cursor velocity (knockback)
             cursor_velocity.v[0] += asteroids[i].velocity.v[0] * KNOCKBACK_STRENGTH;
             cursor_velocity.v[2] += asteroids[i].velocity.v[2] * KNOCKBACK_STRENGTH;
-
 
             reset_entity(&asteroids[i], ASTEROID);
         }
@@ -600,7 +706,7 @@ void draw_mining_point_light(T3DVec3 cursor_pos, T3DVec3 look_dir) {
     cursor_pos.v[1] + 40.0f,  // Slightly above cursor
     cursor_pos.v[2] - look_dir.v[2] * offset_distance
   }};
-  t3d_light_set_point(1, light_color, &light_pos, 300.0f, false);  // Much larger radius
+  t3d_light_set_point(1, light_color, &light_pos, 300.0f, false);
 }
 
 // void draw_drone_mining_point_light(T3DVec3 drone_pos) {
@@ -657,7 +763,8 @@ static void mine_resource(Entity *entity, Entity *resource, float delta_time) { 
         reset_entity(resource, RESOURCE);
     }
 }
-static void drone_mine_resource(Entity *entity, Entity *resource, float delta_time) { // this seems slower
+
+static void drone_mine_resource(Entity *entity, Entity *resource, float delta_time) {
     float amount = delta_time * DRONE_MINING_RATE;
     drone_mining_accumulated += amount;
 
@@ -687,8 +794,23 @@ static void check_cursor_resource_collisions(Entity *cursor, Entity *resources, 
     cursor_is_mining = false;
 
     for (int i = 0; i < count; i++) {
+        // Skip culled resources
+        if (!resource_visible[i]) {
+            cursor->color = COLOR_CURSOR;
+            continue;
+        }
+
+        // Distance-based early rejection
+        float dx = cursor->position.v[0] - resources[i].position.v[0];
+        float dz = cursor->position.v[2] - resources[i].position.v[2];
+        float dist_sq = dx * dx + dz * dz;
+        float max_range = cursor->collision_radius + resources[i].collision_radius + 20.0f;
+        if (dist_sq > max_range * max_range) {
+            cursor->color = COLOR_CURSOR;
+            continue;
+        }
+
         if (check_entity_intersection(cursor, &resources[i]) && (cursor_resource_val < CURSOR_RESOURCE_CAPACITY)) {
-            resource_intersection = true;
             cursor_is_mining = true;
 
             // Flicker both resource and cursor color - welder effect
@@ -710,19 +832,30 @@ static void check_cursor_resource_collisions(Entity *cursor, Entity *resources, 
             cursor_mining_resource = i;
             mine_resource(cursor, &resources[i], delta_time);
             break;  // Only mine one at a time
+        } else {
+            // Reset cursor color if not mining
+            cursor->color = COLOR_CURSOR;
         }
     }
 }
 
-static T3DVec3 last_drone_position = {{0.0f, 0.0f, 0.0f}};
 static void check_drone_resource_collisions(Entity *entity, Entity *resources, int count, float delta_time) {
     drone_mining_resource = -1;
     drone_collecting_resource = false;  // Reset flag each frame
     drone_is_mining = false;
 
     for (int i = 0; i < count; i++) {
+        // Skip culled resources
+        if (!resource_visible[i]) continue;
+
+        // Distance-based early rejection
+        float dx = entity->position.v[0] - resources[i].position.v[0];
+        float dz = entity->position.v[2] - resources[i].position.v[2];
+        float dist_sq = dx * dx + dz * dz;
+        float max_range = entity->collision_radius + resources[i].collision_radius + 20.0f;
+        if (dist_sq > max_range * max_range) continue;
+
         if (check_entity_intersection(entity, &resources[i]) && drone_resource_val < DRONE_MAX_RESOURCES) {
-            resource_intersection = true;
             drone_collecting_resource = true;
             drone_is_mining = true;
             entity->position.v[1] = resources[i].position.v[1] + 5.0f; // hover above resource
@@ -853,7 +986,17 @@ static void process_input(float delta_time, float *cam_yaw) {
                     }
                     break;
                 case MENU_OPTION_30HZ:
-                    limit30hz = !limit30hz;
+                    fps_limit = (fps_limit + 1) % 3;  // Cycle through options
+                    if (fps_limit == 0) {
+                        display_set_fps_limit(is_pal_system ? 25 : 30);
+                    } else if (fps_limit == 1) {
+                        display_set_fps_limit(is_pal_system ? 50 : 60);
+                    } else {
+                        display_set_fps_limit(0);  // 0 = uncapped
+                    }
+                    break;
+                case MENU_OPTION_BG:  // Background option (after FPS Limit)
+                    render_background_enabled = !render_background_enabled;
                     break;
             }
         }
@@ -1113,7 +1256,7 @@ static void setup_lighting(void) {
 
     rspq_block_t *dplLight; //
 
-    uint8_t color_ambient[4] = {0x40, 0x40, 0x40, 0xFF};  // Moderately darker
+    uint8_t color_ambient[4] = {0x50, 0x50, 0x50, 0xFF};  // Moderately darker
     uint8_t color_directional[4] = {0xFF, 0xFF, 0xFF, 0xFF};
 
     T3DVec3 light_dir = {{300.0f, 100.0f, 1.0f}};
@@ -1130,13 +1273,17 @@ static void render_background(sprite_t *background, float cam_yaw) {
     float normalized_yaw = fmodf(cam_yaw, 360.0f);
     if (normalized_yaw < 0) normalized_yaw += 360.0f;
 
-    int offset_x = (int)((normalized_yaw / 360.0f) * BG_WIDTH);
+    // Use multiplication instead of division: BG_WIDTH/360 = 1024/360 = 2.84444444
+    int offset_x = (int)(normalized_yaw * 2.84444444f);
+
+    // Pre-compute wrap condition
+    bool needs_wrap = (offset_x + SCREEN_WIDTH > BG_WIDTH);
 
     rdpq_set_mode_copy(false);
     rdpq_sprite_blit(background, -offset_x, 0, NULL);
 
     // Wrap for seamless loop
-    if (offset_x + SCREEN_WIDTH > BG_WIDTH) {
+    if (needs_wrap) {
         rdpq_sprite_blit(background, BG_WIDTH - offset_x, 0, NULL);
     }
 }
@@ -1146,8 +1293,14 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     culled_count = 0;
     rdpq_attach(display_get(), display_get_zbuf());
 
-    // Panning background
-    render_background(background, cam_yaw);
+    // Panning background (optional for performance testing)
+    if (render_background_enabled) {
+        render_background(background, cam_yaw);
+    } else {
+        // Clear the screen to black when background is disabled
+        rdpq_set_mode_fill(RGBA32(0, 0, 0, 255));
+        rdpq_fill_rectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    }
 
     // 3D setup
     t3d_frame_start();
@@ -1177,27 +1330,33 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
 
      // Draw particles
 
-    draw_entities_culled(entities, ENTITY_COUNT, entity_skip_culling);
-    draw_entities_culled(asteroids, ASTEROID_COUNT, NULL);
-    draw_entities_culled(resources, RESOURCE_COUNT, NULL);
+    draw_entities_culled(entities, ENTITY_COUNT, entity_skip_culling, NULL);
+    // draw_entities_culled(asteroids, ASTEROID_COUNT, NULL, asteroid_visible);
+    // draw_entities_culled(resources, RESOURCE_COUNT, NULL, resource_visible);
 
-    draw_particles(viewport);
+    // Draw asteroids and resources with distance sorting for better Z-culling (disabled - better framerate without it)
+    draw_entities_sorted(asteroids, ASTEROID_COUNT, NULL, asteroid_visible);
+    draw_entities_sorted(resources, RESOURCE_COUNT, NULL, resource_visible);
+
+     // Only render particles every other frame for performance
+    if (frame_count % 2 == 0) {
+        draw_particles(viewport);
+
+    }
+    frame_count++;
 
 
     draw_fps_display(); // remove this
 
     draw_info_bars();
 
-    // Debug: Always show mining status
-    rdpq_sync_pipe();
-    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, 10, 100,
-                     "Mining:%d Res:%d Val:%d", cursor_is_mining ? 1 : 0, cursor_mining_resource, cursor_resource_val);
+
 
     if (render_debug) {
         render_debug_ui(cursor_position, entities, resources, RESOURCE_COUNT, culled_count, cursor_resource_val, drone_resource_val);
     }
     if (game_paused) {
-        // draw_pause_menu();
+        draw_pause_menu();
      }
 
     rdpq_detach_show();
@@ -1212,7 +1371,7 @@ int main(void) {
     init_subsystems();
     T3DViewport viewport = t3d_viewport_create();
 
-    sprite_t *background = sprite_load("rom:/bg1024.sprite");
+    sprite_t *background = sprite_load("rom:/bg1024v2.sprite");
     station_icon = sprite_load("rom:/station.sprite");
     drill_icon = sprite_load("rom:/drill.sprite");
     tile_icon = sprite_load("rom:/tile2.sprite");
@@ -1224,7 +1383,9 @@ int main(void) {
     entities[ENTITY_CURSOR].value = CURSOR_MAX_HEALTH;
     entities[ENTITY_DRONE] = create_entity("rom:/drone.t3dm", (T3DVec3){{20.0f, DEFAULT_HEIGHT, 29.0f}}, 0.75f, COLOR_DRONE, DRAW_TEXTURED_LIT, 30.0f);
     entities[ENTITY_TILE] = create_entity("rom:/tile.t3dm", (T3DVec3){{0, 1000, 0}}, 1.0f, COLOR_TILE, DRAW_SHADED, 0.0f);
-    entities[ENTITY_STATION] = create_entity("rom:/stationew.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}}, 1.50f, COLOR_STATION, DRAW_TEXTURED_LIT, 30.0f);
+    entities[ENTITY_STATION] = create_entity("rom:/stationew.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}}, 0.000f, COLOR_STATION, DRAW_TEXTURED_LIT, 30.0f);
+
+    // entities[ENTITY_STATION] = create_entity("rom:/ringalt.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}}, 1.0f, COLOR_STATION, DRAW_SHADED, 30.0f);
     entities[ENTITY_STATION].value = STATION_MAX_HEALTH;
 
     init_asteroids(asteroids, ASTEROID_COUNT);
@@ -1239,6 +1400,7 @@ int main(void) {
     float cam_yaw = CAM_ANGLE_YAW;
 
     load_point_light(); // Initialize mining light (once)
+    init_ambient_particles(); // Initialize ambient background particles
 
     wav64_open(&sfx_mining, "rom:/ploop.wav64"); //mining sound effect
     play_bgm("rom:/bgm_loop.wav64"); // Start background music
@@ -1267,10 +1429,33 @@ int main(void) {
 
             update_particles(delta_time);
 
-            // Update all entity matrices in one batch
+            // Update ambient particles every 3 frames for performance
+            if (frame_count % 3 == 0) {
+                update_ambient_particles(delta_time * 3.0f);  // Scale delta_time to compensate
+            }
+
+            // Update entity matrices - always update main entities
             update_entity_matrices(entities, ENTITY_COUNT);
-            update_entity_matrices(asteroids, ASTEROID_COUNT);
-            update_entity_matrices(resources, RESOURCE_COUNT);
+
+            // Pre-compute visibility once for both collision and rendering
+            compute_visibility(asteroids, asteroid_visible, ASTEROID_COUNT);
+            compute_visibility(resources, resource_visible, RESOURCE_COUNT);
+
+            // Update asteroid matrices only for visible ones, every other frame
+            if (frame_count % 2 == 0) {
+                for (int i = 0; i < ASTEROID_COUNT; i++) {
+                    if (asteroid_visible[i]) {
+                        update_entity_matrix(&asteroids[i]);
+                    }
+                }
+            }
+
+            // Update resource matrices only for visible ones
+            for (int i = 0; i < RESOURCE_COUNT; i++) {
+                if (resource_visible[i]) {
+                    update_entity_matrix(&resources[i]);
+                }
+            }
 
             // Reset colors before collision checks
             reset_resource_colors(resources, RESOURCE_COUNT);
@@ -1278,7 +1463,6 @@ int main(void) {
             // Collision detection - order from most frequent to least
             check_cursor_resource_collisions(&entities[ENTITY_CURSOR], resources, RESOURCE_COUNT, delta_time);
             check_cursor_station_collision(&entities[ENTITY_CURSOR], &entities[ENTITY_STATION]);
-            check_cursor_asteroid_collisions(&entities[ENTITY_CURSOR], asteroids, ASTEROID_COUNT);
 
             check_drone_resource_collisions(&entities[ENTITY_DRONE], resources, RESOURCE_COUNT, delta_time);
             check_drone_station_collisions(&entities[ENTITY_DRONE], &entities[ENTITY_STATION], 1);
@@ -1287,7 +1471,11 @@ int main(void) {
                 check_drone_cursor_collisions(&entities[ENTITY_DRONE], &entities[ENTITY_CURSOR], 1);
             }
 
-            check_station_asteroid_collisions(&entities[ENTITY_STATION], asteroids, ASTEROID_COUNT, delta_time);
+            // Check asteroid collisions every other frame for performance
+            if (frame_count % 2 == 0) {
+                check_cursor_asteroid_collisions(&entities[ENTITY_CURSOR], asteroids, ASTEROID_COUNT);
+                check_station_asteroid_collisions(&entities[ENTITY_STATION], asteroids, ASTEROID_COUNT, delta_time);
+            }
 
             update_color_flashes(delta_time);
             update_fps_stats(delta_time);

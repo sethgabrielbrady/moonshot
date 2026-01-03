@@ -17,4 +17,8 @@ void spawn_mining_sparks(T3DVec3 position);
 void spawn_exhaust(T3DVec3 position, T3DVec3 direction);
 void cleanup_particles(void);
 
+// Ambient particles
+void init_ambient_particles(void);
+void update_ambient_particles(float delta_time);
+
 #endif
