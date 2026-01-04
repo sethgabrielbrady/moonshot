@@ -46,12 +46,17 @@ if (fps_mode && cursor_entity) {
     const float camera_offset = 8.0f;
 
     // Rotate with joystick X
+    joypad_buttons_t held = joypad_get_buttons_held(JOYPAD_PORT_1);
     joypad_inputs_t joypad = joypad_get_inputs(JOYPAD_PORT_1);
     float stick_x = joypad.stick_x / 128.0f;
     float abs_stick_x = fabsf(stick_x);
 
     if (abs_stick_x > 0.1f) {
-        float rotation_delta = stick_x * FPS_ROTATION_SPEED * delta_time;
+        float new_rotation_speed = FPS_ROTATION_SPEED;
+        if (held.r || held.z) {
+            new_rotation_speed *= 2.0f;  // Faster rotation when R or Z held
+        }
+        float rotation_delta = stick_x * new_rotation_speed * delta_time;
         cursor_entity->rotation.v[1] = normalize_angle(cursor_entity->rotation.v[1] + rotation_delta);
 
         // Update look direction - cache sin/cos for reuse

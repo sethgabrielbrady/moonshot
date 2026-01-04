@@ -25,11 +25,11 @@
 
 
 // Drone
-#define DEFAULT_HEIGHT        10.0f
-#define DRONE_ROTATION_SPEED  5.0f
-#define DRONE_MOVE_SPEED      1.0f
+#define DEFAULT_HEIGHT         10.0f
+#define DRONE_ROTATION_SPEED   5.0f
+#define DRONE_MOVE_SPEED       1.0f
 #define DRONE_ARRIVE_THRESHOLD 1.0f
-#define DRONE_MAX_RESOURCES      50.0f // not actually health b
+#define DRONE_MAX_RESOURCES    30.0f // not actually health b
 
 // Cursor
 #define CURSOR_SPEED       5.0f
@@ -82,6 +82,7 @@
  #define VALUE_MULTIPLIER 20.0f
  #define STATION_MAX_HEALTH 100.0f
  #define MAX_DAMAGE 20.0f
+
 
 
  // Cursor physics

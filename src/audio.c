@@ -2,15 +2,44 @@
 
 
 wav64_t sfx_mining;
+wav64_t sfx_dcom;
+wav64_t sfx_dfull;
+wav64_t sfx_shiphit;
 wav64_t bgm;
 bool bgm_playing = false;
 
-void play_sfx() {
-   if (!mixer_ch_playing(2)) {
-        wav64_play(&sfx_mining, 2);
+void play_sfx(int sfx_type) {
+    // Use switch to play only the requested sound effect
+    // Note: Stereo sounds use 2 consecutive channels, so we skip by 2
+    switch (sfx_type) {
+        case 1:  // Mining sound (uses channels 2-3)
+            if (!mixer_ch_playing(2)) {
+                wav64_play(&sfx_mining, 2);
+                mixer_ch_set_vol(2, 0.3, 0.3);
+            }
+            break;
+
+        case 2:  // Drone collecting (uses channels 4-5)
+            if (!mixer_ch_playing(4)) {
+                wav64_play(&sfx_dcom, 4);
+                mixer_ch_set_vol(4, 0.3, 0.3);
+            }
+            break;
+
+        case 3:  // Drone full (uses channels 6-7)
+            if (!mixer_ch_playing(6)) {
+                wav64_play(&sfx_dfull, 6);
+                mixer_ch_set_vol(6, 0.3, 0.3);
+            }
+            break;
+
+        case 4:  // Ship hit (uses channels 8-9)
+            if (!mixer_ch_playing(8)) {
+                wav64_play(&sfx_shiphit, 8);
+                mixer_ch_set_vol(8, 0.3, 0.3);
+            }
+            break;
     }
-    mixer_ch_set_vol(2, 0.3, 0.3);  // Left, Right
-    mixer_try_play();
 }
 
 
