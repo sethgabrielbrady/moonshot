@@ -99,9 +99,11 @@
 #define BG_HEIGHT 240
 
 #define FONT_CUSTOM           2
-// #define FONT_CUSTOM_TWO       3
+#define FONT_ICON             3
 
 static rdpq_font_t *custom_font = NULL;
+static rdpq_font_t *icon_font = NULL;
+
 // static rdpq_font_t *custom_font_two = NULL;
 
 

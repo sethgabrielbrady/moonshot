@@ -363,13 +363,15 @@ static void init_subsystems(void) {
     );
 
     custom_font = rdpq_font_load("rom:/Nebula.font64"); // fav -- nice slant but a little large- though not a bad thing favor
+    icon_font = rdpq_font_load("rom:/IconBitOne.font64"); // fav -- nice slant but a little large- though not a bad thing favor
+
     // custom_font = rdpq_font_load("rom:/Nulshock.font64"); // decent -- nice slant but a little large- though not a bad thing favor
     //custom_font = rdpq_font_load("rom:/RobotRoc.font64"); // decent -- nice slant but a little large- though not a bad thing favor
     // custom_font = rdpq_font_load("rom:/Induction.font64"); // big but might be good for title
     // custom_font = rdpq_font_load("rom:/H19A-Luna.font64"); // good for symbols
-
     rdpq_text_register_font(FONT_CUSTOM, custom_font);
-    // rdpq_text_register_font(FONT_CUSTOM_TWO, custom_font);
+    rdpq_text_register_font(FONT_ICON, icon_font);
+    // rdpq_text_register_ICON_TWO, custom_font);
 
    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){
         .color = RGBA32(255, 255, 255, 255),
