@@ -35,9 +35,12 @@ static T3DVec3 cursor_velocity = {{0.0f, 0.0f, 0.0f}};
 static bool move_drone = false;
 static float target_rotation = 0.0f;
 static T3DVec3 target_position;
+static int tile_following_resource = -1;  // Which resource the tile is following (-1 = none)
+static float tile_scale_multiplier = 1.0f;  // Animated scale for tile when moving to station
 
 static bool render_debug = false;
 static bool fps_mode = false;
+static bool hi_res_mode = false;
 
 static int resource_val = 0;
 static int drone_resource_val = 0;
@@ -66,9 +69,10 @@ static bool drone_heal = false;
 static bool drone_collecting_resource = false;
 static bool drone_moving_to_resource = false;
 static bool drone_moving_to_station = false;
+static bool drone_full = false;
 
 static int fps_limit = 0;  // 0=30fps, 1=60fps, 2=uncapped
-static bool render_background_enabled = false;
+static bool render_background_enabled = true;
 static bool is_pal_system = false;  // Detected TV type
 static int bgm_track = 1;  // 0=off, 1=track1, 2=track2, 3=track3
 
@@ -104,7 +108,7 @@ void update_fps_stats(float delta_time) {
 }
 
 static void draw_fps_display(void) {
-    int x = SCREEN_WIDTH - 120;
+    int x = display_get_width() - 120;
     int y = 10;
     int line_height = 10;
 
@@ -123,12 +127,12 @@ static void draw_fps_display(void) {
 }
 
 void draw_pause_menu(void) {
-    int padding_x = SCREEN_WIDTH * 0.2f;
+    int padding_x = display_get_width() * 0.2f;
     int padding_y = SCREEN_HEIGHT * 0.15f;
 
     int x1 = padding_x;
     int y1 = padding_y;
-    int x2 = SCREEN_WIDTH - padding_x;
+    int x2 = display_get_width() - padding_x;
     int y2 = SCREEN_HEIGHT - padding_y;
 
     rdpq_sync_pipe();
@@ -164,7 +168,7 @@ void draw_pause_menu(void) {
     rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height,
                      "Camera: %s", fps_mode ? "FPS" : "ISO");
     rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 2,
-                     "Debug: %s", render_debug ? "ON" : "OFF");
+                     "Hi-Res: %s", hi_res_mode ? "640x240" : "320x240");
 
     const char *bgm_text;
     if (bgm_track == 0) bgm_text = "OFF";
@@ -330,6 +334,7 @@ static void draw_entities_sorted(Entity *entity_array, int count, bool *skip_cul
 // Initialization
 // =============================================================================
 
+
 static void init_subsystems(void) {
     debug_init_isviewer();
     debug_init_usblog();
@@ -338,6 +343,8 @@ static void init_subsystems(void) {
     // display_init(hi_res, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
     // display_init(RESOLUTION_320x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_DISABLED);
     display_init(RESOLUTION_320x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
+    // display_init(RESOLUTION_640x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
+
 
     // Detect TV type and set appropriate default FPS
     tv_type_t tv = get_tv_type();
@@ -368,7 +375,7 @@ static void init_subsystems(void) {
     // custom_font = rdpq_font_load("rom:/Nulshock.font64"); // decent -- nice slant but a little large- though not a bad thing favor
     //custom_font = rdpq_font_load("rom:/RobotRoc.font64"); // decent -- nice slant but a little large- though not a bad thing favor
     // custom_font = rdpq_font_load("rom:/Induction.font64"); // big but might be good for title
-    // custom_font = rdpq_font_load("rom:/H19A-Luna.font64"); // good for symbols
+    // icon_font = rdpq_font_load("rom:/H19A-Luna.font64"); // good for symbols
     rdpq_text_register_font(FONT_CUSTOM, custom_font);
     rdpq_text_register_font(FONT_ICON, icon_font);
     // rdpq_text_register_ICON_TWO, custom_font);
@@ -603,7 +610,7 @@ static void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, 
         if (dist_sq > max_range * max_range) continue;
 
         if (check_entity_intersection(cursor, &asteroids[i])) {
-             play_sfx(4);
+            play_sfx(4);
             float damage = calculate_asteroid_damage(&asteroids[i]);
             if (damage >= MAX_DAMAGE * ship_damage_multiplier ) {
                 damage = MAX_DAMAGE * ship_damage_multiplier    ;
@@ -624,6 +631,7 @@ static void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, 
 
             reset_entity(&asteroids[i], ASTEROID);
         }
+
     }
 }
 
@@ -793,6 +801,7 @@ static void drone_mine_resource(Entity *entity, Entity *resource, float delta_ti
         spawn_mining_sparks(entity->position);
     }
 
+
     resource_val = resource->value;
 
     if (resource->value <= 0) {
@@ -866,6 +875,9 @@ static void check_drone_resource_collisions(Entity *entity, Entity *resources, i
     drone_collecting_resource = false;  // Reset flag each frame
     drone_is_mining = false;
 
+    // Update drone_full based on current resource level
+    drone_full = (drone_resource_val >= DRONE_MAX_RESOURCES);
+
     for (int i = 0; i < count; i++) {
         // Skip culled resources
         if (!resource_visible[i]) continue;
@@ -901,9 +913,6 @@ static void check_drone_resource_collisions(Entity *entity, Entity *resources, i
             drone_mine_resource(entity, &resources[i], delta_time);
 
             break;  // Only mine one at a time
-        } else {
-            // Reset resource color if not mining
-            // play_sfx(3);
         }
     }
 }
@@ -929,7 +938,10 @@ static void check_drone_cursor_collisions(Entity *drone, Entity *cursor, int cou
 
 static void reset_resource_colors(Entity *resources, int count) {
     for (int i = 0; i < count; i++) {
-        if (i != highlighted_resource && i != cursor_mining_resource && i != drone_mining_resource) {
+        if (i == tile_following_resource) {
+            // Resource is tagged by tile, use tile color
+            resources[i].color = COLOR_TILE;
+        } else if (i != highlighted_resource && i != cursor_mining_resource && i != drone_mining_resource) {
             resources[i].color = COLOR_RESOURCE;
         } else if (resources[i].value <= 0) {
             resources[i].color = COLOR_ASTEROID;
@@ -947,11 +959,64 @@ void check_cursor_station_collision(Entity *cursor, Entity *station) {
 }
 
 static void update_tile_visibility(Entity *tile) {
-    tile->position.v[0] = move_drone ? target_position.v[0] : 0.0f;
-    tile->position.v[1] = move_drone ? 8.0f : 1000.0f;
-    tile->position.v[2] = move_drone ? target_position.v[2] : 0.0f;
+    // Stop following if drone becomes full
+    if (drone_full && tile_following_resource >= 0) {
+        tile_following_resource = -1;
+    }
+
+    // If tile is following a resource, position it at that resource
+    if (tile_following_resource >= 0 && tile_following_resource < RESOURCE_COUNT) {
+        tile->position.v[0] = resources[tile_following_resource].position.v[0];
+        tile->position.v[1] = 8.0f;
+        tile->position.v[2] = resources[tile_following_resource].position.v[2];
+    } else if (move_drone) {
+        tile->position.v[0] = target_position.v[0];
+        tile->position.v[1] = 8.0f;
+        tile->position.v[2] = target_position.v[2];
+    } else {
+        tile->position.v[0] = 0.0f;
+        tile->position.v[1] = 1000.0f;
+        tile->position.v[2] = 0.0f;
+    }
 }
 
+static void check_tile_resource_collision(Entity *tile, Entity *resources, int count) {
+    // Only check if tile is visible and not already following something
+    if (tile->position.v[1] > 100.0f) return;  // Tile is hidden
+    if (drone_full) return;  // Don't follow resources if drone is full
+
+    for (int i = 0; i < count; i++) {
+        // Skip culled resources
+        if (!resource_visible[i]) continue;
+
+        if (check_entity_intersection(tile, &resources[i])) {
+            // Start following this resource
+            tile_following_resource = i;
+
+            // Send drone to this resource
+            target_position.v[0] = resources[i].position.v[0];
+            target_position.v[1] = resources[i].position.v[1];
+            target_position.v[2] = resources[i].position.v[2];
+            target_rotation = 0.0f;  // Face forward
+            move_drone = true;
+            drone_moving_to_resource = true;
+            drone_moving_to_station = false;
+
+            return;
+        }
+    }
+}
+
+static void check_tile_following_status(Entity *drone) {
+    // If tile is following a resource and drone reaches it, return tile
+    if (tile_following_resource >= 0 && tile_following_resource < RESOURCE_COUNT) {
+        // Check if drone is at the resource the tile is following
+        if (drone_mining_resource == tile_following_resource) {
+            // Drone reached the resource, stop following
+            tile_following_resource = -1;
+        }
+    }
+}
 
 
 // =============================================================================
@@ -960,7 +1025,7 @@ static void update_tile_visibility(Entity *tile) {
 
 static int menu_input_delay = 0;
 
-static void process_input(float delta_time, float *cam_yaw) {
+static void process_input(float delta_time, float *cam_yaw, T3DViewport *viewport) {
     joypad_inputs_t joypad = joypad_get_inputs(JOYPAD_PORT_1);
     joypad_buttons_t held = joypad_get_buttons_held(JOYPAD_PORT_1);
     joypad_buttons_t pressed = joypad_get_buttons_pressed(JOYPAD_PORT_1);
@@ -970,8 +1035,13 @@ static void process_input(float delta_time, float *cam_yaw) {
         game_paused = !game_paused;
         menu_selection = 0;
         menu_input_delay = 0;
-        set_bgm_volume(0.3f);
 
+        // Duck BGM volume when paused, restore when unpaused
+        if (game_paused) {
+            set_bgm_volume(0.25f);  // Lower volume
+        } else {
+            set_bgm_volume(0.5f);   // Normal volume
+        }
         return;
     }
 
@@ -998,12 +1068,21 @@ static void process_input(float delta_time, float *cam_yaw) {
             switch (menu_selection) {
                 case MENU_OPTION_RESUME:
                     game_paused = false;
+                    set_bgm_volume(0.5f);  // Restore normal volume
                     break;
                 case MENU_OPTION_CAMERA:
                     fps_mode = !fps_mode;
                     break;
-                case MENU_OPTION_DEBUG:
-                    render_debug = !render_debug;
+                case MENU_OPTION_HIRES:
+                    hi_res_mode = !hi_res_mode;
+                    display_close();
+                    if (hi_res_mode) {
+                        display_init(RESOLUTION_640x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
+                    } else {
+                        display_init(RESOLUTION_320x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
+                    }
+                    // Recreate viewport with new resolution
+                    *viewport = t3d_viewport_create();
                     break;
                 case MENU_OPTION_AUDIO:
                     bgm_track = (bgm_track + 1) % 4;  // Cycle through 0,1,2,3
@@ -1064,6 +1143,8 @@ static void process_input(float delta_time, float *cam_yaw) {
         move_drone = true;
         drone_moving_to_resource = move_drone;
         drone_moving_to_station = false;
+        // Stop tile from following resource when placed elsewhere
+        tile_following_resource = -1;
          play_sfx(2);
     }
 
@@ -1142,7 +1223,7 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
     int bar_height = 4;
 
     // Position in lower right
-    int x = SCREEN_WIDTH - bar_width - 10;
+    int x = display_get_width() - bar_width - 10;
     int y = SCREEN_HEIGHT - y_offset;
 
     if (!show_triangle) {
@@ -1197,7 +1278,7 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
 
 
     if (show_triangle) {
-        icon_x = SCREEN_WIDTH - 30;
+        icon_x = display_get_width() - 30;
         int action_x = icon_x - 8;
         int action_y = icon_y + 10;
         rdpq_sync_pipe();
@@ -1215,8 +1296,8 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
 
         rdpq_mode_alphacompare(1);  // Enable transparency
         rdpq_sprite_blit(drone_icon, icon_x, icon_y, &(rdpq_blitparms_t){
-            .scale_x = 0.70f,  // Half size
-            .scale_y = 0.70f
+            .scale_x = 1.0f,  // Half size
+            .scale_y = 1.0f
         });
 
 
@@ -1225,12 +1306,12 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
                 rdpq_sync_pipe();
                 rdpq_set_mode_standard();
                 rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
-                rdpq_set_prim_color(RGBA32(255, 149, 5, 255));  // Saffron tint
+                rdpq_set_prim_color(RGBA32(220, 0, 115, 255));
 
                 rdpq_mode_alphacompare(1);  // Enable transparency
                 rdpq_sprite_blit(drill_icon, action_x, action_y, &(rdpq_blitparms_t){
-                    .scale_x = 0.5f,  // Half size
-                    .scale_y = 0.5f
+                    .scale_x = 1.0f,  // Half size
+                    .scale_y = 1.0f
                 });
                 drone_moving_to_resource = false;
                 drone_moving_to_station = false;
@@ -1238,12 +1319,11 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
                 rdpq_sync_pipe();
                 rdpq_set_mode_standard();
                 rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
-                rdpq_set_prim_color(RGBA32(137, 252, 0, 255));  // Lime
-
+                rdpq_set_prim_color(RGBA32(255, 128, 13, 255));
                 rdpq_mode_alphacompare(1);  // Enable transparency
                 rdpq_sprite_blit(tile_icon, action_x, action_y, &(rdpq_blitparms_t){
-                    .scale_x = 0.0525f,  // Half size
-                    .scale_y = 0.0525f
+                    .scale_x = 1.0f,  // Half size
+                    .scale_y = 1.0f
                 });
                 drone_collecting_resource = false;
                 drone_moving_to_station = false;
@@ -1251,15 +1331,29 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
                 rdpq_sync_pipe();
                 rdpq_set_mode_standard();
                 rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
-                rdpq_set_prim_color(RGBA32(27, 154, 170, 255));  // Red tint
+                rdpq_set_prim_color(RGBA32(200, 200, 200, 255));  // Red tint
 
                 rdpq_mode_alphacompare(1);  // Enable transparency
                 rdpq_sprite_blit(station_icon, action_x, action_y, &(rdpq_blitparms_t){
-                    .scale_x = 0.250f,  // Half size
-                    .scale_y = 0.250f
+                    .scale_x = 1.0f,  // Half size
+                    .scale_y = 1.0f
                 });
                 drone_collecting_resource = false;
                 drone_moving_to_resource = false;
+            } else if (drone_full) {
+                rdpq_sync_pipe();
+                rdpq_set_mode_standard();
+                rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
+                rdpq_set_prim_color(RGBA32(137, 252, 0, 255));  // Red tint
+
+                rdpq_mode_alphacompare(1);  // Enable transparency
+                rdpq_sprite_blit(drone_full_icon, action_x, action_y, &(rdpq_blitparms_t){
+                    .scale_x = 1.0f,  // Half size
+                    .scale_y = 1.0f
+                });
+                drone_collecting_resource = false;
+                drone_moving_to_resource = false;
+                drone_moving_to_station = false;
             }
         }
     }
@@ -1316,8 +1410,11 @@ static void render_background(sprite_t *background, float cam_yaw) {
     // Use multiplication instead of division: BG_WIDTH/360 = 1024/360 = 2.84444444
     int offset_x = (int)(normalized_yaw * 2.84444444f);
 
+    // Get actual screen width dynamically for hi-res support
+    int screen_width = display_get_width();
+
     // Pre-compute wrap condition
-    bool needs_wrap = (offset_x + SCREEN_WIDTH > BG_WIDTH);
+    bool needs_wrap = (offset_x + screen_width > BG_WIDTH);
 
     rdpq_set_mode_copy(false);
     rdpq_sprite_blit(background, -offset_x, 0, NULL);
@@ -1339,7 +1436,7 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     } else {
         // Clear the screen to black when background is disabled
         rdpq_set_mode_fill(RGBA32(0, 0, 0, 255));
-        rdpq_fill_rectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+        rdpq_fill_rectangle(0, 0, display_get_width(), display_get_height());
     }
 
     // 3D setup
@@ -1372,6 +1469,36 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     // Draw opaque entities first (skip station and grid - draw them at end)
     for (int i = 0; i < ENTITY_COUNT; i++) {
         if (i == ENTITY_STATION || i == ENTITY_GRID) continue;  // Skip, draw at end
+
+        // Special handling for tile - apply animated scale
+        if (i == ENTITY_TILE && (drone_moving_to_station || move_drone || tile_following_resource >= 0)) {
+            // Save original values
+            color_t original_color = entities[i].color;
+            float original_scale = entities[i].scale;
+
+            // Set color based on state
+            if (drone_moving_to_station) {
+                entities[i].color = RGBA32(255, 0, 255, 255);  // Magenta when moving to station
+            }
+            // else keep original color
+
+            // Update matrix with animated scale for x, y, z
+            T3DMat4 temp_mat;
+            t3d_mat4_from_srt_euler(&temp_mat,
+                (float[3]){original_scale * tile_scale_multiplier, original_scale, original_scale * tile_scale_multiplier},  // Animated on x and z
+                (float[3]){entities[i].rotation.v[0], entities[i].rotation.v[1], entities[i].rotation.v[2]},
+                entities[i].position.v);
+            t3d_mat4_to_fixed(entities[i].matrix, &temp_mat);
+
+            // Draw with modified properties
+            draw_entity(&entities[i]);
+
+            // Restore original values
+            entities[i].color = original_color;
+            entities[i].scale = original_scale;
+            // Note: matrix will be updated next frame anyway, so no need to restore it
+            continue;
+        }
 
         if (entity_skip_culling[i]) {
             // Always draw without culling
@@ -1433,20 +1560,22 @@ int main(void) {
     T3DViewport viewport = t3d_viewport_create();
 
     sprite_t *background = sprite_load("rom:/bg1024v2.sprite");
-    station_icon = sprite_load("rom:/station.sprite");
-    drill_icon = sprite_load("rom:/drill.sprite");
-    tile_icon = sprite_load("rom:/tile2.sprite");
+    station_icon = sprite_load("rom:/station2.sprite");
+    drill_icon = sprite_load("rom:/drill2.sprite");
+    tile_icon = sprite_load("rom:/tile3.sprite");
     drone_icon = sprite_load("rom:/drone.sprite");
-    ship_icon = sprite_load("rom:/ship.sprite");
+    drone_full_icon = sprite_load("rom:/drone_full.sprite");
     health_icon = sprite_load("rom:/health.sprite");
 
-    entities[ENTITY_STATION] = create_entity("rom:/stationew.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}}, 4.000f, COLOR_STATION, DRAW_TEXTURED_LIT, 30.0f);
+    // entities[ENTITY_STATION] = create_entity("rom:/stationew.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}}, 5.000f, COLOR_STATION, DRAW_TEXTURED_LIT, 30.0f);
+
+    entities[ENTITY_STATION] = create_entity("rom:/stationew.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}}, 0.75000f, COLOR_STATION, DRAW_TEXTURED_LIT, 30.0f);
     entities[ENTITY_STATION].value = STATION_MAX_HEALTH;
 
     entities[ENTITY_CURSOR] = create_entity("rom:/miner.t3dm", cursor_position, 0.562605f, COLOR_CURSOR, DRAW_TEXTURED_LIT, 10.0f);
     entities[ENTITY_CURSOR].value = CURSOR_MAX_HEALTH;
     entities[ENTITY_DRONE] = create_entity("rom:/dronenew.t3dm", (T3DVec3){{20.0f, DEFAULT_HEIGHT, 29.0f}}, 0.55f, COLOR_DRONE, DRAW_SHADED, 30.0f);
-    entities[ENTITY_TILE] = create_entity("rom:/tile.t3dm", (T3DVec3){{0, 1000, 0}}, 1.0f, COLOR_TILE, DRAW_SHADED, 0.0f);
+    entities[ENTITY_TILE] = create_entity("rom:/tile2.t3dm", (T3DVec3){{0, 1000, 0}}, 1.0f, COLOR_TILE, DRAW_SHADED, 10.0f);
 
     // entities[ENTITY_STATION] = create_entity("rom:/ringalt.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}}, 1.0f, COLOR_STATION, DRAW_SHADED, 30.0f);
 
@@ -1483,12 +1612,37 @@ int main(void) {
         last_time = current_time;
 
         joypad_poll();
-        process_input(delta_time, &cam_yaw);
+        process_input(delta_time, &cam_yaw, &viewport);
 
         if (!game_paused) {
             update_cursor(delta_time, cam_yaw);
             update_camera(&viewport, cam_yaw, delta_time, cursor_position, fps_mode, cursor_entity);
             update_tile_visibility(&entities[ENTITY_TILE]);
+
+            // Only check tile collisions if drone is not full
+            if (!drone_full) {
+                check_tile_resource_collision(&entities[ENTITY_TILE], resources, RESOURCE_COUNT);
+            }
+
+            check_tile_following_status(&entities[ENTITY_DRONE]);
+
+            // Animate tile scale based on state
+            if (drone_moving_to_station) {
+                // Pulsing effect: grow from 1x to 4x, then reset and repeat
+                tile_scale_multiplier += delta_time * 3.0f;
+                if (tile_scale_multiplier >= 4.0f) {
+                    tile_scale_multiplier = 1.0f;  // Reset to 1x and start growing again
+                }
+            } else if (move_drone || tile_following_resource >= 0) {
+                // Pulsing effect when placed: grow from 0.25x to 1.0x, then reset and repeat
+                tile_scale_multiplier += delta_time * 1.25f;  // Grow at 1.25x per second
+                if (tile_scale_multiplier >= 1.0f) {
+                    tile_scale_multiplier = 0.25f;  // Reset to start and repeat
+                }
+            } else {
+                // Tile is hidden, reset scale for next placement
+                tile_scale_multiplier = 0.25f;
+            }
 
             if (move_drone) {
                 move_drone_elsewhere(&entities[ENTITY_DRONE], delta_time, false);
@@ -1562,6 +1716,7 @@ int main(void) {
             if (blink_timer > 20) blink_timer = 0;
         }
 
+
          // Render while RSP/RDP are working
         render_frame(&viewport, background, cam_yaw, delta_time);
 
@@ -1578,7 +1733,7 @@ int main(void) {
     sprite_free(drill_icon);
     sprite_free(tile_icon);
     sprite_free(drone_icon);
-    sprite_free(ship_icon);
+    sprite_free(drone_full_icon);
     // sprite_free(health_icon);
     wav64_close(&sfx_mining);
     wav64_close(&sfx_dcom);

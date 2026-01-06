@@ -150,7 +150,7 @@ void init_asteroids(Entity *asteroids, int count) {
     init_rotation_tables();
 
     for (int i = 0; i < count; i++) {
-        asteroids[i] = create_entity("rom:/asteroid.t3dm", (T3DVec3){{0, 10, 0}},
+        asteroids[i] = create_entity("rom:/asteroid1.t3dm", (T3DVec3){{0, 10, 0}},
                                       randomize_float(0.1f, 1.3f), COLOR_ASTEROID, DRAW_SHADED, 10.0f);
         // Set up velocity and speed first
        reset_entity(&asteroids[i], ASTEROID);
@@ -167,7 +167,7 @@ void init_resources(Entity *resources, int count) {
     init_rotation_tables();
 
     for (int i = 0; i < count; i++) {
-        resources[i] = create_entity("rom:/asteroid.t3dm", (T3DVec3){{0, 10, 0}},
+        resources[i] = create_entity("rom:/asteroid1.t3dm", (T3DVec3){{0, 10, 0}},
                                       1.0f, COLOR_RESOURCE, DRAW_SHADED, 10.0f);
         reset_entity(&resources[i], RESOURCE);
         resources[i].position.v[0] = randomize_float(-RESOURCE_BOUND_X, RESOURCE_BOUND_X);

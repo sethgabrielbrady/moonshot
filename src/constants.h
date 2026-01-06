@@ -68,11 +68,9 @@
 #define COLOR_DRONE        RGBA32(255, 0, 155, 255)
 #define COLOR_STATION      RGBA32(220, 220, 220, 255)
 #define COLOR_RING         RGBA32(150, 150, 150, 255)
-#define COLOR_TILE         RGBA32(255, 149, 5, 120)
+#define COLOR_TILE         RGBA32(255, 149, 5, 250)
 #define COLOR_ASTEROID     RGBA32(108, 136, 64, 255)
 #define COLOR_SPARKS       RGBA32(255, 220, 0, 255)
-// #define COLOR_ASTEROID     RGBA32(78, 56, 34, 255)
-
 #define COLOR_RESOURCE     RGBA32(27, 154, 170, 255)
 
 
@@ -113,7 +111,7 @@ static bool game_paused = false;
 static int menu_selection = 0;
 #define MENU_OPTION_RESUME   0
 #define MENU_OPTION_CAMERA   1
-#define MENU_OPTION_DEBUG    2
+#define MENU_OPTION_HIRES    2
 #define MENU_OPTION_AUDIO    3
 #define MENU_OPTION_30HZ     4
 #define MENU_OPTION_BG       5
@@ -129,7 +127,7 @@ static sprite_t *station_icon = NULL;
 static sprite_t *tile_icon = NULL;
 static sprite_t *drill_icon = NULL;
 static sprite_t *drone_icon = NULL;
-static sprite_t *ship_icon = NULL;
+static sprite_t *drone_full_icon = NULL;
 static sprite_t *health_icon = NULL;
 
 

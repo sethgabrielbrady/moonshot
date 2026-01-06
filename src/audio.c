@@ -30,14 +30,18 @@ void play_sfx(int sfx_type) {
             if (!mixer_ch_playing(6)) {
                 wav64_play(&sfx_dfull, 6);
                 mixer_ch_set_vol(6, 0.3, 0.3);
+                mixer_ch_set_freq(6, 1040.0f);
             }
             break;
 
         case 4:  // Ship hit (uses channels 8-9)
-            if (!mixer_ch_playing(8)) {
-                wav64_play(&sfx_shiphit, 8);
-                mixer_ch_set_vol(8, 0.3, 0.3);
+            // Stop and restart if already playing
+            if (mixer_ch_playing(8)) {
+                mixer_ch_stop(8);
             }
+            wav64_play(&sfx_shiphit, 8);
+            mixer_ch_set_vol(8, 0.5, 0.5);
+            mixer_ch_set_freq(8, 840.0f);
             break;
     }
 }
@@ -68,7 +72,7 @@ void set_bgm_volume(float volume) {
 }
 
 // Call every frame to keep audio playing
-void update_audio(void) {
+void update_audio() {
     if (audio_can_write()) {
         short *buf = audio_write_begin();
         mixer_poll(buf, audio_get_buffer_length());

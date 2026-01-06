@@ -13,3 +13,4 @@
 .gitmodules
 Makefile
 *.n64
+.DS_Store
