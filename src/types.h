@@ -6,16 +6,18 @@
 #include <t3d/t3dmath.h>
 #include <t3d/t3dmodel.h>
 
+// =============================================================================
+// Draw Types
+// =============================================================================
+
 typedef enum {
     DRAW_SHADED,
     DRAW_TEXTURED_LIT
 } DrawType;
 
-typedef struct {
-    T3DVec3 position;
-    T3DVec3 target;
-    float rotation_y;
-} Camera;
+// =============================================================================
+// Entity Structure
+// =============================================================================
 
 typedef struct {
     T3DModel *model;
@@ -31,6 +33,9 @@ typedef struct {
     DrawType draw_type;
 } Entity;
 
+// =============================================================================
+// Entity IDs
+// =============================================================================
 
 typedef enum {
     ENTITY_STATION,
@@ -40,6 +45,10 @@ typedef enum {
     ENTITY_GRID,
     ENTITY_COUNT
 } EntityID;
+
+// =============================================================================
+// Asteroid IDs
+// =============================================================================
 
 typedef enum {
     ASTEROID_A1,
@@ -62,38 +71,12 @@ typedef enum {
     ASTEROID_A18,
     ASTEROID_A19,
     ASTEROID_A20,
-    ASTEROID_A21,
-    ASTEROID_A22,
-    ASTEROID_A23,
-    ASTEROID_A24,
-    ASTEROID_A25,
-    ASTEROID_A26,
-    ASTEROID_A27,
-    ASTEROID_A28,
-    ASTEROID_A29,
-    ASTEROID_A30,
-    // ASTEROID_A31,
-    // ASTEROID_A32,
-    // ASTEROID_A33,
-    // ASTEROID_A34,
-    // ASTEROID_A35,
-    // ASTEROID_A36,
-    // ASTEROID_A37,
-    // ASTEROID_A38,
-    // ASTEROID_A39,
-    // ASTEROID_A40,
-    // ASTEROID_A41,
-    // ASTEROID_A42,
-    // ASTEROID_A43,
-    // ASTEROID_A44,
-    // ASTEROID_A45,
-    // ASTEROID_A46,
-    // ASTEROID_A47,
-    // ASTEROID_A48,
-    // ASTEROID_A49,
-    // ASTEROID_A50,
     ASTEROID_COUNT
 } AsteroidID;
+
+// =============================================================================
+// Resource IDs
+// =============================================================================
 
 typedef enum {
     R1,
@@ -105,6 +88,10 @@ typedef enum {
     RESOURCE_COUNT
 } ResourceID;
 
+// =============================================================================
+// Resource States
+// =============================================================================
+
 typedef enum {
     RESOURCE_STATE_DEFAULT,
     RESOURCE_STATE_HIGHLIGHTED,
@@ -112,10 +99,18 @@ typedef enum {
     RESOURCE_STATE_DEPLETED
 } ResourceState;
 
+// =============================================================================
+// Entity Types (for spawning)
+// =============================================================================
+
 typedef enum {
     ASTEROID,
     RESOURCE
 } EntityType;
+
+// =============================================================================
+// Color Flash Effect
+// =============================================================================
 
 typedef struct {
     Entity *entity;
@@ -126,12 +121,19 @@ typedef struct {
     bool active;
 } ColorFlash;
 
+// =============================================================================
+// Point Light
+// =============================================================================
+
 typedef struct {
-  T3DVec3 pos;
-  float strength;
-  color_t color;
+    T3DVec3 pos;
+    float strength;
+    color_t color;
 } PointLight;
 
+// =============================================================================
+// Particle Data (used by particle system)
+// =============================================================================
 
 typedef struct {
     T3DVec3 position;
@@ -143,4 +145,4 @@ typedef struct {
     bool active;
 } ParticleData;
 
-#endif
+#endif // TYPES_H

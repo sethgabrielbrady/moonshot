@@ -1,32 +1,38 @@
 #include "audio.h"
 
+// =============================================================================
+// Sound Effect Handles
+// =============================================================================
 
 wav64_t sfx_mining;
 wav64_t sfx_dcom;
 wav64_t sfx_dfull;
 wav64_t sfx_shiphit;
 wav64_t bgm;
+
 bool bgm_playing = false;
 
+// =============================================================================
+// Sound Effects
+// =============================================================================
+
 void play_sfx(int sfx_type) {
-    // Use switch to play only the requested sound effect
-    // Note: Stereo sounds use 2 consecutive channels, so we skip by 2
     switch (sfx_type) {
-        case 1:  // Mining sound (uses channels 2-3)
+        case SFX_MINING:  // Mining sound (channels 2-3)
             if (!mixer_ch_playing(2)) {
                 wav64_play(&sfx_mining, 2);
                 mixer_ch_set_vol(2, 0.3, 0.3);
             }
             break;
 
-        case 2:  // Drone collecting (uses channels 4-5)
+        case SFX_DRONE_CMD:  // Drone command (channels 4-5)
             if (!mixer_ch_playing(4)) {
                 wav64_play(&sfx_dcom, 4);
                 mixer_ch_set_vol(4, 0.3, 0.3);
             }
             break;
 
-        case 3:  // Drone full (uses channels 6-7)
+        case SFX_DRONE_FULL:  // Drone full (channels 6-7)
             if (!mixer_ch_playing(6)) {
                 wav64_play(&sfx_dfull, 6);
                 mixer_ch_set_vol(6, 0.3, 0.3);
@@ -34,8 +40,7 @@ void play_sfx(int sfx_type) {
             }
             break;
 
-        case 4:  // Ship hit (uses channels 8-9)
-            // Stop and restart if already playing
+        case SFX_SHIP_HIT:  // Ship hit (channels 8-9)
             if (mixer_ch_playing(8)) {
                 mixer_ch_stop(8);
             }
@@ -43,8 +48,8 @@ void play_sfx(int sfx_type) {
             mixer_ch_set_vol(8, 0.5, 0.5);
             mixer_ch_set_freq(8, 840.0f);
             break;
-        case 5:  // Ship hit (uses channels 8-9)
-            // Stop and restart if already playing
+
+        case SFX_EXPLOSION:  // Explosion (channels 10-11)
             if (mixer_ch_playing(10)) {
                 mixer_ch_stop(10);
             }
@@ -55,18 +60,19 @@ void play_sfx(int sfx_type) {
     }
 }
 
+// =============================================================================
+// Background Music
+// =============================================================================
 
-// Load and play background music
 void play_bgm(const char *filename) {
-    if (bgm_playing) return;  // Already playing
+    if (bgm_playing) return;
 
     wav64_open(&bgm, filename);
-    wav64_set_loop(&bgm, true);  // Loop forever
-    wav64_play(&bgm, 0);         // Play on channel 0
+    wav64_set_loop(&bgm, true);
+    wav64_play(&bgm, 0);
     bgm_playing = true;
 }
 
-// Stop background music
 void stop_bgm(void) {
     if (!bgm_playing) return;
 
@@ -76,12 +82,14 @@ void stop_bgm(void) {
 }
 
 void set_bgm_volume(float volume) {
-    // volume: 0.0 to 1.0
-    mixer_ch_set_vol(0, volume, volume);  // Left, Right
+    mixer_ch_set_vol(0, volume, volume);
 }
 
-// Call every frame to keep audio playing
-void update_audio() {
+// =============================================================================
+// Audio Update (call every frame)
+// =============================================================================
+
+void update_audio(void) {
     if (audio_can_write()) {
         short *buf = audio_write_begin();
         mixer_poll(buf, audio_get_buffer_length());

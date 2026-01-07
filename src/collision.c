@@ -1,0 +1,399 @@
+#include "collision.h"
+#include "constants.h"
+#include "game_state.h"
+#include "entity.h"
+#include "particles.h"
+#include "audio.h"
+#include "camera.h"
+#include "spawner.h"
+#include <math.h>
+
+// =============================================================================
+// External References (from main.c - will be moved to game_state later)
+// =============================================================================
+
+// These need to be passed in or accessed via game state
+// For now, declare as extern until full migration
+extern bool *asteroid_visible;
+extern bool *resource_visible;
+extern Entity *cursor_entity;
+extern T3DVec3 cursor_velocity;
+
+// =============================================================================
+// Color Flash System
+// =============================================================================
+
+static ColorFlash color_flashes[MAX_COLOR_FLASHES];
+
+void start_entity_color_flash(Entity *entity, color_t flash_color, float duration_seconds) {
+    // Single pass: update existing or find free slot
+    for (int i = 0; i < MAX_COLOR_FLASHES; i++) {
+        if (color_flashes[i].active && color_flashes[i].entity == entity) {
+            color_flashes[i].timer = 0.0f;
+            color_flashes[i].duration = duration_seconds;
+            color_flashes[i].flash_color = flash_color;
+            return;
+        }
+    }
+
+    // Find free slot (only if existing flash not found)
+    for (int i = 0; i < MAX_COLOR_FLASHES; i++) {
+        if (!color_flashes[i].active) {
+            color_flashes[i].entity = entity;
+            color_flashes[i].original_color = entity->color;
+            color_flashes[i].flash_color = flash_color;
+            color_flashes[i].timer = 0.0f;
+            color_flashes[i].duration = duration_seconds;
+            color_flashes[i].active = true;
+            entity->color = flash_color;
+            return;
+        }
+    }
+}
+
+void update_color_flashes(float delta_time) {
+    for (int i = 0; i < MAX_COLOR_FLASHES; i++) {
+        if (!color_flashes[i].active) continue;
+
+        color_flashes[i].timer += delta_time;
+
+        if (color_flashes[i].timer >= color_flashes[i].duration) {
+            color_flashes[i].entity->color = color_flashes[i].original_color;
+            color_flashes[i].active = false;
+            color_flashes[i].entity = NULL;
+        } else {
+            int blink_state = (int)(color_flashes[i].timer * 10) % 2;
+            if (blink_state == 0) {
+                color_flashes[i].entity->color = color_flashes[i].flash_color;
+            } else {
+                color_flashes[i].entity->color = color_flashes[i].original_color;
+            }
+        }
+    }
+}
+
+// =============================================================================
+// Damage Calculation
+// =============================================================================
+
+float calculate_asteroid_damage(Entity *asteroid) {
+    // Mass approximation (volume scales with cube of size)
+    float mass = asteroid->scale * asteroid->scale * asteroid->scale;
+    float kinetic_energy = 0.25f * mass * asteroid->speed * asteroid->speed;
+    return kinetic_energy * DAMAGE_MULTIPLIER;
+}
+
+// =============================================================================
+// Station Collisions
+// =============================================================================
+
+void check_station_asteroid_collisions(Entity *station, Entity *asteroids, int count, float delta_time) {
+    // Update iframe timer
+    if (game.station_iframe_timer > 0.0f) {
+        game.station_iframe_timer -= delta_time;
+    }
+
+    for (int i = 0; i < count; i++) {
+        // Distance-based early rejection - skip if too far away
+        float dx = station->position.v[0] - asteroids[i].position.v[0];
+        float dz = station->position.v[2] - asteroids[i].position.v[2];
+        float dist_sq = dx * dx + dz * dz;
+        float max_range = station->collision_radius + asteroids[i].collision_radius + 50.0f;
+        if (dist_sq > max_range * max_range) continue;
+
+        if (check_entity_intersection(station, &asteroids[i])) {
+            // Only apply damage if not in iframe period
+            if (game.station_iframe_timer <= 0.0f) {
+                float damage = calculate_asteroid_damage(&asteroids[i]);
+                if (damage >= MAX_DAMAGE) {
+                    damage = MAX_DAMAGE;
+                }
+
+                spawn_explosion(asteroids[i].position);
+
+                station->value -= damage;
+                game.station_last_damage = (int)damage;
+
+                // Clamp to zero
+                if (station->value < 0) {
+                    station->value = 0;
+                    spawn_station_explosion(station->position);
+                    start_entity_color_flash(station, RGBA32(255, 255, 0, 125), 0.5f);
+                    play_sfx(5);
+                }
+
+                // Start iframe period
+                game.station_iframe_timer = STATION_IFRAME_DURATION;
+            }
+
+            // Always reset asteroid to prevent multiple collisions
+            reset_entity(&asteroids[i], ASTEROID);
+        }
+    }
+}
+
+// =============================================================================
+// Cursor/Ship Collisions
+// =============================================================================
+
+static float ship_damage_multiplier = 1.0f;
+
+void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, int count, bool *visibility) {
+    for (int i = 0; i < count; i++) {
+        // Skip culled asteroids
+        if (visibility && !visibility[i]) continue;
+
+        // Distance-based early rejection
+        float dx = cursor->position.v[0] - asteroids[i].position.v[0];
+        float dz = cursor->position.v[2] - asteroids[i].position.v[2];
+        float dist_sq = dx * dx + dz * dz;
+        float max_range = cursor->collision_radius + asteroids[i].collision_radius + 30.0f;
+        if (dist_sq > max_range * max_range) continue;
+
+        if (check_entity_intersection(cursor, &asteroids[i])) {
+            play_sfx(4);
+            float damage = calculate_asteroid_damage(&asteroids[i]);
+            if (damage >= MAX_DAMAGE * ship_damage_multiplier) {
+                damage = MAX_DAMAGE * ship_damage_multiplier;
+            }
+            spawn_explosion(asteroids[i].position);
+            cursor->value -= damage;
+            game.cursor_last_damage = (int)damage;
+
+            if (cursor->value < 0) {
+                cursor->value = 0;
+            }
+
+            // Add asteroid velocity to cursor velocity (knockback)
+            game.cursor_velocity.v[0] += asteroids[i].velocity.v[0] * KNOCKBACK_STRENGTH;
+            game.cursor_velocity.v[2] += asteroids[i].velocity.v[2] * KNOCKBACK_STRENGTH;
+
+            other_shake_enabled = damage > 0 ? true : false;
+            if (other_shake_enabled) {
+                trigger_screen_shake(3.0f, 0.25f);
+            }
+            reset_entity(&asteroids[i], ASTEROID);
+        }
+    }
+}
+
+void check_cursor_station_collision(Entity *cursor, Entity *station) {
+    if (check_entity_intersection(cursor, station)) {
+        station->value += game.cursor_resource_val;
+        game.cursor_resource_val = 0;
+    }
+}
+
+// =============================================================================
+// Mining Functions
+// =============================================================================
+
+static float mining_accumulated = 0.0f;
+static bool cursor_was_mining = false;
+
+static void mine_resource(Entity *entity, Entity *resource, float delta_time) {
+    float amount = delta_time * MINING_RATE;
+    mining_accumulated += amount;
+
+    // Only transfer whole units
+    if (mining_accumulated >= 1.0f) {
+        int transfer = (int)mining_accumulated;
+        resource->value -= transfer;
+        game.cursor_resource_val += transfer;
+        mining_accumulated -= transfer;
+        spawn_mining_sparks(resource->position);
+    }
+
+    game.resource_val = resource->value;
+
+    if (resource->value <= 0) {
+        mining_accumulated = 0.0f;
+        resource->value = 0;
+        resource->color = COLOR_ASTEROID;
+        entity->value += 5; // replenish some energy on resource depletion
+        reset_entity(resource, RESOURCE);
+    }
+}
+
+void check_cursor_resource_collisions(Entity *cursor, Entity *resources, int count, float delta_time) {
+    game.cursor_mining_resource = -1;
+    game.cursor_is_mining = false;
+    bool found_mining = false;
+
+    for (int i = 0; i < count; i++) {
+        // Distance-based early rejection
+        float dx = cursor->position.v[0] - resources[i].position.v[0];
+        float dz = cursor->position.v[2] - resources[i].position.v[2];
+        float dist_sq = dx * dx + dz * dz;
+        float max_range = cursor->collision_radius + resources[i].collision_radius + 20.0f;
+        if (dist_sq > max_range * max_range) {
+            cursor->color = COLOR_CURSOR;
+            continue;
+        }
+
+        if (check_entity_intersection(cursor, &resources[i]) &&
+            (game.cursor_resource_val < CURSOR_RESOURCE_CAPACITY)) {
+            game.cursor_is_mining = true;
+
+            // Flicker both resource and cursor color - welder effect
+            int flicker = rand() % 100;
+            if (flicker < 10) {
+                cursor->color = RGBA32(0, 0, 0, 255);
+            } else if (flicker < 40) {
+                resources[i].color = RGBA32(255, 255, 255, 255);
+                cursor->color = RGBA32(100, 100, 100, 255);
+            } else if (flicker < 70) {
+                resources[i].color = RGBA32(200, 200, 200, 255);
+                cursor->color = RGBA32(220, 220, 220, 255);
+            } else {
+                resources[i].color = COLOR_RESOURCE;
+                cursor->color = COLOR_CURSOR;
+            }
+
+            // Only play sound when mining starts
+            if (!cursor_was_mining) {
+                play_sfx(1);
+            }
+            found_mining = true;
+            game.cursor_mining_resource = i;
+            mine_resource(cursor, &resources[i], delta_time);
+            break;
+        } else {
+            cursor->color = COLOR_CURSOR;
+        }
+    }
+
+    cursor_was_mining = found_mining;
+}
+
+// =============================================================================
+// Drone Collisions
+// =============================================================================
+
+static void drone_mine_resource(Entity *entity, Entity *resource, float delta_time) {
+    float amount = delta_time * DRONE_MINING_RATE;
+    game.drone_mining_accumulated += amount;
+
+    // Only transfer whole units
+    if (game.drone_mining_accumulated >= 1.0f && game.drone_resource_val < DRONE_MAX_RESOURCES) {
+        int transfer = (int)game.drone_mining_accumulated;
+        resource->value -= transfer;
+        game.drone_resource_val += transfer;
+        entity->value = game.drone_resource_val;
+        game.drone_mining_accumulated -= transfer;
+        spawn_mining_sparks(entity->position);
+    }
+
+    game.resource_val = resource->value;
+
+    if (resource->value <= 0) {
+        game.drone_mining_accumulated = 0.0f;
+        resource->value = 0;
+        resource->color = COLOR_ASTEROID;
+        reset_entity(resource, RESOURCE);
+    }
+}
+
+void check_drone_resource_collisions(Entity *entity, Entity *resources, int count, float delta_time) {
+    game.drone_mining_resource = -1;
+    game.drone_collecting_resource = false;
+    game.drone_is_mining = false;
+
+    // Update drone_full based on current resource level
+    game.drone_full = (game.drone_resource_val >= DRONE_MAX_RESOURCES);
+
+    for (int i = 0; i < count; i++) {
+        // Distance-based early rejection
+        float dx = entity->position.v[0] - resources[i].position.v[0];
+        float dz = entity->position.v[2] - resources[i].position.v[2];
+        float dist_sq = dx * dx + dz * dz;
+        float max_range = entity->collision_radius + resources[i].collision_radius + 20.0f;
+        if (dist_sq > max_range * max_range) continue;
+
+        if (check_entity_intersection(entity, &resources[i]) &&
+            game.drone_resource_val < DRONE_MAX_RESOURCES) {
+            game.drone_collecting_resource = true;
+            game.drone_is_mining = true;
+            entity->position.v[1] = resources[i].position.v[1] + 5.0f;
+            entity->position.v[0] = resources[i].position.v[0];
+            entity->position.v[2] = resources[i].position.v[2];
+
+            // Flicker resource color - welder effect
+            int flicker = rand() % 100;
+            if (flicker < 40) {
+                resources[i].color = RGBA32(111, 239, 255, 255);
+            } else if (flicker < 70) {
+                resources[i].color = RGBA32(200, 200, 200, 255);
+            } else {
+                resources[i].color = COLOR_RESOURCE;
+            }
+
+            game.drone_mining_resource = i;
+            drone_mine_resource(entity, &resources[i], delta_time);
+
+            break;
+        }
+    }
+}
+
+void check_drone_station_collisions(Entity *drone, Entity *station, int count) {
+    if (check_entity_intersection(drone, station)) {
+        station->value += game.drone_resource_val;
+        game.drone_resource_val = 0;
+        drone->value = game.drone_resource_val;
+    }
+}
+
+void check_drone_cursor_collisions(Entity *drone, Entity *cursor, int count) {
+    if (check_entity_intersection(drone, cursor)) {
+        cursor->value += game.drone_resource_val;
+        game.drone_resource_val = 0;
+        drone->value = game.drone_resource_val;
+    }
+}
+
+// =============================================================================
+// Tile Collisions
+// =============================================================================
+
+void check_tile_resource_collision(Entity *tile, Entity *resources, int count) {
+    // Only check if tile is visible and not already following something
+    if (tile->position.v[1] > 100.0f) return;
+    if (game.drone_full) return;
+
+    for (int i = 0; i < count; i++) {
+        if (check_entity_intersection(tile, &resources[i])) {
+            // Start following this resource
+            game.tile_following_resource = i;
+
+            // Send drone to this resource
+            game.drone_target_position.v[0] = resources[i].position.v[0];
+            game.drone_target_position.v[1] = resources[i].position.v[1];
+            game.drone_target_position.v[2] = resources[i].position.v[2];
+            game.drone_target_rotation = 0.0f;
+            game.move_drone = true;
+            game.drone_moving_to_resource = true;
+            game.drone_moving_to_station = false;
+
+            return;
+        }
+    }
+}
+
+// =============================================================================
+// Utility Functions
+// =============================================================================
+
+void reset_resource_colors(Entity *resources, int count) {
+    for (int i = 0; i < count; i++) {
+        if (i == game.tile_following_resource) {
+            resources[i].color = COLOR_TILE;
+        } else if (i != game.highlighted_resource &&
+                   i != game.cursor_mining_resource &&
+                   i != game.drone_mining_resource) {
+            resources[i].color = COLOR_RESOURCE;
+        } else if (resources[i].value <= 0) {
+            resources[i].color = COLOR_ASTEROID;
+        }
+    }
+}

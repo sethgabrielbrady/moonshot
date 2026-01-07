@@ -1,293 +1,106 @@
+// =============================================================================
+// AsteRisk - Main Game File (Refactored)
+// =============================================================================
+
 #include <libdragon.h>
 #include <t3d/t3d.h>
 #include <t3d/t3ddebug.h>
 #include <rdpq.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <math.h>
 
+// Core modules
 #include "types.h"
 #include "constants.h"
+#include "game_state.h"
 #include "utils.h"
+
+// Game systems
 #include "entity.h"
 #include "camera.h"
-#include "asteroid.h"
+#include "spawner.h"
 #include "audio.h"
 #include "debug.h"
 #include "particles.h"
-
-
-
+#include "collision.h"
+#include "input.h"
+#include "ui.h"
 
 // =============================================================================
-// Global State
+// Entity Arrays (not in game_state - too large)
 // =============================================================================
-
 
 static Entity entities[ENTITY_COUNT];
 static Entity asteroids[ASTEROID_COUNT];
 static Entity resources[RESOURCE_COUNT];
 static Entity *cursor_entity = NULL;
 
-static T3DVec3 cursor_position = {{200.0f, CURSOR_HEIGHT, 100.0f}};
-static T3DVec3 cursor_velocity = {{0.0f, 0.0f, 0.0f}};
-
-static bool move_drone = false;
-static float target_rotation = 0.0f;
-static T3DVec3 target_position;
-static int tile_following_resource = -1;  // Which resource the tile is following (-1 = none)
-static float tile_scale_multiplier = 1.0f;  // Animated scale for tile when moving to station
-
-static bool render_debug = false;
-static bool fps_mode = false;
-static bool hi_res_mode = false;
-
-static float cursor_scale_multiplier = 1.0f;  // Dynamic scale based on distance to station
-
-static int resource_val = 0;
-static int drone_resource_val = 0;
-static int cursor_resource_val = 0;
-static int highlighted_resource = -1;
-
-static float cursor_mining_accumulated = 0.0f;
-static float drone_mining_accumulated = 0.0f;
-
-static int frame_count = 0;
-
-// Time accumulators for consistent update rates at any FPS
-static float particle_render_timer = 0.0f;
-static float ambient_particle_timer = 0.0f;
-static float asteroid_matrix_timer = 0.0f;
-static float collision_timer = 0.0f;
-
-// Culling state arrays - computed once per frame
+// Visibility arrays for culling
 static bool asteroid_visible[ASTEROID_COUNT];
 static bool resource_visible[RESOURCE_COUNT];
 
-T3DVec3 cursor_look_direction = {{0.0f, 0.0f, -1.0f}};
-static ColorFlash color_flashes[MAX_COLOR_FLASHES];
+// =============================================================================
+// Mining Light (kept local as it's rendering-specific)
+// =============================================================================
 
-static bool drone_heal = false;
-static bool drone_collecting_resource = false;
-static bool drone_moving_to_resource = false;
-static bool drone_moving_to_station = false;
-static bool drone_full = false;
+static T3DMat4FP *miningLightMatFP = NULL;
+static rspq_block_t *miningDplLight = NULL;
 
-static int fps_limit = 0;  // 0=30fps, 1=60fps, 2=uncapped
-static bool render_background_enabled = true;
-static bool is_pal_system = false;  // Detected TV type
-static int bgm_track = 1;  // 0=off, 1=track1, 2=track2, 3=track3
-
-
-static float fps_min = 9999.0f;
-static float fps_max = 0.0f;
-static float fps_current = 0.0f;
-static float fps_avg = 0.0f;
-static float fps_total = 0.0f;
-static int fps_frame_count = 0;
-
-// static float screen_shake_timer = 0.0f;
-// static float screen_shake_intensity = 0.0f;
-
-bool show_fps = false;
-
-void reset_fps_stats(void) {
-    fps_min = 9999.0f;
-    fps_max = 0.0f;
-    fps_total = 0.0f;
-    fps_frame_count = 0;
-    fps_avg = 0.0f;
+static void load_point_light(void) {
+    miningLightMatFP = malloc_uncached(sizeof(T3DMat4FP));
+    rspq_block_begin();
+    miningDplLight = rspq_block_end();
 }
 
-void update_fps_stats(float delta_time) {
-    fps_current = 1.0f / delta_time;
+static void draw_mining_point_light(T3DVec3 cursor_pos, T3DVec3 look_dir) {
+    if (!game.cursor_is_mining || game.cursor_mining_resource < 0) return;
 
-    if (fps_current > 1.0f && fps_current < 1000.0f) {
-        if (fps_current < fps_min) fps_min = fps_current;
-        if (fps_current > fps_max) fps_max = fps_current;
+    int flicker = rand() % 100;
+    uint8_t brightness;
 
-        fps_total += fps_current;
-        fps_frame_count++;
-        fps_avg = fps_total / fps_frame_count;
-    }
-}
-static void draw_fps_display(void) {
-    int x = display_get_width() - 120;
-    int y = 10;
-    int line_height = 10;
-
-    rdpq_sync_pipe();
-
-    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, x, y,
-                     "fps: %.0f avg: %.0f", fps_current, fps_avg);
-    y += line_height;
-    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, x, y,
-                     "min: %.0f max: %.0f", fps_min, fps_max);
-
-
-    y += line_height;
-    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, x, y,
-                     "Particles: %d", debug_particle_count);
-}
-
-// // Call when explosion happens
-// void trigger_screen_shake(float intensity, float duration) {
-//     screen_shake_intensity = intensity;
-//     screen_shake_timer = duration;
-// }
-
-// // In update loop
-// void update_screen_shake(float delta_time) {
-//     if (screen_shake_timer > 0) {
-//         screen_shake_timer -= delta_time;
-//         if (screen_shake_timer <= 0) {
-//             screen_shake_intensity = 0;
-//         }
-//     }
-// }
-
-// void reset_game {
-//     // Reset game state variables
-//     resource_val = 0;
-//     drone_resource_val = 0;
-//     cursor_resource_val = 0;
-//     highlighted_resource = -1;
-//     move_drone = false;
-//     tile_following_resource = -1;
-//     tile_scale_multiplier = 1.0f;
-//     cursor_scale_multiplier = 1.0f;
-
-//     cursor_position.v[0] = 200.0f;
-//     cursor_position.v[1] = CURSOR_HEIGHT;
-//     cursor_position.v[2] = 100.0f;
-
-//     cursor_velocity.v[0] = 0.0f;
-//     cursor_velocity.v[1] = 0.0f;
-//     cursor_velocity.v[2] = 0.0f;
-
-//     // Reset entities
-//     for (int i = 0; i < ENTITY_COUNT; i++) {
-//         init_entity(&entities[i], i);
-//     }
-
-//     // Reset asteroids
-//     for (int i = 0; i < ASTEROID_COUNT; i++) {
-//         init_asteroid(&asteroids[i], i);
-//     }
-
-//     // Reset resources
-//     for (int i = 0; i < RESOURCE_COUNT; i++) {
-//         init_resource(&resources[i], i);
-//     }
-
-//     cursor_entity = &entities[ENTITY_CURSOR];
-
-//     // Reset other state variables as needed
-//     frame_count = 0;
-//     clear_all_particles();
-//     game_over = false;
-// }
-
-bool game_over_pause = false;
-
-void draw_pause_menu(void) {
-    if (game_over) {
-        game_paused = true;
-        game_over = false;
-        game_over_pause = true;
-    }
-
-    int padding_x = display_get_width() * 0.2f;
-    int padding_y = SCREEN_HEIGHT * 0.15f;
-
-    int x1 = padding_x;
-    int y1 = padding_y;
-    int x2 = display_get_width() - padding_x;
-    int y2 = SCREEN_HEIGHT - padding_y;
-
-    rdpq_sync_pipe();
-    rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
-
-    // Draw teal box
-    rdpq_set_prim_color(RGBA32(0, 128, 128, 255));
-    rdpq_fill_rectangle(x1, y1, x2, y2);
-
-    // Draw border
-    rdpq_set_prim_color(RGBA32(0, 200, 200, 255));
-    rdpq_fill_rectangle(x1, y1, x2, y1 + 2);
-    rdpq_fill_rectangle(x1, y2 - 2, x2, y2);
-    rdpq_fill_rectangle(x1, y1, x1 + 2, y2);
-    rdpq_fill_rectangle(x2 - 2, y1, x2, y2);
-
-    int menu_x = x1 + 15;
-    int menu_y = y1 + 40;
-    int line_height = 18;
-
-    // Draw highlight box behind selected option
-    rdpq_set_prim_color(RGBA32(0, 180, 180, 255));
-    rdpq_fill_rectangle(menu_x - 5, menu_y + (menu_selection * line_height) - 10,
-                        x2 - 15, menu_y + (menu_selection * line_height) + 5);
-
-    rdpq_sync_pipe();
-
-    // Title
-    rdpq_text_printf(&(rdpq_textparms_t){
-        .align = ALIGN_CENTER,
-        .width = display_get_width(),
-          // Add this to specify the width to center within
-    }, FONT_CUSTOM, 0, y1 + 15, "AsteRisk");  // Use 0 for x when centering
-
-
-    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y,  "%s", game_over_pause? "Restart" : "Resume");
-    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height,
-                     "Camera: %s", fps_mode ? "FPS" : "ISO");
-    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 2,
-                     "Resolution: %s", hi_res_mode ? "640x240" : "320x240");
-
-    const char *bgm_text;
-    if (bgm_track == 0) bgm_text = "OFF";
-    else if (bgm_track == 1) bgm_text = "Nebula Run";
-    else if (bgm_track == 2) bgm_text = "Orbit Oddyssey";
-    else bgm_text = "Lunar Rampage";
-    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 3,
-                     "Music: %s", bgm_text);
-
-    const char *fps_text;
-    if (is_pal_system) {
-        if (fps_limit == 0) fps_text = "25";
-        else if (fps_limit == 1) fps_text = "50";
-        else fps_text = "Uncapped";
+    if (flicker < 40) {
+        brightness = 255;
+    } else if (flicker < 60) {
+        brightness = 200 + (rand() % 55);
+    } else if (flicker < 80) {
+        brightness = 120 + (rand() % 80);
+    } else if (flicker < 95) {
+        brightness = 50 + (rand() % 70);
     } else {
-        if (fps_limit == 0) fps_text = "30";
-        else if (fps_limit == 1) fps_text = "60";
-        else fps_text = "Uncapped";
+        brightness = 10 + (rand() % 40);
     }
-    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 4,
-                     "FPS Limit: %s", fps_text);
-    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 5,
-                     "Background: %s", render_background_enabled ? "ON" : "OFF");
 
-    // Controls hint
-    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, y2 - 20,
-                     "Up/Down: Select  A: Toggle");
+    uint8_t light_color[4] = {brightness, brightness, brightness, 255};
+
+    float offset_distance = 15.0f;
+    T3DVec3 light_pos = {{
+        cursor_pos.v[0] - look_dir.v[0] * offset_distance,
+        cursor_pos.v[1] + 40.0f,
+        cursor_pos.v[2] - look_dir.v[2] * offset_distance
+    }};
+    t3d_light_set_point(1, light_color, &light_pos, 300.0f, false);
 }
+
+// =============================================================================
+// Frustum Culling
+// =============================================================================
+
+static int culled_count = 0;
 
 static bool is_entity_in_frustum(Entity *entity, T3DVec3 cam_position, T3DVec3 cam_target, float fov_degrees) {
-    // Direction from camera to entity
     float dx = entity->position.v[0] - cam_position.v[0];
     float dy = entity->position.v[1] - cam_position.v[1];
     float dz = entity->position.v[2] - cam_position.v[2];
 
-    // Squared distance to entity
     float distance_sq = dx * dx + dy * dy + dz * dz;
-    if (distance_sq < 0.000001f) return true;  // Entity at camera position
+    if (distance_sq < 0.000001f) return true;
 
-    // Normalize direction to entity using fast inverse sqrt
     float inv_dist = fast_inv_sqrt(distance_sq);
     dx *= inv_dist;
     dy *= inv_dist;
     dz *= inv_dist;
 
-    // Camera forward direction
     float fx = cam_target.v[0] - cam_position.v[0];
     float fy = cam_target.v[1] - cam_position.v[1];
     float fz = cam_target.v[2] - cam_position.v[2];
@@ -300,19 +113,15 @@ static bool is_entity_in_frustum(Entity *entity, T3DVec3 cam_position, T3DVec3 c
     fy *= inv_forward;
     fz *= inv_forward;
 
-    // Dot product (cosine of angle between camera forward and direction to entity)
     float dot = dx * fx + dy * fy + dz * fz;
 
-    // Convert FOV to cosine threshold (with some padding for object radius)
     float half_fov_rad = T3D_DEG_TO_RAD(fov_degrees * 0.5f);
-    float cos_threshold = cosf(half_fov_rad * 1.2f);  // 1.2 = padding
+    float cos_threshold = cosf(half_fov_rad * 1.2f);
 
-    // Behind camera or outside FOV
     if (dot < cos_threshold) {
         return false;
     }
 
-    // Distance culling - compute actual distance only when needed
     float distance = 1.0f / inv_dist;
     float radius = entity->scale * 50.0f;
     if (distance - radius > CAM_FAR_PLANE) {
@@ -322,67 +131,21 @@ static bool is_entity_in_frustum(Entity *entity, T3DVec3 cam_position, T3DVec3 c
     return true;
 }
 
-static int culled_count = 0;
-
-static void draw_entities_culled(Entity *entity_array, int count, bool *skip_culling, bool *visibility) {
-    for (int i = 0; i < count; i++) {
-        if (skip_culling != NULL && skip_culling[i]) {
-            // Always draw, don't cull
-            draw_entity(&entity_array[i]);
-        } else if (visibility != NULL && visibility[i]) {
-            // Use pre-computed visibility
-            draw_entity(&entity_array[i]);
-        } else if (visibility == NULL && is_entity_in_frustum(&entity_array[i], camera.position, camera.target, CAM_DEFAULT_FOV)) {
-            // Fall back to live check if no visibility array provided
-            draw_entity(&entity_array[i]);
-        } else {
-            culled_count++;
-        }
-    }
-}
-
-// Pre-compute frustum visibility for all entities
 static void compute_visibility(Entity *entity_array, bool *visibility, int count) {
     for (int i = 0; i < count; i++) {
         visibility[i] = is_entity_in_frustum(&entity_array[i], camera.position, camera.target, CAM_DEFAULT_FOV);
     }
 }
 
+// =============================================================================
+// Entity Drawing with Culling and Sorting
+// =============================================================================
 
-static void update_cursor_scale_by_distance(Entity *cursor, Entity *station, float delta_time) {
-    // Calculate distance to station
-    float dx = cursor->position.v[0] - station->position.v[0];
-    float dz = cursor->position.v[2] - station->position.v[2];
-    float distance = sqrtf(dx * dx + dz * dz);
-
-    const float START_DISTANCE = 40.0f;  // Start shrinking at 50 units
-    const float END_DISTANCE = 30.0f;    // Reach min size at 20 units
-    const float MIN_SCALE = 0.05f;       // Minimum scale at station
-    const float MAX_SCALE = 1.0f;        // Normal scale when far away
-
-    float target_scale;
-    if (distance >= START_DISTANCE) {
-        target_scale = MAX_SCALE;  // Full size when 50+ units away
-    } else if (distance <= END_DISTANCE) {
-        target_scale = MIN_SCALE;  // Min size when 20 or fewer units away
-    } else {
-        // Interpolate between MIN_SCALE and MAX_SCALE in the 20-50 unit range
-        float t = (distance - END_DISTANCE) / (START_DISTANCE - END_DISTANCE);
-        // t = 0.0 at 20 units (min), 1.0 at 50 units (max)
-        target_scale = MIN_SCALE + (MAX_SCALE - MIN_SCALE) * t;
-    }
-
-    // Smoothly interpolate to target scale
-    float scale_speed = 2.0f;  // How fast the scale changes
-    cursor_scale_multiplier += (target_scale - cursor_scale_multiplier) * scale_speed * delta_time;
-}
-// Helper structure for distance sorting
 typedef struct {
     int index;
     float distance_sq;
 } EntityDistance;
 
-// Comparison function for sorting by distance (front to back)
 static int compare_distance(const void *a, const void *b) {
     const EntityDistance *ea = (const EntityDistance *)a;
     const EntityDistance *eb = (const EntityDistance *)b;
@@ -391,13 +154,11 @@ static int compare_distance(const void *a, const void *b) {
     return 0;
 }
 
-// Optimized draw with distance sorting for better Z-culling
 static void draw_entities_sorted(Entity *entity_array, int count, bool *skip_culling, bool *visibility) {
-    static EntityDistance sorted_indices[32];  // Max entities in any array
+    static EntityDistance sorted_indices[64];
     int visible_count = 0;
 
-    // Build list of visible entities with distances
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < count && visible_count < 64; i++) {
         bool should_draw = false;
 
         if (skip_culling != NULL && skip_culling[i]) {
@@ -419,367 +180,70 @@ static void draw_entities_sorted(Entity *entity_array, int count, bool *skip_cul
         }
     }
 
-    // Sort by distance (front to back for better Z-culling)
     if (visible_count > 1) {
         qsort(sorted_indices, visible_count, sizeof(EntityDistance), compare_distance);
     }
 
-    // Draw in sorted order
     for (int i = 0; i < visible_count; i++) {
         draw_entity(&entity_array[sorted_indices[i].index]);
     }
 }
 
-
 // =============================================================================
-// Initialization
-// =============================================================================
-
-
-static void init_subsystems(void) {
-    debug_init_isviewer();
-    debug_init_usblog();
-    asset_init_compression(2);
-    dfs_init(DFS_DEFAULT_LOCATION);
-    // display_init(hi_res, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
-    // display_init(RESOLUTION_320x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_DISABLED);
-    display_init(RESOLUTION_320x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
-    // display_init(RESOLUTION_640x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
-
-
-    // Detect TV type and set appropriate default FPS
-    tv_type_t tv = get_tv_type();
-    is_pal_system = (tv == TV_PAL);
-
-    // if (is_pal_system) {
-    //     display_set_fps_limit(25);  // PAL default (30fps mode)
-    // } else {
-    //     display_set_fps_limit(30);  // NTSC/MPAL default (30fps mode)
-    // }
-    // display_set_fps_limit(30);
-
-    rdpq_init();
-
-    joypad_init();
-    t3d_init((T3DInitParams){});
-    init_particles();  // This now calls tpx_init internally
-
-
-    rdpq_text_register_font(
-        FONT_BUILTIN_DEBUG_MONO,
-        rdpq_font_load_builtin(FONT_BUILTIN_DEBUG_MONO)
-    );
-
-
-    custom_font = rdpq_font_load("rom:/Nebula.font64"); // fav -- nice slant but a little large- though not a bad thing favor
-    icon_font = rdpq_font_load("rom:/IconBitOne.font64"); // fav -- nice slant but a little large- though not a bad thing favor
-
-
-    // custom_font = rdpq_font_load("rom:/Nulshock.font64"); // decent -- nice slant but a little large- though not a bad thing favor
-    //custom_font = rdpq_font_load("rom:/RobotRoc.font64"); // decent -- nice slant but a little large- though not a bad thing favor
-    // custom_font = rdpq_font_load("rom:/Induction.font64"); // big but might be good for title
-    // icon_font = rdpq_font_load("rom:/H19A-Luna.font64"); // good for symbols
-    rdpq_text_register_font(FONT_CUSTOM, custom_font);
-    rdpq_text_register_font(FONT_ICON, icon_font);
-    // rdpq_text_register_ICON_TWO, custom_font);
-
-   rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){
-        .color = RGBA32(255, 255, 255, 255),
-        // .outline_color = RGBA32(0, 0, 0, 0),
-	});
-
-    // Initialize audio
-    audio_init(32000, 4);  // 32kHz sample rate, 4 buffers
-    mixer_init(12);       // 12 channels (stereo sounds use 2 channels each)
-    set_bgm_volume(0.5f);
-
-
-
-
-
-    // Seed the random number generator - THIS IS THE KEY LINE
-    srand(get_ticks());
-}
-
-// =============================================================================
-// Cursor
+// Cursor Scale by Distance
 // =============================================================================
 
-static inline void clamp_cursor_position(void) {
-    cursor_position.v[0] = clampf(cursor_position.v[0], -PLAY_AREA_HALF_X, PLAY_AREA_HALF_X);
-    cursor_position.v[2] = clampf(cursor_position.v[2], -PLAY_AREA_HALF_Z, PLAY_AREA_HALF_Z);
-}
+static void update_cursor_scale_by_distance(Entity *cursor, Entity *station, float delta_time) {
+    float dx = cursor->position.v[0] - station->position.v[0];
+    float dz = cursor->position.v[2] - station->position.v[2];
+    float distance = sqrtf(dx * dx + dz * dz);
 
-static void update_cursor(float delta_time, float cam_yaw) {
-    joypad_inputs_t joypad = joypad_get_inputs(JOYPAD_PORT_1);
-    joypad_buttons_t held = joypad_get_buttons_held(JOYPAD_PORT_1);
+    const float START_DISTANCE = 40.0f;
+    const float END_DISTANCE = 30.0f;
+    const float MIN_SCALE = 0.05f;
+    const float MAX_SCALE = 1.0f;
 
-    float yaw_rad = T3D_DEG_TO_RAD(cam_yaw);
-    float cos_yaw = cosf(yaw_rad);
-    float sin_yaw = sinf(yaw_rad);
-
-    float rotated_x = (joypad.stick_x * cos_yaw - joypad.stick_y * sin_yaw);
-    float rotated_z = (joypad.stick_x * sin_yaw + joypad.stick_y * cos_yaw);
-
-    float stick_magnitude_sq = joypad.stick_x * joypad.stick_x +
-                               joypad.stick_y * joypad.stick_y;
-    float deadzone_sq = CURSOR_DEADZONE * CURSOR_DEADZONE;
-
-    if (fps_mode) {
-        // FPS mode: thrust forward/backward only
-        float stick_y = joypad.stick_y / 128.0f;
-
-        if (fabsf(stick_y) > 0.1f && cursor_entity) {
-            float thrust_x = -sinf(cursor_entity->rotation.v[1]) * stick_y * 128.0f;
-            float thrust_z = -cosf(cursor_entity->rotation.v[1]) * stick_y * 128.0f;
-            cursor_velocity.v[0] += thrust_x * CURSOR_THRUST * delta_time;
-            cursor_velocity.v[2] -= thrust_z * CURSOR_THRUST * delta_time;
-        }
-
+    float target_scale;
+    if (distance >= START_DISTANCE) {
+        target_scale = MAX_SCALE;
+    } else if (distance <= END_DISTANCE) {
+        target_scale = MIN_SCALE;
     } else {
-
-        // Isometric mode: rotate cursor to face stick direction
-        if (stick_magnitude_sq > deadzone_sq && cursor_entity) {
-            float stick_magnitude = sqrtf(stick_magnitude_sq);
-            cursor_entity->rotation.v[1] = atan2f(-rotated_x, -rotated_z);
-
-            cursor_look_direction.v[0] = -rotated_x / stick_magnitude;
-            cursor_look_direction.v[2] = rotated_z / stick_magnitude;
-            // spawn_exhaust(cursor_position, cursor_look_direction);
-
-        }
-
-        // Thrust in joystick direction
-        if (stick_magnitude_sq > deadzone_sq) {
-            cursor_velocity.v[0] += rotated_x * CURSOR_THRUST * delta_time;
-            cursor_velocity.v[2] -= rotated_z * CURSOR_THRUST * delta_time;
-        }
-
+        float t = (distance - END_DISTANCE) / (START_DISTANCE - END_DISTANCE);
+        target_scale = MIN_SCALE + (MAX_SCALE - MIN_SCALE) * t;
     }
 
-    // Apply drag
-    float drag = CURSOR_DRAG * delta_time;
-    if (drag > 1.0f) drag = 1.0f;
-
-    cursor_velocity.v[0] *= (1.0f - drag);
-    cursor_velocity.v[2] *= (1.0f - drag);
-
-    // Clamp velocity to max speed using squared comparison
-    float speed_sq = cursor_velocity.v[0] * cursor_velocity.v[0] +
-                     cursor_velocity.v[2] * cursor_velocity.v[2];
-    float max_speed_sq = CURSOR_MAX_SPEED * CURSOR_MAX_SPEED;
-
-    if (speed_sq > max_speed_sq) {
-        float speed = sqrtf(speed_sq);
-        float scale = CURSOR_MAX_SPEED / speed;
-        cursor_velocity.v[0] *= scale;
-        cursor_velocity.v[2] *= scale;
-    }
-
-    // Stop completely if very slow (0.1f * 0.1f = 0.01f)
-    if (speed_sq < 0.01f) {
-        cursor_velocity.v[0] = 0.0f;
-        cursor_velocity.v[2] = 0.0f;
-    }
-
-
-
-
-
-    // Apply velocity to position
-    cursor_position.v[0] += cursor_velocity.v[0] * delta_time;
-    cursor_position.v[2] += cursor_velocity.v[2] * delta_time;
-
-    // Round position to reduce jitter
-    cursor_position.v[0] = roundf(cursor_position.v[0] * 10.0f) / 10.0f;
-    cursor_position.v[2] = roundf(cursor_position.v[2] * 10.0f) / 10.0f;
-    if (cursor_entity) {
-        cursor_entity->position = cursor_position;
-        clamp_cursor_position();
-    }
+    float scale_speed = 2.0f;
+    game.cursor_scale_multiplier += (target_scale - game.cursor_scale_multiplier) * scale_speed * delta_time;
 }
-
-
-
-
-static void start_entity_color_flash(Entity *entity, color_t flash_color, float duration_seconds) {
-    // Single pass: update existing or find free slot
-    for (int i = 0; i < MAX_COLOR_FLASHES; i++) {
-        if (color_flashes[i].active && color_flashes[i].entity == entity) {
-            color_flashes[i].timer = 0.0f;
-            color_flashes[i].duration = duration_seconds;
-            color_flashes[i].flash_color = flash_color;
-            return;
-        }
-    }
-
-    // Find free slot (only if existing flash not found)
-    for (int i = 0; i < MAX_COLOR_FLASHES; i++) {
-        if (!color_flashes[i].active) {
-            color_flashes[i].entity = entity;
-            color_flashes[i].original_color = entity->color;
-            color_flashes[i].flash_color = flash_color;
-            color_flashes[i].timer = 0.0f;
-            color_flashes[i].duration = duration_seconds;
-            color_flashes[i].active = true;
-            entity->color = flash_color;
-            return;
-        }
-    }
-}
-
-static void update_color_flashes(float delta_time) {
-    for (int i = 0; i < MAX_COLOR_FLASHES; i++) {
-        if (!color_flashes[i].active) continue;
-
-        color_flashes[i].timer += delta_time;
-
-        if (color_flashes[i].timer >= color_flashes[i].duration) {
-            color_flashes[i].entity->color = color_flashes[i].original_color;
-            color_flashes[i].active = false;
-            color_flashes[i].entity = NULL;
-        } else {
-            int blink_state = (int)(color_flashes[i].timer * 10) % 2;
-            if (blink_state == 0) {
-                color_flashes[i].entity->color = color_flashes[i].flash_color;
-            } else {
-                color_flashes[i].entity->color = color_flashes[i].original_color;
-            }
-        }
-    }
-}
-
-static float calculate_asteroid_damage(Entity *asteroid) {
-    // Mass approximation (volume scales with cube of size)
-    float mass = asteroid->scale * asteroid->scale * asteroid->scale;
-    float kinetic_energy = 0.25f * mass * asteroid->speed * asteroid->speed;
-    return kinetic_energy * DAMAGE_MULTIPLIER;
-}
-
-
-static float station_iframe_timer = 0.0f;
-static const float STATION_IFRAME_DURATION = 1.0f;  // 1 second invincibility
-static void check_station_asteroid_collisions(Entity *station, Entity *asteroids, int count, float delta_time) {
-    // Update iframe timer
-    if (station_iframe_timer > 0.0f) {
-        station_iframe_timer -= delta_time;
-    }
-
-    for (int i = 0; i < count; i++) {
-        // Distance-based early rejection - skip if too far away
-        float dx = station->position.v[0] - asteroids[i].position.v[0];
-        float dz = station->position.v[2] - asteroids[i].position.v[2];
-        float dist_sq = dx * dx + dz * dz;
-        float max_range = station->collision_radius + asteroids[i].collision_radius + 50.0f;
-        if (dist_sq > max_range * max_range) continue;
-
-        if (check_entity_intersection(station, &asteroids[i])) {
-            // Only apply damage if not in iframe period
-            if (station_iframe_timer <= 0.0f) {
-                float damage = calculate_asteroid_damage(&asteroids[i]);
-                if (damage >= MAX_DAMAGE) {
-                    damage = MAX_DAMAGE;
-                }
-                // if (damage <= MAX_DAMAGE) {
-                //     damage = 100.0f;
-                // }
-                // damage = MAX_DAMAGE * 3.0f;  // Station always takes max damage from asteroid hit
-                spawn_explosion(asteroids[i].position);
-
-                station->value -= damage;
-                station_last_damage = (int)damage;  // Store damage
-                // Clamp to zero
-                if (station->value < 0) {
-                    station->value = 0;
-                    spawn_station_explosion(station->position);
-                    start_entity_color_flash(station, RGBA32(255, 255, 0, 125), 0.5f);
-                    play_sfx(5);
-                }
-                // Visual feedback
-                // start_entity_color_flash(station, RGBA32(255, 0, 0, 255), 0.5f);
-                // Start iframe period
-                station_iframe_timer = STATION_IFRAME_DURATION;
-            }
-
-            // Always reset asteroid to prevent multiple collisions
-            reset_entity(&asteroids[i], ASTEROID);
-        }
-    }
-}
-
-static float ship_damage_multiplier = 1.0f;
-static void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, int count) {
-    for (int i = 0; i < count; i++) {
-        // Skip culled asteroids
-        if (!asteroid_visible[i]) continue;
-
-        // Distance-based early rejection
-        float dx = cursor->position.v[0] - asteroids[i].position.v[0];
-        float dz = cursor->position.v[2] - asteroids[i].position.v[2];
-        float dist_sq = dx * dx + dz * dz;
-        float max_range = cursor->collision_radius + asteroids[i].collision_radius + 30.0f;
-        if (dist_sq > max_range * max_range) continue;
-
-        if (check_entity_intersection(cursor, &asteroids[i])) {
-            play_sfx(4);
-            float damage = calculate_asteroid_damage(&asteroids[i]);
-            if (damage >= MAX_DAMAGE * ship_damage_multiplier ) {
-                damage = MAX_DAMAGE * ship_damage_multiplier    ;
-            }
-            spawn_explosion(asteroids[i].position);
-            cursor->value -= damage;
-            cursor_last_damage = (int)damage;  // Store damage
-
-            if (cursor->value < 0) {
-                cursor->value = 0;
-            }
-
-
-            // start_entity_color_flash(cursor, RGBA32(255, 0, 0, 255), 0.5f);
-            // Add asteroid velocity to cursor velocity (knockback)
-            cursor_velocity.v[0] += asteroids[i].velocity.v[0] * KNOCKBACK_STRENGTH;
-            cursor_velocity.v[2] += asteroids[i].velocity.v[2] * KNOCKBACK_STRENGTH;
-            other_shake_enabled = damage > 0  ? 1 : 0;
-            if (other_shake_enabled)   {
-                trigger_screen_shake(3.0f, 0.25f);
-            }
-            reset_entity(&asteroids[i], ASTEROID);
-        }
-
-    }
-}
-
-
 
 // =============================================================================
 // Drone Movement
 // =============================================================================
 
-static void move_drone_elsewhere(Entity *drone, float delta_time, bool base_return) {
-
+static void move_drone_to_target(Entity *drone, float delta_time, bool base_return) {
     if (base_return) {
-        target_position.v[0] = 0.0f;
-        target_position.v[2] = 0.0f;
+        game.drone_target_position.v[0] = 0.0f;
+        game.drone_target_position.v[2] = 0.0f;
     }
 
-
-    float dx = target_position.v[0] - drone->position.v[0];
-    float dz = target_position.v[2] - drone->position.v[2];
+    float dx = game.drone_target_position.v[0] - drone->position.v[0];
+    float dz = game.drone_target_position.v[2] - drone->position.v[2];
     float distance_sq = dx * dx + dz * dz;
 
     if (distance_sq < DRONE_ARRIVE_THRESHOLD * DRONE_ARRIVE_THRESHOLD) {
-        move_drone = false;
-        drone_moving_to_resource = move_drone;
-        drone_moving_to_station = move_drone;
+        game.move_drone = false;
+        game.drone_moving_to_resource = false;
+        game.drone_moving_to_station = false;
         return;
     }
 
-    float angle_diff = normalize_angle(target_rotation - drone->rotation.v[1]);
+    float angle_diff = normalize_angle(game.drone_target_rotation - drone->rotation.v[1]);
     float rotation_factor = DRONE_ROTATION_SPEED * delta_time;
     if (rotation_factor > 1.0f) rotation_factor = 1.0f;
 
     if (fabsf(angle_diff) < 0.01f) {
-        drone->rotation.v[1] = target_rotation;
+        drone->rotation.v[1] = game.drone_target_rotation;
     } else {
         drone->rotation.v[1] += angle_diff * rotation_factor;
         drone->rotation.v[1] = normalize_angle(drone->rotation.v[1]);
@@ -790,304 +254,23 @@ static void move_drone_elsewhere(Entity *drone, float delta_time, bool base_retu
     drone->position.v[2] += dz * move_factor;
 }
 
-
-
-//beamlight
-// Define a new PointLight for the beam
-
-static float mining_accumulated = 0.0f;
-static int cursor_mining_resource = -1;
-static int drone_mining_resource = -1;
-static T3DMat4FP *miningLightMatFP = NULL;
-static bool cursor_is_mining = false;
-static bool drone_is_mining = false;
-static bool cursor_was_mining = false;  // Track previous frame state
-rspq_block_t *miningDplLight;
-
-
-// Function to load the beam as a point light
-void load_point_light() {
-  miningLightMatFP = malloc_uncached(sizeof(T3DMat4FP)); // Allocate matrix for mining light
-  rspq_block_begin();
-  miningDplLight = rspq_block_end();
-}
-
-void draw_mining_point_light(T3DVec3 cursor_pos, T3DVec3 look_dir) {
-  if (!cursor_is_mining || cursor_mining_resource < 0) return;
-
-  // Welder-like flicker effect - more dramatic intensity changes
-  int flicker = rand() % 100;
-  uint8_t brightness;
-
-  if (flicker < 40) {
-    brightness = 255;  // Full bright 40% of the time
-  } else if (flicker < 60) {
-    brightness = 200 + (rand() % 55);  // Medium-high flicker
-  } else if (flicker < 80) {
-    brightness = 120 + (rand() % 80);  // Medium flicker
-  } else if (flicker < 95) {
-    brightness = 50 + (rand() % 70);  // Dim flicker
-  } else {
-    brightness = 10 + (rand() % 40);  // Very dim - almost off
-  }
-
-  uint8_t light_color[4] = {brightness, brightness, brightness, 255};
-
-
-
-  // Position light in front of cursor (like a headlamp)
-  float offset_distance = 15.0f;
-  T3DVec3 light_pos = {{
-    cursor_pos.v[0] - look_dir.v[0] * offset_distance,
-    cursor_pos.v[1] + 40.0f,  // Slightly above cursor
-    cursor_pos.v[2] - look_dir.v[2] * offset_distance
-  }};
-  t3d_light_set_point(1, light_color, &light_pos, 300.0f, false);
-}
-
-// void draw_drone_mining_point_light(T3DVec3 drone_pos) {
-//   if (!drone_is_mining || drone_mining_resource < 0) return;
-
-//   // Welder-like flicker effect - more dramatic intensity changes
-//   int flicker = rand() % 100;
-//   uint8_t brightness;
-
-//   if (flicker < 40) {
-//     brightness = 255;  // Full bright 40% of the time
-//   } else if (flicker < 60) {
-//     brightness = 200 + (rand() % 55);  // Medium-high flicker
-//   } else if (flicker < 80) {
-//     brightness = 120 + (rand() % 80);  // Medium flicker
-//   } else if (flicker < 95) {
-//     brightness = 50 + (rand() % 70);  // Dim flicker
-//   } else {
-//     brightness = 10 + (rand() % 40);  // Very dim - almost off
-//   }
-
-//   uint8_t light_color[4] = {brightness, brightness, brightness, 255};
-
-//   // Position light at drone position (drone hovers above resource)
-//   T3DVec3 light_pos = {{
-//     drone_pos.v[0],
-//     drone_pos.v[1] + 20.0f,  // Slightly above drone
-//     drone_pos.v[2]
-//   }};
-//   t3d_light_set_point(2, light_color, &light_pos, 300.0f, false);  // Use light index 2
-// }
-
-static void mine_resource(Entity *entity, Entity *resource, float delta_time) { // this seems slower
-    float amount = delta_time * MINING_RATE;
-    mining_accumulated += amount;
-
-    // Only transfer whole units
-    if (mining_accumulated >= 1.0f) {
-        int transfer = (int)mining_accumulated;
-        resource->value -= transfer;
-        cursor_resource_val += transfer;
-        mining_accumulated -= transfer;
-        spawn_mining_sparks(resource->position);
-    }
-
-
-    resource_val = resource->value;
-
-
-    if (resource->value <= 0) {
-        mining_accumulated = 0.0f;  // Reset accumulator
-        resource->value = 0;
-        resource->color = COLOR_ASTEROID;
-        entity->value += 5; // replenish some energy on resource depletion
-        reset_entity(resource, RESOURCE);
-    }
-}
-
-static void drone_mine_resource(Entity *entity, Entity *resource, float delta_time) {
-    float amount = delta_time * DRONE_MINING_RATE;
-    drone_mining_accumulated += amount;
-
-    // Only transfer whole units
-    if (drone_mining_accumulated >= 1.0f && drone_resource_val < DRONE_MAX_RESOURCES) {
-        int transfer = (int)drone_mining_accumulated;
-        resource->value -= transfer;
-        // entity->value += transfer;
-        drone_resource_val += transfer;
-        entity->value = drone_resource_val;
-        drone_mining_accumulated -= transfer;
-        spawn_mining_sparks(entity->position);
-    }
-
-
-    resource_val = resource->value;
-
-    if (resource->value <= 0) {
-        drone_mining_accumulated = 0.0f;  // Reset accumulator
-        resource->value = 0;
-        resource->color = COLOR_ASTEROID;
-        reset_entity(resource, RESOURCE);
-    }
-}
-
-static void check_cursor_resource_collisions(Entity *cursor, Entity *resources, int count, float delta_time) {
-    cursor_mining_resource = -1;
-    cursor_is_mining = false;
-    bool found_mining = false;
-
-    for (int i = 0; i < count; i++) {
-        // Skip culled resources
-        if (!resource_visible[i]) {
-            cursor->color = COLOR_CURSOR;
-            continue;
-        }
-
-        // Distance-based early rejection
-        float dx = cursor->position.v[0] - resources[i].position.v[0];
-        float dz = cursor->position.v[2] - resources[i].position.v[2];
-        float dist_sq = dx * dx + dz * dz;
-        float max_range = cursor->collision_radius + resources[i].collision_radius + 20.0f;
-        if (dist_sq > max_range * max_range) {
-            cursor->color = COLOR_CURSOR;
-            continue;
-        }
-
-        if (check_entity_intersection(cursor, &resources[i]) && (cursor_resource_val < CURSOR_RESOURCE_CAPACITY)) {
-            cursor_is_mining = true;
-
-            // Flicker both resource and cursor color - welder effect
-            int flicker = rand() % 100;
-            if (flicker < 10) {
-                cursor->color = RGBA32(0, 0, 0, 255);  // Cursor flashes white too
-            } else if (flicker < 40) {
-                resources[i].color = RGBA32(255, 255, 255, 255);  // White flash
-                cursor->color = RGBA32(100, 100, 100, 255);  // Cursor flashes white too
-            } else if (flicker < 70) {
-                resources[i].color = RGBA32(200, 200, 200, 255);  // Light gray
-                cursor->color = RGBA32(220, 220, 220, 255);  // Cursor light gray
-            } else {
-                resources[i].color = COLOR_RESOURCE;  // Normal color
-                cursor->color = COLOR_CURSOR;  // Cursor normal color
-            }
-
-            // Only play sound when mining starts
-            if (!cursor_was_mining) {
-                play_sfx(1);
-            }
-            found_mining = true;
-            cursor_mining_resource = i;
-            mine_resource(cursor, &resources[i], delta_time);
-            break;  // Only mine one at a time
-        } else {
-            // Reset cursor color if not mining
-            cursor->color = COLOR_CURSOR;
-        }
-    }
-
-    // Update mining state for next frame
-    cursor_was_mining = found_mining;
-}
-
-static void check_drone_resource_collisions(Entity *entity, Entity *resources, int count, float delta_time) {
-    drone_mining_resource = -1;
-    drone_collecting_resource = false;  // Reset flag each frame
-    drone_is_mining = false;
-
-    // Update drone_full based on current resource level
-    drone_full = (drone_resource_val >= DRONE_MAX_RESOURCES);
-
-    for (int i = 0; i < count; i++) {
-        // Skip culled resources
-        if (!resource_visible[i]) continue;
-
-        // Distance-based early rejection
-        float dx = entity->position.v[0] - resources[i].position.v[0];
-        float dz = entity->position.v[2] - resources[i].position.v[2];
-        float dist_sq = dx * dx + dz * dz;
-        float max_range = entity->collision_radius + resources[i].collision_radius + 20.0f;
-        if (dist_sq > max_range * max_range) continue;
-
-        if (check_entity_intersection(entity, &resources[i]) && drone_resource_val < DRONE_MAX_RESOURCES) {
-            drone_collecting_resource = true;
-            drone_is_mining = true;
-            entity->position.v[1] = resources[i].position.v[1] + 5.0f; // hover above resource
-            entity->position.v[0] = resources[i].position.v[0];
-            entity->position.v[2] = resources[i].position.v[2];
-
-            // Flicker resource color between white and normal - welder effect
-            int flicker = rand() % 100;
-            if (flicker < 40) {
-                resources[i].color = RGBA32(111, 239, 255, 255);  // White flash 27, 154, 170, 255)
-            } else if (flicker < 70) {
-                resources[i].color = RGBA32(200, 200, 200, 255);  // Light gray
-            } else {
-                resources[i].color = COLOR_RESOURCE;  // Normal color
-            }
-
-
-
-            // play_sfx(1);
-            drone_mining_resource = i;
-            drone_mine_resource(entity, &resources[i], delta_time);
-
-            break;  // Only mine one at a time
-        }
-    }
-}
-
-static void check_drone_station_collisions(Entity *drone, Entity *station, int count) {
-        if (check_entity_intersection(drone, station)) {
-            station->value += drone_resource_val;
-            drone_resource_val = 0;
-            drone->value = drone_resource_val;
-            // start_entity_color_flash(station, RGBA32(0, 255, 0, 255), 0.5f);
-        }
-
-}
-static void check_drone_cursor_collisions(Entity *drone, Entity *cursor, int count) {
-        if (check_entity_intersection(drone, cursor)) {
-            cursor->value += drone_resource_val;
-            drone_resource_val = 0;
-            drone->value = drone_resource_val;
-            // start_entity_color_flash(cursor, RGBA32(0, 255, 0, 255), 0.5f);
-        }
-}
-
-
-static void reset_resource_colors(Entity *resources, int count) {
-    for (int i = 0; i < count; i++) {
-        if (i == tile_following_resource) {
-            // Resource is tagged by tile, use tile color
-            resources[i].color = COLOR_TILE;
-        } else if (i != highlighted_resource && i != cursor_mining_resource && i != drone_mining_resource) {
-            resources[i].color = COLOR_RESOURCE;
-        } else if (resources[i].value <= 0) {
-            resources[i].color = COLOR_ASTEROID;
-        }
-    }
-}
-
-
-void check_cursor_station_collision(Entity *cursor, Entity *station) {
-    if (check_entity_intersection(cursor, station)) {
-        station->value += cursor_resource_val;
-        cursor_resource_val = 0;
-        // start_entity_color_flash(station, RGBA32(0, 255, 0, 255), 0.5f);
-    }
-}
+// =============================================================================
+// Tile Visibility and Following
+// =============================================================================
 
 static void update_tile_visibility(Entity *tile) {
-    // Stop following if drone becomes full
-    if (drone_full && tile_following_resource >= 0) {
-        tile_following_resource = -1;
+    if (game.drone_full && game.tile_following_resource >= 0) {
+        game.tile_following_resource = -1;
     }
 
-    // If tile is following a resource, position it at that resource
-    if (tile_following_resource >= 0 && tile_following_resource < RESOURCE_COUNT) {
-        tile->position.v[0] = resources[tile_following_resource].position.v[0];
+    if (game.tile_following_resource >= 0 && game.tile_following_resource < RESOURCE_COUNT) {
+        tile->position.v[0] = resources[game.tile_following_resource].position.v[0];
         tile->position.v[1] = 8.0f;
-        tile->position.v[2] = resources[tile_following_resource].position.v[2];
-    } else if (move_drone) {
-        tile->position.v[0] = target_position.v[0];
+        tile->position.v[2] = resources[game.tile_following_resource].position.v[2];
+    } else if (game.move_drone) {
+        tile->position.v[0] = game.drone_target_position.v[0];
         tile->position.v[1] = 8.0f;
-        tile->position.v[2] = target_position.v[2];
+        tile->position.v[2] = game.drone_target_position.v[2];
     } else {
         tile->position.v[0] = 0.0f;
         tile->position.v[1] = 1000.0f;
@@ -1095,202 +278,92 @@ static void update_tile_visibility(Entity *tile) {
     }
 }
 
-static void check_tile_resource_collision(Entity *tile, Entity *resources, int count) {
-    // Only check if tile is visible and not already following something
-    if (tile->position.v[1] > 100.0f) return;  // Tile is hidden
-    if (drone_full) return;  // Don't follow resources if drone is full
-
-    for (int i = 0; i < count; i++) {
-        // Skip culled resources
-        if (!resource_visible[i]) continue;
-
-        if (check_entity_intersection(tile, &resources[i])) {
-            // Start following this resource
-            tile_following_resource = i;
-
-            // Send drone to this resource
-            target_position.v[0] = resources[i].position.v[0];
-            target_position.v[1] = resources[i].position.v[1];
-            target_position.v[2] = resources[i].position.v[2];
-            target_rotation = 0.0f;  // Face forward
-            move_drone = true;
-            drone_moving_to_resource = true;
-            drone_moving_to_station = false;
-
-            return;
-        }
-    }
-}
-
 static void check_tile_following_status(Entity *drone) {
-    // If tile is following a resource and drone reaches it, return tile
-    if (tile_following_resource >= 0 && tile_following_resource < RESOURCE_COUNT) {
-        // Check if drone is at the resource the tile is following
-        if (drone_mining_resource == tile_following_resource) {
-            // Drone reached the resource, stop following
-            tile_following_resource = -1;
+    if (game.tile_following_resource >= 0 && game.tile_following_resource < RESOURCE_COUNT) {
+        if (game.drone_mining_resource == game.tile_following_resource) {
+            game.tile_following_resource = -1;
         }
     }
 }
-
-void reset_game_state() {
-    entities[ENTITY_STATION].value = 100;
-    entities[ENTITY_CURSOR].value = 100;
-
-    cursor_resource_val = 0;
-    drone_resource_val = 0;
-    mining_accumulated = 0.0f;
-    drone_mining_accumulated = 0.0f;
-    tile_following_resource = -1;
-    move_drone = false;
-    drone_moving_to_resource = false;
-    drone_moving_to_station = false;
-    drone_full = false;
-}
-
 
 // =============================================================================
-// Input
+// Initialization
 // =============================================================================
 
-static int menu_input_delay = 0;
+static void init_subsystems(void) {
+    debug_init_isviewer();
+    debug_init_usblog();
+    asset_init_compression(2);
+    dfs_init(DFS_DEFAULT_LOCATION);
+    display_init(RESOLUTION_320x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
 
-static void process_input(float delta_time, float *cam_yaw, T3DViewport *viewport) {
-    joypad_inputs_t joypad = joypad_get_inputs(JOYPAD_PORT_1);
-    joypad_buttons_t held = joypad_get_buttons_held(JOYPAD_PORT_1);
-    joypad_buttons_t pressed = joypad_get_buttons_pressed(JOYPAD_PORT_1);
+    tv_type_t tv = get_tv_type();
+    game.is_pal_system = (tv == TV_PAL);
 
-    // Toggle pause with START
-    if (pressed.start) {
-        game_paused = !game_paused;
-        menu_selection = 0;
-        menu_input_delay = 0;
+    rdpq_init();
+    joypad_init();
+    t3d_init((T3DInitParams){});
+    init_particles();
 
-        // Duck BGM volume when paused, restore when unpaused
-        if (game_paused) {
-            set_bgm_volume(0.25f);  // Lower volume
-        } else {
-            set_bgm_volume(0.5f);   // Normal volume
-        }
-        return;
-    }
+    rdpq_text_register_font(FONT_BUILTIN_DEBUG_MONO, rdpq_font_load_builtin(FONT_BUILTIN_DEBUG_MONO));
 
-    if (game_paused) {
-        // Decrease delay timer
-        if (menu_input_delay > 0) menu_input_delay--;
+    custom_font = rdpq_font_load("rom:/Nebula.font64");
+    icon_font = rdpq_font_load("rom:/IconBitOne.font64");
 
-        // Navigate up
-        if (menu_input_delay == 0 && (pressed.d_up || pressed.c_up || joypad.stick_y > 50)) {
-            menu_selection--;
-            if (menu_selection < 0) menu_selection = MENU_OPTIONS_COUNT - 1;
-            menu_input_delay = 10;  // Delay before next input
-        }
+    rdpq_text_register_font(FONT_CUSTOM, custom_font);
+    rdpq_text_register_font(FONT_ICON, icon_font);
 
-        // Navigate down
-        if (menu_input_delay == 0 && (pressed.d_down || pressed.c_down || joypad.stick_y < -50)) {
-            menu_selection++;
-            if (menu_selection >= MENU_OPTIONS_COUNT) menu_selection = 0;
-            menu_input_delay = 10;
-        }
+    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){
+        .color = RGBA32(255, 255, 255, 255),
+    });
 
-        // Select with A (no delay needed for button press)
-        if (pressed.a) {
-            switch (menu_selection) {
-                case MENU_OPTION_RESUME:
-                    game_paused = false;
-                    game_over = false;
-                    reset_game_state();
-                    set_bgm_volume(0.5f);  // Restore normal volume
-                    break;
-                case MENU_OPTION_CAMERA:
-                    fps_mode = !fps_mode;
-                    break;
-                case MENU_OPTION_HIRES:
-                    hi_res_mode = !hi_res_mode;
-                    display_close();
-                    if (hi_res_mode) {
-                        display_init(RESOLUTION_640x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
-                    } else {
-                        display_init(RESOLUTION_320x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
-                    }
-                    // Recreate viewport with new resolution
-                    *viewport = t3d_viewport_create();
-                    break;
-                case MENU_OPTION_AUDIO:
-                    bgm_track = (bgm_track + 1) % 4;  // Cycle through 0,1,2,3
-                    stop_bgm();
-                    if (bgm_track == 1) {
-                        play_bgm("rom:/nebrun.wav64");
-                    } else if (bgm_track == 2) {
-                        play_bgm("rom:/orbodd.wav64");
-                    } else if (bgm_track == 3) {
-                        play_bgm("rom:/lunram.wav64");  // Replace with third track filename
-                    }
-                    break;
-                case MENU_OPTION_30HZ:
-                    fps_limit = (fps_limit + 1) % 3;  // Cycle through options
-                    if (fps_limit == 0) {
-                        display_set_fps_limit(is_pal_system ? 25 : 30);
-                    } else if (fps_limit == 1) {
-                        display_set_fps_limit(is_pal_system ? 50 : 60);
-                    } else {
-                        display_set_fps_limit(0);  // 0 = uncapped
-                    }
-                    break;
-                case MENU_OPTION_BG:  // Background option (after FPS Limit)
-                    render_background_enabled = !render_background_enabled;
-                    break;
-            }
-        }
-        return;
-    }
+    audio_init(32000, 4);
+    mixer_init(12);
+    set_bgm_volume(0.5f);
 
-    if (!fps_mode) {
-        float rotation_speed = CAM_ROTATION_SPEED * delta_time;
-        if (held.r) *cam_yaw -= rotation_speed;  // Rotate right
-        if (held.z) *cam_yaw += rotation_speed;  // Rotate left
-    }
+    srand(get_ticks());
 
-    if (!held.r && pressed.c_up) {
-        fps_mode = !fps_mode;
-    }
+    init_game_state();
+}
 
-    if (pressed.l) reset_fps_stats();
+// =============================================================================
+// Lighting Setup
+// =============================================================================
 
+static void setup_lighting(void) {
+    uint8_t color_ambient[4] = {0x50, 0x50, 0x50, 0xFF};
+    uint8_t color_directional[4] = {0xFF, 0xFF, 0xFF, 0xFF};
 
-    if (pressed.d_up) render_debug = !render_debug;
-    if (pressed.d_left) show_fps = !show_fps;
-    // if (pressed.d_down) spawn_explosion(cursor_position);
+    T3DVec3 light_dir = {{300.0f, 100.0f, 1.0f}};
+    t3d_vec3_norm(&light_dir);
 
+    t3d_light_set_ambient(color_ambient);
+    t3d_light_set_directional(0, color_directional, &light_dir);
+}
 
-    drone_heal = held.b;
+// =============================================================================
+// Background Rendering
+// =============================================================================
 
-    if (pressed.b && cursor_entity) {
-        target_rotation = cursor_entity->rotation.v[1];
-        // target_position = cursor_position;
-        float offset_distance = 30.0f;  // How far in front of cursor
-        target_position.v[0] = cursor_position.v[0] - cursor_look_direction.v[0] * offset_distance;
-        target_position.v[1] = cursor_position.v[1];
-        target_position.v[2] = cursor_position.v[2] - cursor_look_direction.v[2] * offset_distance;
-        move_drone = true;
-        drone_moving_to_resource = move_drone;
-        drone_moving_to_station = false;
-        // Stop tile from following resource when placed elsewhere
-        tile_following_resource = -1;
-         play_sfx(2);
-    }
+static void render_background(sprite_t *background, float cam_yaw) {
+    float normalized_yaw = fmodf(cam_yaw, 360.0f);
+    if (normalized_yaw < 0) normalized_yaw += 360.0f;
 
-    if (pressed.c_down && cursor_entity) {
-        // move drone to station
-        target_rotation = 0.0f;
-        target_position.v[0] = 0.0f;
-        target_position.v[2] = 0.0f;
-        move_drone = true;
+    int offset_x = (int)(normalized_yaw * 2.84444444f);
+    int screen_width = display_get_width();
+    bool needs_wrap = (offset_x + screen_width > BG_WIDTH);
 
-        drone_moving_to_station = move_drone;
-        drone_moving_to_resource = false;
+    rdpq_set_mode_copy(false);
+    rdpq_sprite_blit(background, -offset_x, 0, NULL);
+
+    if (needs_wrap) {
+        rdpq_sprite_blit(background, BG_WIDTH - offset_x, 0, NULL);
     }
 }
+
+// =============================================================================
+// UI Drawing
+// =============================================================================
 
 static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset, const char *label, int cursor) {
     if (entity->value < 0) entity->value = 0;
@@ -1305,7 +378,6 @@ static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset
     }
 
     float health_percent = entity->value / max_value;
-
     if (health_percent > 1.0f) health_percent = 1.0f;
     if (health_percent < 0.0f) health_percent = 0.0f;
 
@@ -1333,28 +405,15 @@ static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset
         rdpq_fill_rectangle(x + fill_width, y, x + bar_width, y + bar_height);
     }
 
-    // Label with damage
     rdpq_sync_pipe();
-
-    rdpq_text_printf(
-        &(rdpq_textparms_t){
-            .char_spacing = 1,
-        },
-        FONT_CUSTOM,
-        x + bar_width + 5,
-        y + bar_height,
-        "%s",
-        label);
+    rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
+                     x + bar_width + 5, y + bar_height, "%s", label);
 }
-
-
-
 
 static void draw_entity_resource_bar(int resource_val, float max_value, int y_offset, const char *label, bool show_triangle) {
     int bar_width = 40;
     int bar_height = 4;
 
-    // Position in lower right
     int x = display_get_width() - bar_width - 10;
     int y = SCREEN_HEIGHT - y_offset;
 
@@ -1363,305 +422,180 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
         x = 8;
     }
 
-
     float resource_percent = resource_val / max_value;
     if (resource_percent > 1.0f) resource_percent = 1.0f;
     if (resource_percent < 0.0f) resource_percent = 0.0f;
 
     int fill_width = (int)(bar_width * resource_percent);
-
     color_t bar_color = RGBA32(0, 191, 255, 255);
 
     rdpq_sync_pipe();
     rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
 
     if (!show_triangle) {
-        // Draw resource fill
         if (fill_width > 0) {
             rdpq_set_prim_color(bar_color);
             rdpq_fill_rectangle(x, y, x + fill_width, y + bar_height);
         }
 
-        // Draw empty portion in gray
         if (fill_width < bar_width) {
             rdpq_set_prim_color(RGBA32(50, 50, 60, 255));
             rdpq_fill_rectangle(x + fill_width, y, x + bar_width, y + bar_height);
         }
-    } else {
-        // // Draw resource fill
-        // if (fill_width > 0) {
-        //     rdpq_set_prim_color(bar_color);
-        //     rdpq_fill_rectangle(x, y, x + fill_width, y + bar_height);
-        // }
-        // // Draw empty portion in gray
-        // if (fill_width < bar_width) {
-        //     rdpq_set_prim_color(RGBA32(80, 80, 80, 255));
-        //     rdpq_fill_rectangle(x + fill_width, y, x + bar_width, y + bar_height);
-        // }
     }
-
-    // Label
-    // rdpq_sync_pipe();
-    // rdpq_text_printf(NULL, FONT_CUSTOM, x + bar_width + 5, y + bar_height, "%s", label);
 
     int icon_x = x - 20;
     int icon_y = y - 6;
-
-
 
     if (show_triangle) {
         icon_x = display_get_width() - 30;
         int action_x = icon_x - 8;
         int action_y = icon_y + 10;
+
         rdpq_sync_pipe();
         rdpq_set_mode_standard();
         rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
 
-         // Triangle indicator only for drone when collecting
-        if (drone_resource_val >= DRONE_MAX_RESOURCES) {
-            rdpq_set_prim_color(RGBA32(220, 0, 115, 255));  // Red tint
-            drone_collecting_resource = false;  // prevent mining when full
+        if (game.drone_resource_val >= DRONE_MAX_RESOURCES) {
+            rdpq_set_prim_color(RGBA32(220, 0, 115, 255));
+            game.drone_collecting_resource = false;
         } else {
-            rdpq_set_prim_color(RGBA32(0, 255, 191, 255));  // Cyan tint
+            rdpq_set_prim_color(RGBA32(0, 255, 191, 255));
         }
 
-
-        rdpq_mode_alphacompare(1);  // Enable transparency
+        rdpq_mode_alphacompare(1);
         rdpq_sprite_blit(drone_icon, icon_x, icon_y, &(rdpq_blitparms_t){
-            .scale_x = 1.0f,  // Half size
+            .scale_x = 1.0f,
             .scale_y = 1.0f
         });
 
-
-        if (blink_timer < 10) {
-            if (drone_collecting_resource ) {
+        if (game.blink_timer < 10) {
+            if (game.drone_collecting_resource) {
                 rdpq_sync_pipe();
                 rdpq_set_mode_standard();
                 rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
                 rdpq_set_prim_color(RGBA32(220, 0, 115, 255));
-
-                rdpq_mode_alphacompare(1);  // Enable transparency
+                rdpq_mode_alphacompare(1);
                 rdpq_sprite_blit(drill_icon, action_x, action_y, &(rdpq_blitparms_t){
-                    .scale_x = 1.0f,  // Half size
-                    .scale_y = 1.0f
+                    .scale_x = 1.0f, .scale_y = 1.0f
                 });
-                drone_moving_to_resource = false;
-                drone_moving_to_station = false;
-            } else if (drone_moving_to_resource) {
+                game.drone_moving_to_resource = false;
+                game.drone_moving_to_station = false;
+            } else if (game.drone_moving_to_resource) {
                 rdpq_sync_pipe();
                 rdpq_set_mode_standard();
                 rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
                 rdpq_set_prim_color(RGBA32(255, 128, 13, 255));
-                rdpq_mode_alphacompare(1);  // Enable transparency
+                rdpq_mode_alphacompare(1);
                 rdpq_sprite_blit(tile_icon, action_x, action_y, &(rdpq_blitparms_t){
-                    .scale_x = 1.0f,  // Half size
-                    .scale_y = 1.0f
+                    .scale_x = 1.0f, .scale_y = 1.0f
                 });
-                drone_collecting_resource = false;
-                drone_moving_to_station = false;
-            } else if (drone_moving_to_station) {
+                game.drone_collecting_resource = false;
+                game.drone_moving_to_station = false;
+            } else if (game.drone_moving_to_station) {
                 rdpq_sync_pipe();
                 rdpq_set_mode_standard();
                 rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
-                rdpq_set_prim_color(RGBA32(200, 200, 200, 255));  // Red tint
-
-                rdpq_mode_alphacompare(1);  // Enable transparency
+                rdpq_set_prim_color(RGBA32(200, 200, 200, 255));
+                rdpq_mode_alphacompare(1);
                 rdpq_sprite_blit(station_icon, action_x, action_y, &(rdpq_blitparms_t){
-                    .scale_x = 1.0f,  // Half size
-                    .scale_y = 1.0f
+                    .scale_x = 1.0f, .scale_y = 1.0f
                 });
-                drone_collecting_resource = false;
-                drone_moving_to_resource = false;
-            } else if (drone_full) {
+                game.drone_collecting_resource = false;
+                game.drone_moving_to_resource = false;
+            } else if (game.drone_full) {
                 rdpq_sync_pipe();
                 rdpq_set_mode_standard();
                 rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
-                rdpq_set_prim_color(RGBA32(137, 252, 0, 255));  // Red tint
-
-                rdpq_mode_alphacompare(1);  // Enable transparency
+                rdpq_set_prim_color(RGBA32(137, 252, 0, 255));
+                rdpq_mode_alphacompare(1);
                 rdpq_sprite_blit(drone_full_icon, action_x, action_y, &(rdpq_blitparms_t){
-                    .scale_x = 1.0f,  // Half size
-                    .scale_y = 1.0f
+                    .scale_x = 1.0f, .scale_y = 1.0f
                 });
-                drone_collecting_resource = false;
-                drone_moving_to_resource = false;
-                drone_moving_to_station = false;
+                game.drone_collecting_resource = false;
+                game.drone_moving_to_resource = false;
+                game.drone_moving_to_station = false;
             }
         }
     }
-
-    //else {
-    //     rdpq_sync_pipe();
-    //     rdpq_set_mode_standard();
-    //     rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
-    //     rdpq_set_prim_color(RGBA32(170, 170, 170, 255));  // Red tint
-
-    //     rdpq_mode_alphacompare(1);  // Enable transparency
-    //     rdpq_sprite_blit(ship_icon, icon_x, icon_y, &(rdpq_blitparms_t){
-    //         .scale_x = 0.5f,  // Half size
-    //         .scale_y = 0.5f
-    //     });
-    // }
 }
 
 static void draw_info_bars(void) {
     draw_entity_health_bar(&entities[ENTITY_STATION], STATION_MAX_HEALTH, 0, "STATION", 0);
     draw_entity_health_bar(cursor_entity, CURSOR_MAX_HEALTH, 15, "CURSOR", 1);
-    draw_entity_resource_bar(cursor_resource_val, CURSOR_RESOURCE_CAPACITY, 15, "CURSOR", false);
-    draw_entity_resource_bar(drone_resource_val, DRONE_MAX_RESOURCES, 20, "DRONE", true);
+    draw_entity_resource_bar(game.cursor_resource_val, CURSOR_RESOURCE_CAPACITY, 15, "CURSOR", false);
+    draw_entity_resource_bar(game.drone_resource_val, DRONE_MAX_RESOURCES, 20, "DRONE", true);
 }
-
 
 // =============================================================================
-// Rendering
+// Frame Rendering
 // =============================================================================
-
-
-
-static void setup_lighting(void) {
-
-    rspq_block_t *dplLight; //
-
-    uint8_t color_ambient[4] = {0x50, 0x50, 0x50, 0xFF};  // Moderately darker
-    uint8_t color_directional[4] = {0xFF, 0xFF, 0xFF, 0xFF};
-
-    T3DVec3 light_dir = {{300.0f, 100.0f, 1.0f}};
-    t3d_vec3_norm(&light_dir);
-
-    t3d_light_set_ambient(color_ambient);
-    t3d_light_set_directional(0, color_directional, &light_dir);
-
-    // Light count will be set in render_frame after all lights are configured
-}
-
-
-static void render_background(sprite_t *background, float cam_yaw) {
-    float normalized_yaw = fmodf(cam_yaw, 360.0f);
-    if (normalized_yaw < 0) normalized_yaw += 360.0f;
-
-    // Use multiplication instead of division: BG_WIDTH/360 = 1024/360 = 2.84444444
-    int offset_x = (int)(normalized_yaw * 2.84444444f);
-
-    // Get actual screen width dynamically for hi-res support
-    int screen_width = display_get_width();
-
-    // Pre-compute wrap condition
-    bool needs_wrap = (offset_x + screen_width > BG_WIDTH);
-
-    rdpq_set_mode_copy(false);
-    rdpq_sprite_blit(background, -offset_x, 0, NULL);
-
-    // Wrap for seamless loop
-    if (needs_wrap) {
-        rdpq_sprite_blit(background, BG_WIDTH - offset_x, 0, NULL);
-    }
-}
-
 
 static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_yaw, float delta_time) {
     culled_count = 0;
     rdpq_attach(display_get(), display_get_zbuf());
 
-    // Panning background (optional for performance testing)
-    if (render_background_enabled) {
+    if (game.render_background_enabled) {
         render_background(background, cam_yaw);
     } else {
-        // Clear the screen to black when background is disabled
         rdpq_set_mode_fill(RGBA32(0, 0, 0, 255));
         rdpq_fill_rectangle(0, 0, display_get_width(), display_get_height());
     }
 
-    // 3D setup
     t3d_frame_start();
     t3d_viewport_attach(viewport);
     t3d_screen_clear_depth();
     setup_lighting();
 
-    // Add mining pointlights for cursor and/or drone
-    int light_count = 1;  // Start with directional light
-
-    // Cursor now uses color flickering instead of point light
-    // Uncomment below to use point light instead:
-    // if (cursor_is_mining && cursor_mining_resource >= 0) {
-    //     draw_mining_point_light(cursor_position, cursor_look_direction);
-    //     light_count++;
-    // }
-
-    // Drone now uses color flickering instead of point light
-
+    int light_count = 1;
     t3d_light_set_count(light_count);
 
-    // // Skip culling for specific entities
     bool entity_skip_culling[ENTITY_COUNT] = {false};
-    entity_skip_culling[ENTITY_GRID] = true;     // Always draw grid
-    entity_skip_culling[ENTITY_CURSOR] = true;   // Always draw cursor
+    entity_skip_culling[ENTITY_GRID] = true;
+    entity_skip_culling[ENTITY_CURSOR] = true;
 
-     // Draw particles
-
-    // Draw opaque entities first (skip station and grid - draw them at end)
+    // Draw main entities
     for (int i = 0; i < ENTITY_COUNT; i++) {
-        if (i == ENTITY_STATION || i == ENTITY_GRID) continue;  // Skip, draw at end
+        if (i == ENTITY_STATION || i == ENTITY_GRID) continue;
 
-
-
-        // Special handling for cursor - apply distance-based scale
-        if (i == ENTITY_CURSOR && cursor_scale_multiplier != 1.0f) {
-            // Save original scale
+        // Cursor with distance-based scale
+        if (i == ENTITY_CURSOR && game.cursor_scale_multiplier != 1.0f) {
             float original_scale = entities[i].scale;
-
-            // Update matrix with scaled size
             T3DMat4 temp_mat;
             t3d_mat4_from_srt_euler(&temp_mat,
-                (float[3]){original_scale * cursor_scale_multiplier,
-                           original_scale * cursor_scale_multiplier,
-                           original_scale * cursor_scale_multiplier},
+                (float[3]){original_scale * game.cursor_scale_multiplier,
+                           original_scale * game.cursor_scale_multiplier,
+                           original_scale * game.cursor_scale_multiplier},
                 (float[3]){entities[i].rotation.v[0], entities[i].rotation.v[1], entities[i].rotation.v[2]},
                 entities[i].position.v);
             t3d_mat4_to_fixed(entities[i].matrix, &temp_mat);
-
-            // Draw with modified scale
             draw_entity(&entities[i]);
-
-            // Restore original scale (matrix will be updated next frame anyway)
             entities[i].scale = original_scale;
             continue;
         }
 
-
-
-        // Special handling for tile - apply animated scale
-        if (i == ENTITY_TILE && (drone_moving_to_station || move_drone || tile_following_resource >= 0)) {
-            // Save original values
+        // Tile with animated scale
+        if (i == ENTITY_TILE && (game.drone_moving_to_station || game.move_drone || game.tile_following_resource >= 0)) {
             color_t original_color = entities[i].color;
             float original_scale = entities[i].scale;
 
-
-            // Set color based on state
-            if (drone_moving_to_station) {
-                entities[i].color = RGBA32(255, 0, 255, 255);  // Magenta when moving to station
+            if (game.drone_moving_to_station) {
+                entities[i].color = RGBA32(255, 0, 255, 255);
             }
-            // else keep original color
 
-            // Update matrix with animated scale for x, y, z
             T3DMat4 temp_mat;
             t3d_mat4_from_srt_euler(&temp_mat,
-                (float[3]){original_scale * tile_scale_multiplier, original_scale, original_scale * tile_scale_multiplier},  // Animated on x and z
+                (float[3]){original_scale * game.tile_scale_multiplier, original_scale, original_scale * game.tile_scale_multiplier},
                 (float[3]){entities[i].rotation.v[0], entities[i].rotation.v[1], entities[i].rotation.v[2]},
                 entities[i].position.v);
             t3d_mat4_to_fixed(entities[i].matrix, &temp_mat);
-
-            // Draw with modified properties
             draw_entity(&entities[i]);
-
-            // Restore original values
             entities[i].color = original_color;
             entities[i].scale = original_scale;
-            // Note: matrix will be updated next frame anyway, so no need to restore it
             continue;
         }
 
         if (entity_skip_culling[i]) {
-            // Always draw without culling
             draw_entity(&entities[i]);
         } else if (is_entity_in_frustum(&entities[i], camera.position, camera.target, CAM_DEFAULT_FOV)) {
             draw_entity(&entities[i]);
@@ -1670,61 +604,55 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
         }
     }
 
-    // Draw asteroids and resources with distance sorting for better Z-culling (disabled - better framerate without it)
+    // Draw asteroids and resources
     draw_entities_sorted(asteroids, ASTEROID_COUNT, NULL, asteroid_visible);
     draw_entities_sorted(resources, RESOURCE_COUNT, NULL, resource_visible);
 
-    // Draw station SECOND TO LAST with transparency so other objects show through
+    // Draw station with fade
     if (is_entity_in_frustum(&entities[ENTITY_STATION], camera.position, camera.target, CAM_DEFAULT_FOV)) {
         draw_entity_with_fade(&entities[ENTITY_STATION], 300.0f);
     } else {
         culled_count++;
     }
 
-    // Draw grid LAST (always visible)
+    // Draw grid last
     draw_entity(&entities[ENTITY_GRID]);
 
-     // Render particles at ~30Hz for performance
-    particle_render_timer += delta_time;
-    if (particle_render_timer >= 0.033f) {  // 30Hz = 1/30 = 0.033s
+    // Render particles at ~30Hz
+    game.particle_render_timer += delta_time;
+    if (game.particle_render_timer >= 0.033f) {
         draw_particles(viewport);
-        particle_render_timer = 0.0f;
+        game.particle_render_timer = 0.0f;
     }
-    frame_count++;
+    game.frame_count++;
 
-    if (show_fps) {
-        draw_fps_display(); // remove this
+    if (game.show_fps) {
+        draw_fps_display(fps_stats.current, fps_stats.avg, fps_stats.min, fps_stats.max, debug_particle_count);
     }
-
 
     draw_info_bars();
 
-
-
-    if (render_debug) {
-        render_debug_ui(cursor_position, entities, resources, RESOURCE_COUNT, culled_count, cursor_resource_val, drone_resource_val);
+    if (game.render_debug) {
+        render_debug_ui(game.cursor_position, entities, resources, RESOURCE_COUNT, culled_count,
+                        game.cursor_resource_val, game.drone_resource_val);
     }
 
-    // if (game_over || game_over_pause) {
-    //     entities[ENTITY_STATION].position.v[1] = -1000.0f; // Hide station
-    // }else {
-    //     entities[ENTITY_STATION].position.v[1] = DEFAULT_HEIGHT; // Reset station position
-    // }
-    if (game_paused || game_over) {
+    if (game.state == STATE_PAUSED || game.game_over) {
         draw_pause_menu();
-     }
+    }
+
     rdpq_detach_show();
 }
 
 // =============================================================================
-// Main
+// Main Entry Point
 // =============================================================================
-
 
 int main(void) {
     init_subsystems();
     T3DViewport viewport = t3d_viewport_create();
 
+    // Load sprites
     sprite_t *background = sprite_load("rom:/bg1024v2.sprite");
     station_icon = sprite_load("rom:/station2.sprite");
     drill_icon = sprite_load("rom:/drill2.sprite");
@@ -1733,44 +661,45 @@ int main(void) {
     drone_full_icon = sprite_load("rom:/drone_full.sprite");
     health_icon = sprite_load("rom:/health.sprite");
 
-    // entities[ENTITY_STATION] = create_entity("rom:/stationew.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}}, 5.000f, COLOR_STATION, DRAW_TEXTURED_LIT, 30.0f);
-
-    entities[ENTITY_STATION] = create_entity("rom:/stationew.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}}, 0.75000f, COLOR_STATION, DRAW_TEXTURED_LIT, 30.0f);
+    // Create entities
+    entities[ENTITY_STATION] = create_entity("rom:/stationew.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}},
+                                              0.75f, COLOR_STATION, DRAW_TEXTURED_LIT, 30.0f);
     entities[ENTITY_STATION].value = STATION_MAX_HEALTH;
 
-    entities[ENTITY_CURSOR] = create_entity("rom:/miner.t3dm", cursor_position, 0.562605f, COLOR_CURSOR, DRAW_TEXTURED_LIT, 10.0f);
+    entities[ENTITY_CURSOR] = create_entity("rom:/cursor2.t3dm", game.cursor_position,
+                                             0.562605f, COLOR_CURSOR, DRAW_SHADED, 10.0f);
     entities[ENTITY_CURSOR].value = CURSOR_MAX_HEALTH;
-    entities[ENTITY_DRONE] = create_entity("rom:/dronenew.t3dm", (T3DVec3){{20.0f, DEFAULT_HEIGHT, 29.0f}}, 0.55f, COLOR_DRONE, DRAW_SHADED, 30.0f);
-    entities[ENTITY_TILE] = create_entity("rom:/tile2.t3dm", (T3DVec3){{0, 1000, 0}}, 1.0f, COLOR_TILE, DRAW_SHADED, 10.0f);
 
-    // entities[ENTITY_STATION] = create_entity("rom:/ringalt.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}}, 1.0f, COLOR_STATION, DRAW_SHADED, 30.0f);
+    entities[ENTITY_DRONE] = create_entity("rom:/dronenew.t3dm", (T3DVec3){{20.0f, DEFAULT_HEIGHT, 29.0f}},
+                                            0.55f, COLOR_DRONE, DRAW_SHADED, 30.0f);
+    entities[ENTITY_TILE] = create_entity("rom:/tile2.t3dm", (T3DVec3){{0, 1000, 0}},
+                                           1.0f, COLOR_TILE, DRAW_SHADED, 10.0f);
+    entities[ENTITY_GRID] = create_entity("rom:/grid.t3dm", (T3DVec3){{0, 1, 0}},
+                                           1.0f, COLOR_MAP, DRAW_SHADED, 0.0f);
 
     init_asteroids(asteroids, ASTEROID_COUNT);
     init_resources(resources, RESOURCE_COUNT);
 
-    entities[ENTITY_GRID] = create_entity("rom:/grid.t3dm", (T3DVec3){{0, 1, 0}}, 1.0f, COLOR_MAP, DRAW_SHADED, 0.00f);
-
-
     cursor_entity = &entities[ENTITY_CURSOR];
 
-    float last_time = get_time_s() - (1.0f / 60.0f);
-    float cam_yaw = CAM_ANGLE_YAW;
+    load_point_light();
+    init_ambient_particles();
 
-    load_point_light(); // Initialize mining light (once)
-    init_ambient_particles(); // Initialize ambient background particles
+    // Load audio
+    wav64_open(&sfx_mining, "rom:/ploop.wav64");
+    wav64_open(&sfx_dcom, "rom:/dronecommand.wav64");
+    wav64_open(&sfx_dfull, "rom:/dronecommand.wav64");
+    wav64_open(&sfx_shiphit, "rom:/shiphit.wav64");
 
-    wav64_open(&sfx_mining, "rom:/ploop.wav64"); //mining sound effect
-    wav64_open(&sfx_dcom, "rom:/dronecommand.wav64"); //mining sound effect
-    wav64_open(&sfx_dfull, "rom:/dronecommand.wav64"); //mining sound effect
-    wav64_open(&sfx_shiphit, "rom:/shiphit.wav64"); //mining sound effect
-
-
-
-
-    // Start with track 1 by default
-    if (bgm_track == 1) {
+    if (game.bgm_track == 1) {
         play_bgm("rom:/nebrun.wav64");
     }
+
+    float last_time = get_time_s() - (1.0f / 60.0f);
+
+    // =============================================================================
+    // Main Game Loop
+    // =============================================================================
 
     for (;;) {
         float current_time = get_time_s();
@@ -1778,135 +707,124 @@ int main(void) {
         last_time = current_time;
 
         joypad_poll();
-        process_input(delta_time, &cam_yaw, &viewport);
+        update_input();
+        process_system_input(&viewport);
 
-        if (!game_paused) {
-            update_cursor(delta_time, cam_yaw);
-            update_cursor_scale_by_distance(&entities[ENTITY_CURSOR], &entities[ENTITY_STATION], delta_time);  // ADD THIS LINE
+        if (game.state == STATE_PLAYING && !game.game_over) {
+            process_game_input(delta_time);
+            update_cursor_movement(delta_time, cursor_entity);
+            update_cursor_scale_by_distance(&entities[ENTITY_CURSOR], &entities[ENTITY_STATION], delta_time);
 
-            update_camera(&viewport, cam_yaw, delta_time, cursor_position, fps_mode, cursor_entity);
+            update_camera(&viewport, game.cam_yaw, delta_time, game.cursor_position, game.fps_mode, cursor_entity);
             update_screen_shake(delta_time);
             update_tile_visibility(&entities[ENTITY_TILE]);
 
-            // Only check tile collisions if drone is not full
-            if (!drone_full) {
+            // Tile collision (only if drone not full)
+            if (!game.drone_full) {
                 check_tile_resource_collision(&entities[ENTITY_TILE], resources, RESOURCE_COUNT);
             }
 
             check_tile_following_status(&entities[ENTITY_DRONE]);
 
-            // Animate tile scale based on state
-            if (drone_moving_to_station) {
-                // Pulsing effect: grow from 1x to 4x, then reset and repeat
-                tile_scale_multiplier += delta_time * 3.0f;
-                if (tile_scale_multiplier >= 4.0f) {
-                    tile_scale_multiplier = 1.0f;  // Reset to 1x and start growing again
+            // Tile scale animation
+            if (game.drone_moving_to_station) {
+                game.tile_scale_multiplier += delta_time * 3.0f;
+                if (game.tile_scale_multiplier >= 4.0f) {
+                    game.tile_scale_multiplier = 1.0f;
                 }
-            } else if (move_drone || tile_following_resource >= 0) {
-                // Pulsing effect when placed: grow from 0.25x to 1.0x, then reset and repeat
-                tile_scale_multiplier += delta_time * 1.25f;  // Grow at 1.25x per second
-                if (tile_scale_multiplier >= 1.0f) {
-                    tile_scale_multiplier = 0.25f;  // Reset to start and repeat
+            } else if (game.move_drone || game.tile_following_resource >= 0) {
+                game.tile_scale_multiplier += delta_time * 1.25f;
+                if (game.tile_scale_multiplier >= 1.0f) {
+                    game.tile_scale_multiplier = 0.25f;
                 }
             } else {
-                // Tile is hidden, reset scale for next placement
-                tile_scale_multiplier = 0.25f;
+                game.tile_scale_multiplier = 0.25f;
             }
 
-            if (move_drone) {
-                move_drone_elsewhere(&entities[ENTITY_DRONE], delta_time, false);
+            // Drone movement
+            if (game.move_drone) {
+                move_drone_to_target(&entities[ENTITY_DRONE], delta_time, false);
             }
 
+            // Update world
             update_asteroids(asteroids, ASTEROID_COUNT, delta_time);
             update_resources(resources, RESOURCE_COUNT, delta_time);
-
-            // rotate_entity(&entities[ENTITY_STATION], delta_time, 0.250f);
-
             update_particles(delta_time);
 
-
-            // Update ambient particles at ~20Hz for performance
-            ambient_particle_timer += delta_time;
-            if (ambient_particle_timer >= 0.05f) {  // 20Hz = 1/20 = 0.05s
-                update_ambient_particles(ambient_particle_timer);
-                ambient_particle_timer = 0.0f;
+            // Ambient particles at ~20Hz
+            game.ambient_particle_timer += delta_time;
+            if (game.ambient_particle_timer >= 0.05f) {
+                update_ambient_particles(game.ambient_particle_timer);
+                game.ambient_particle_timer = 0.0f;
             }
 
-            // Update entity matrices - always update main entities
+            // Update matrices
             update_entity_matrices(entities, ENTITY_COUNT);
 
-            // Pre-compute visibility once for both collision and rendering
+            // Compute visibility
             compute_visibility(asteroids, asteroid_visible, ASTEROID_COUNT);
             compute_visibility(resources, resource_visible, RESOURCE_COUNT);
 
-            // Update asteroid matrices only for visible ones at ~30Hz
-            asteroid_matrix_timer += delta_time;
-            if (asteroid_matrix_timer >= 0.033f) {  // 30Hz = 1/30 = 0.033s
+            // Asteroid matrices at ~30Hz
+            game.asteroid_matrix_timer += delta_time;
+            if (game.asteroid_matrix_timer >= 0.033f) {
                 for (int i = 0; i < ASTEROID_COUNT; i++) {
                     if (asteroid_visible[i]) {
                         update_entity_matrix(&asteroids[i]);
                     }
                 }
-                asteroid_matrix_timer = 0.0f;
+                game.asteroid_matrix_timer = 0.0f;
             }
 
-            // Update resource matrices only for visible ones
+            // Resource matrices
             for (int i = 0; i < RESOURCE_COUNT; i++) {
                 if (resource_visible[i]) {
                     update_entity_matrix(&resources[i]);
                 }
             }
 
-            // Reset colors before collision checks
+            // Reset colors
             reset_resource_colors(resources, RESOURCE_COUNT);
 
-            // Collision detection - order from most frequent to least
+            // Collision detection
             check_cursor_resource_collisions(&entities[ENTITY_CURSOR], resources, RESOURCE_COUNT, delta_time);
             check_cursor_station_collision(&entities[ENTITY_CURSOR], &entities[ENTITY_STATION]);
-
             check_drone_resource_collisions(&entities[ENTITY_DRONE], resources, RESOURCE_COUNT, delta_time);
             check_drone_station_collisions(&entities[ENTITY_DRONE], &entities[ENTITY_STATION], 1);
 
-            if (drone_heal) {
+            if (game.drone_heal) {
                 check_drone_cursor_collisions(&entities[ENTITY_DRONE], &entities[ENTITY_CURSOR], 1);
             }
 
-            // Check asteroid collisions at ~30Hz for performance
-            collision_timer += delta_time;
-            if (collision_timer >= 0.033f) {  // 30Hz = 1/30 = 0.033s
-                check_cursor_asteroid_collisions(&entities[ENTITY_CURSOR], asteroids, ASTEROID_COUNT);
+            // Asteroid collisions at ~30Hz
+            game.collision_timer += delta_time;
+            if (game.collision_timer >= 0.033f) {
+                check_cursor_asteroid_collisions(&entities[ENTITY_CURSOR], asteroids, ASTEROID_COUNT, asteroid_visible);
                 check_station_asteroid_collisions(&entities[ENTITY_STATION], asteroids, ASTEROID_COUNT, delta_time);
-                collision_timer = 0.0f;
+                game.collision_timer = 0.0f;
             }
 
             update_color_flashes(delta_time);
             update_fps_stats(delta_time);
 
-            blink_timer++; // for indicators
-            if (blink_timer > 20) blink_timer = 0;
-
-
+            game.blink_timer++;
+            if (game.blink_timer > 20) game.blink_timer = 0;
         }
 
-
-         // Render while RSP/RDP are working
-        render_frame(&viewport, background, cam_yaw, delta_time);
-
-        // Do audio update while waiting for rendering
+        render_frame(&viewport, background, game.cam_yaw, delta_time);
         update_audio();
-        rspq_wait();  // Wait for RSP to finish
+        rspq_wait();
     }
 
     // Cleanup
     cleanup_particles();
-
     sprite_free(background);
     sprite_free(station_icon);
     sprite_free(drill_icon);
     sprite_free(tile_icon);
     sprite_free(drone_icon);
     sprite_free(drone_full_icon);
-    // sprite_free(health_icon);
+
     wav64_close(&sfx_mining);
     wav64_close(&sfx_dcom);
     wav64_close(&sfx_dfull);
