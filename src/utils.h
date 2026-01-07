@@ -5,6 +5,9 @@
 #include <stdlib.h>
 #include "constants.h"
 
+extern bool other_shake_enabled;
+extern bool game_over;
+
 static inline float get_time_s(void) {
     return (float)((double)get_ticks_us() / 1000000.0);
 }

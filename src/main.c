@@ -18,7 +18,6 @@
 
 
 
-
 // =============================================================================
 // Global State
 // =============================================================================
@@ -41,6 +40,8 @@ static float tile_scale_multiplier = 1.0f;  // Animated scale for tile when movi
 static bool render_debug = false;
 static bool fps_mode = false;
 static bool hi_res_mode = false;
+
+static float cursor_scale_multiplier = 1.0f;  // Dynamic scale based on distance to station
 
 static int resource_val = 0;
 static int drone_resource_val = 0;
@@ -84,6 +85,9 @@ static float fps_avg = 0.0f;
 static float fps_total = 0.0f;
 static int fps_frame_count = 0;
 
+// static float screen_shake_timer = 0.0f;
+// static float screen_shake_intensity = 0.0f;
+
 bool show_fps = false;
 
 void reset_fps_stats(void) {
@@ -106,7 +110,6 @@ void update_fps_stats(float delta_time) {
         fps_avg = fps_total / fps_frame_count;
     }
 }
-
 static void draw_fps_display(void) {
     int x = display_get_width() - 120;
     int y = 10;
@@ -126,7 +129,73 @@ static void draw_fps_display(void) {
                      "Particles: %d", debug_particle_count);
 }
 
+// // Call when explosion happens
+// void trigger_screen_shake(float intensity, float duration) {
+//     screen_shake_intensity = intensity;
+//     screen_shake_timer = duration;
+// }
+
+// // In update loop
+// void update_screen_shake(float delta_time) {
+//     if (screen_shake_timer > 0) {
+//         screen_shake_timer -= delta_time;
+//         if (screen_shake_timer <= 0) {
+//             screen_shake_intensity = 0;
+//         }
+//     }
+// }
+
+// void reset_game {
+//     // Reset game state variables
+//     resource_val = 0;
+//     drone_resource_val = 0;
+//     cursor_resource_val = 0;
+//     highlighted_resource = -1;
+//     move_drone = false;
+//     tile_following_resource = -1;
+//     tile_scale_multiplier = 1.0f;
+//     cursor_scale_multiplier = 1.0f;
+
+//     cursor_position.v[0] = 200.0f;
+//     cursor_position.v[1] = CURSOR_HEIGHT;
+//     cursor_position.v[2] = 100.0f;
+
+//     cursor_velocity.v[0] = 0.0f;
+//     cursor_velocity.v[1] = 0.0f;
+//     cursor_velocity.v[2] = 0.0f;
+
+//     // Reset entities
+//     for (int i = 0; i < ENTITY_COUNT; i++) {
+//         init_entity(&entities[i], i);
+//     }
+
+//     // Reset asteroids
+//     for (int i = 0; i < ASTEROID_COUNT; i++) {
+//         init_asteroid(&asteroids[i], i);
+//     }
+
+//     // Reset resources
+//     for (int i = 0; i < RESOURCE_COUNT; i++) {
+//         init_resource(&resources[i], i);
+//     }
+
+//     cursor_entity = &entities[ENTITY_CURSOR];
+
+//     // Reset other state variables as needed
+//     frame_count = 0;
+//     clear_all_particles();
+//     game_over = false;
+// }
+
+bool game_over_pause = false;
+
 void draw_pause_menu(void) {
+    if (game_over) {
+        game_paused = true;
+        game_over = false;
+        game_over_pause = true;
+    }
+
     int padding_x = display_get_width() * 0.2f;
     int padding_y = SCREEN_HEIGHT * 0.15f;
 
@@ -161,14 +230,18 @@ void draw_pause_menu(void) {
     rdpq_sync_pipe();
 
     // Title
-    rdpq_text_printf(NULL, FONT_CUSTOM, 120, y1 + 15, "AsteRisk");
+    rdpq_text_printf(&(rdpq_textparms_t){
+        .align = ALIGN_CENTER,
+        .width = display_get_width(),
+          // Add this to specify the width to center within
+    }, FONT_CUSTOM, 0, y1 + 15, "AsteRisk");  // Use 0 for x when centering
 
-    // Menu options
-    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y, "Resume");
+
+    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y,  "%s", game_over_pause? "Restart" : "Resume");
     rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height,
                      "Camera: %s", fps_mode ? "FPS" : "ISO");
     rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 2,
-                     "Hi-Res: %s", hi_res_mode ? "640x240" : "320x240");
+                     "Resolution: %s", hi_res_mode ? "640x240" : "320x240");
 
     const char *bgm_text;
     if (bgm_track == 0) bgm_text = "OFF";
@@ -275,6 +348,34 @@ static void compute_visibility(Entity *entity_array, bool *visibility, int count
     }
 }
 
+
+static void update_cursor_scale_by_distance(Entity *cursor, Entity *station, float delta_time) {
+    // Calculate distance to station
+    float dx = cursor->position.v[0] - station->position.v[0];
+    float dz = cursor->position.v[2] - station->position.v[2];
+    float distance = sqrtf(dx * dx + dz * dz);
+
+    const float START_DISTANCE = 40.0f;  // Start shrinking at 50 units
+    const float END_DISTANCE = 30.0f;    // Reach min size at 20 units
+    const float MIN_SCALE = 0.05f;       // Minimum scale at station
+    const float MAX_SCALE = 1.0f;        // Normal scale when far away
+
+    float target_scale;
+    if (distance >= START_DISTANCE) {
+        target_scale = MAX_SCALE;  // Full size when 50+ units away
+    } else if (distance <= END_DISTANCE) {
+        target_scale = MIN_SCALE;  // Min size when 20 or fewer units away
+    } else {
+        // Interpolate between MIN_SCALE and MAX_SCALE in the 20-50 unit range
+        float t = (distance - END_DISTANCE) / (START_DISTANCE - END_DISTANCE);
+        // t = 0.0 at 20 units (min), 1.0 at 50 units (max)
+        target_scale = MIN_SCALE + (MAX_SCALE - MIN_SCALE) * t;
+    }
+
+    // Smoothly interpolate to target scale
+    float scale_speed = 2.0f;  // How fast the scale changes
+    cursor_scale_multiplier += (target_scale - cursor_scale_multiplier) * scale_speed * delta_time;
+}
 // Helper structure for distance sorting
 typedef struct {
     int index;
@@ -350,11 +451,11 @@ static void init_subsystems(void) {
     tv_type_t tv = get_tv_type();
     is_pal_system = (tv == TV_PAL);
 
-    if (is_pal_system) {
-        display_set_fps_limit(25);  // PAL default (30fps mode)
-    } else {
-        display_set_fps_limit(30);  // NTSC/MPAL default (30fps mode)
-    }
+    // if (is_pal_system) {
+    //     display_set_fps_limit(25);  // PAL default (30fps mode)
+    // } else {
+    //     display_set_fps_limit(30);  // NTSC/MPAL default (30fps mode)
+    // }
     // display_set_fps_limit(30);
 
     rdpq_init();
@@ -369,8 +470,10 @@ static void init_subsystems(void) {
         rdpq_font_load_builtin(FONT_BUILTIN_DEBUG_MONO)
     );
 
+
     custom_font = rdpq_font_load("rom:/Nebula.font64"); // fav -- nice slant but a little large- though not a bad thing favor
     icon_font = rdpq_font_load("rom:/IconBitOne.font64"); // fav -- nice slant but a little large- though not a bad thing favor
+
 
     // custom_font = rdpq_font_load("rom:/Nulshock.font64"); // decent -- nice slant but a little large- though not a bad thing favor
     //custom_font = rdpq_font_load("rom:/RobotRoc.font64"); // decent -- nice slant but a little large- though not a bad thing favor
@@ -577,12 +680,20 @@ static void check_station_asteroid_collisions(Entity *station, Entity *asteroids
                 if (damage >= MAX_DAMAGE) {
                     damage = MAX_DAMAGE;
                 }
+                // if (damage <= MAX_DAMAGE) {
+                //     damage = 100.0f;
+                // }
+                // damage = MAX_DAMAGE * 3.0f;  // Station always takes max damage from asteroid hit
                 spawn_explosion(asteroids[i].position);
+
                 station->value -= damage;
                 station_last_damage = (int)damage;  // Store damage
                 // Clamp to zero
                 if (station->value < 0) {
                     station->value = 0;
+                    spawn_station_explosion(station->position);
+                    start_entity_color_flash(station, RGBA32(255, 255, 0, 125), 0.5f);
+                    play_sfx(5);
                 }
                 // Visual feedback
                 // start_entity_color_flash(station, RGBA32(255, 0, 0, 255), 0.5f);
@@ -628,7 +739,10 @@ static void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, 
             // Add asteroid velocity to cursor velocity (knockback)
             cursor_velocity.v[0] += asteroids[i].velocity.v[0] * KNOCKBACK_STRENGTH;
             cursor_velocity.v[2] += asteroids[i].velocity.v[2] * KNOCKBACK_STRENGTH;
-
+            other_shake_enabled = damage > 0  ? 1 : 0;
+            if (other_shake_enabled)   {
+                trigger_screen_shake(3.0f, 0.25f);
+            }
             reset_entity(&asteroids[i], ASTEROID);
         }
 
@@ -773,6 +887,7 @@ static void mine_resource(Entity *entity, Entity *resource, float delta_time) { 
         mining_accumulated -= transfer;
         spawn_mining_sparks(resource->position);
     }
+
 
     resource_val = resource->value;
 
@@ -1018,6 +1133,21 @@ static void check_tile_following_status(Entity *drone) {
     }
 }
 
+void reset_game_state() {
+    entities[ENTITY_STATION].value = 100;
+    entities[ENTITY_CURSOR].value = 100;
+
+    cursor_resource_val = 0;
+    drone_resource_val = 0;
+    mining_accumulated = 0.0f;
+    drone_mining_accumulated = 0.0f;
+    tile_following_resource = -1;
+    move_drone = false;
+    drone_moving_to_resource = false;
+    drone_moving_to_station = false;
+    drone_full = false;
+}
+
 
 // =============================================================================
 // Input
@@ -1068,6 +1198,8 @@ static void process_input(float delta_time, float *cam_yaw, T3DViewport *viewpor
             switch (menu_selection) {
                 case MENU_OPTION_RESUME:
                     game_paused = false;
+                    game_over = false;
+                    reset_game_state();
                     set_bgm_volume(0.5f);  // Restore normal volume
                     break;
                 case MENU_OPTION_CAMERA:
@@ -1470,11 +1602,39 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     for (int i = 0; i < ENTITY_COUNT; i++) {
         if (i == ENTITY_STATION || i == ENTITY_GRID) continue;  // Skip, draw at end
 
+
+
+        // Special handling for cursor - apply distance-based scale
+        if (i == ENTITY_CURSOR && cursor_scale_multiplier != 1.0f) {
+            // Save original scale
+            float original_scale = entities[i].scale;
+
+            // Update matrix with scaled size
+            T3DMat4 temp_mat;
+            t3d_mat4_from_srt_euler(&temp_mat,
+                (float[3]){original_scale * cursor_scale_multiplier,
+                           original_scale * cursor_scale_multiplier,
+                           original_scale * cursor_scale_multiplier},
+                (float[3]){entities[i].rotation.v[0], entities[i].rotation.v[1], entities[i].rotation.v[2]},
+                entities[i].position.v);
+            t3d_mat4_to_fixed(entities[i].matrix, &temp_mat);
+
+            // Draw with modified scale
+            draw_entity(&entities[i]);
+
+            // Restore original scale (matrix will be updated next frame anyway)
+            entities[i].scale = original_scale;
+            continue;
+        }
+
+
+
         // Special handling for tile - apply animated scale
         if (i == ENTITY_TILE && (drone_moving_to_station || move_drone || tile_following_resource >= 0)) {
             // Save original values
             color_t original_color = entities[i].color;
             float original_scale = entities[i].scale;
+
 
             // Set color based on state
             if (drone_moving_to_station) {
@@ -1544,7 +1704,13 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     if (render_debug) {
         render_debug_ui(cursor_position, entities, resources, RESOURCE_COUNT, culled_count, cursor_resource_val, drone_resource_val);
     }
-    if (game_paused) {
+
+    // if (game_over || game_over_pause) {
+    //     entities[ENTITY_STATION].position.v[1] = -1000.0f; // Hide station
+    // }else {
+    //     entities[ENTITY_STATION].position.v[1] = DEFAULT_HEIGHT; // Reset station position
+    // }
+    if (game_paused || game_over) {
         draw_pause_menu();
      }
     rdpq_detach_show();
@@ -1616,7 +1782,10 @@ int main(void) {
 
         if (!game_paused) {
             update_cursor(delta_time, cam_yaw);
+            update_cursor_scale_by_distance(&entities[ENTITY_CURSOR], &entities[ENTITY_STATION], delta_time);  // ADD THIS LINE
+
             update_camera(&viewport, cam_yaw, delta_time, cursor_position, fps_mode, cursor_entity);
+            update_screen_shake(delta_time);
             update_tile_visibility(&entities[ENTITY_TILE]);
 
             // Only check tile collisions if drone is not full
@@ -1654,6 +1823,7 @@ int main(void) {
             // rotate_entity(&entities[ENTITY_STATION], delta_time, 0.250f);
 
             update_particles(delta_time);
+
 
             // Update ambient particles at ~20Hz for performance
             ambient_particle_timer += delta_time;
@@ -1714,6 +1884,8 @@ int main(void) {
 
             blink_timer++; // for indicators
             if (blink_timer > 20) blink_timer = 0;
+
+
         }
 
 

@@ -23,9 +23,9 @@ static void init_rotation_tables(void) {
     }
     rotation_tables_initialized = true;
 }
-
+float astroSpeedMultiplier = 550.0f;
 void get_asteroid_velocity_and_scale (Entity *asteroid, T3DVec3 *out_velocity) {
-    asteroid->speed = randomize_float(200.0f, 450.0f);
+    asteroid->speed = randomize_float(astroSpeedMultiplier, 450.0f);
     asteroid->scale = randomize_float(0.1f, 1.3f);
 }
 

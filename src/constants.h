@@ -51,7 +51,7 @@
 #define RESOURCE_VALUE     100.0f // This will get multiplied by the scale to determine value
 #define RESOURCE_POOL_MAX  1000.0f
 #define RESOURCE_POOL_MIN  000.0f
-#define MINING_RATE        10.0f // per second
+#define MINING_RATE        5.0f // per second
 #define DRONE_MINING_RATE  2.50f  // per second
 
 // Debug UI

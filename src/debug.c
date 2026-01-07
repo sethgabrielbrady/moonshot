@@ -45,4 +45,9 @@ void render_debug_ui(T3DVec3 cursor_position, Entity entities[], Entity resource
     y += DEBUG_LINE_HEIGHT;
     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
                      "drone_resource_val: %d", drone_resource_val);
+
+    y += DEBUG_LINE_HEIGHT;
+    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
+                     "game_over?: %d", game_over ? 1 : 0);
+
 }

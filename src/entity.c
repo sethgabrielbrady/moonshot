@@ -1,5 +1,6 @@
 #include "entity.h"
 #include "camera.h"
+#include "utils.h"
 #include <rdpq.h>
 #include <math.h>
 
@@ -15,7 +16,7 @@ Entity create_entity(const char *model_path, T3DVec3 position, float scale, colo
         .speed = 1.0f,
         .collision_radius = collision_radius,
         .value = 0,
-        .draw_type = draw_type
+        .draw_type = draw_type,
     };
     return entity;
 }

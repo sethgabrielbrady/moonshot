@@ -14,3 +14,4 @@
 Makefile
 *.n64
 .DS_Store
+.tool-versions

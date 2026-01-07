@@ -1,5 +1,10 @@
 #include "utils.h"
 
+
+
+bool other_shake_enabled = false;
+bool game_over = false;
+
 const char* get_compass_direction(float angle) {
     while (angle < 0) angle += TWO_PI;
     while (angle >= TWO_PI) angle -= TWO_PI;
@@ -13,3 +18,5 @@ const char* get_compass_direction(float angle) {
     if (angle < 13.0f * T3D_PI / 8.0f) return "W";
     return "NW";
 }
+
+
