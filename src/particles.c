@@ -12,7 +12,9 @@
 // =============================================================================
 
 #define MAX_PARTICLES 512
-#define MAX_AMBIENT_PARTICLES 256
+#define MAX_AMBIENT_PARTICLES 400
+
+
 
 // =============================================================================
 // Debug
@@ -20,14 +22,13 @@
 
 int debug_particle_count = 0;
 
+
 // =============================================================================
 // Ambient Particle Structure
 // =============================================================================
 
 typedef struct {
     T3DVec3 position;
-    T3DVec3 velocity;
-    float speed;
     float size;
     bool active;
 } AmbientParticle;
@@ -311,9 +312,9 @@ void draw_particles(T3DViewport *viewport) {
         tpx->posA[2] = tpx->posB[2] = pz;
         tpx->sizeA = tpx->sizeB = size_fp;
 
-        tpx->colorA[0] = tpx->colorB[0] = 101;
-        tpx->colorA[1] = tpx->colorB[1] = 67;
-        tpx->colorA[2] = tpx->colorB[2] = 33;
+        tpx->colorA[0] = tpx->colorB[0] = 255;
+        tpx->colorA[1] = tpx->colorB[1] = 248;
+        tpx->colorA[2] = tpx->colorB[2] = 5;
         tpx->colorA[3] = tpx->colorB[3] = 255;
 
         tpx++;
@@ -342,6 +343,7 @@ void draw_particles(T3DViewport *viewport) {
     rdpq_sync_load();
     rdpq_set_mode_standard();
     rdpq_mode_zbuf(true, true);
+
     rdpq_mode_zoverride(true, 0, 0);
     rdpq_mode_filter(FILTER_POINT);
     rdpq_mode_alphacompare(10);
@@ -371,67 +373,16 @@ void draw_particles(T3DViewport *viewport) {
 // =============================================================================
 // Ambient Particles
 // =============================================================================
-
 void init_ambient_particles(void) {
     for (int i = 0; i < MAX_AMBIENT_PARTICLES; i++) {
         AmbientParticle *p = &ambient_particles[i];
         p->active = true;
 
+        // Random position in play area
         p->position.v[0] = (rand() % ((int)PLAY_AREA_SIZE * 2)) - PLAY_AREA_SIZE;
         p->position.v[1] = 24.0f + (rand() % 77);
         p->position.v[2] = (rand() % ((int)PLAY_AREA_SIZE * 2)) - PLAY_AREA_SIZE;
 
-        float angle = (rand() % 360) * (3.14159f / 180.0f);
-        p->velocity.v[0] = cosf(angle);
-        p->velocity.v[1] = 0;
-        p->velocity.v[2] = sinf(angle);
-
-        p->speed = 10.0f + (rand() % 20);
         p->size = (10 + (rand() % 31)) * 0.001f;
-    }
-}
-
-void update_ambient_particles(float delta_time) {
-    for (int i = 0; i < MAX_AMBIENT_PARTICLES; i++) {
-        AmbientParticle *p = &ambient_particles[i];
-        if (!p->active) continue;
-
-        p->position.v[0] += p->velocity.v[0] * p->speed * delta_time;
-        p->position.v[2] += p->velocity.v[2] * p->speed * delta_time;
-
-        // Check bounds and respawn
-        if (p->position.v[0] > PLAY_AREA_SIZE || p->position.v[0] < -PLAY_AREA_SIZE ||
-            p->position.v[2] > PLAY_AREA_SIZE || p->position.v[2] < -PLAY_AREA_SIZE) {
-            
-            int edge = rand() % 4;
-            switch (edge) {
-                case 0:
-                    p->position.v[0] = (rand() % ((int)PLAY_AREA_SIZE * 2)) - PLAY_AREA_SIZE;
-                    p->position.v[1] = 5.0f + (rand() % 77);
-                    p->position.v[2] = -PLAY_AREA_SIZE;
-                    break;
-                case 1:
-                    p->position.v[0] = (rand() % ((int)PLAY_AREA_SIZE * 2)) - PLAY_AREA_SIZE;
-                    p->position.v[1] = 5.0f + (rand() % 77);
-                    p->position.v[2] = PLAY_AREA_SIZE;
-                    break;
-                case 2:
-                    p->position.v[0] = -PLAY_AREA_SIZE;
-                    p->position.v[1] = 5.0f + (rand() % 77);
-                    p->position.v[2] = (rand() % ((int)PLAY_AREA_SIZE * 2)) - PLAY_AREA_SIZE;
-                    break;
-                case 3:
-                    p->position.v[0] = PLAY_AREA_SIZE;
-                    p->position.v[1] = 5.0f + (rand() % 77);
-                    p->position.v[2] = (rand() % ((int)PLAY_AREA_SIZE * 2)) - PLAY_AREA_SIZE;
-                    break;
-            }
-
-            float angle = (rand() % 360) * (3.14159f / 180.0f);
-            p->velocity.v[0] = cosf(angle);
-            p->velocity.v[2] = sinf(angle);
-            p->speed = 10.0f + (rand() % 20);
-            p->size = (10 + (rand() % 31)) * 0.001f;
-        }
     }
 }

@@ -7,36 +7,68 @@
 // FPS Stats
 // =============================================================================
 
+
 FPSStats fps_stats = {
     .current = 0.0f,
-    .min = 9999.0f,
-    .max = 0.0f,
     .avg = 0.0f,
-    .total = 0.0f,
+    .min = 0.0f,
+    .max = 0.0f,
+    .frame_times = {0},      // Add this
+    .frame_index = 0,        // Add this
+    .sample_count = 0,       // Add this
     .frame_count = 0
 };
 
 void reset_fps_stats(void) {
     fps_stats.min = 9999.0f;
     fps_stats.max = 0.0f;
-    fps_stats.total = 0.0f;
     fps_stats.frame_count = 0;
     fps_stats.avg = 0.0f;
 }
 
+// void update_fps_stats(float delta_time) {
+//     fps_stats.current = 1.0f / delta_time;
+
+//     if (fps_stats.current > 1.0f && fps_stats.current < 1000.0f) {
+//         if (fps_stats.current < fps_stats.min) fps_stats.min = fps_stats.current;
+//         if (fps_stats.current > fps_stats.max) fps_stats.max = fps_stats.current;
+
+//         fps_stats.total += fps_stats.current;
+//         fps_stats.frame_count++;
+//         fps_stats.avg = fps_stats.total / fps_stats.frame_count;
+//     }
+// }
+
 void update_fps_stats(float delta_time) {
-    fps_stats.current = 1.0f / delta_time;
+    // Use delta_time directly - it's the actual time between frames
+    float current_fps = (delta_time > 0.0f) ? (1.0f / delta_time) : 0.0f;
 
-    if (fps_stats.current > 1.0f && fps_stats.current < 1000.0f) {
-        if (fps_stats.current < fps_stats.min) fps_stats.min = fps_stats.current;
-        if (fps_stats.current > fps_stats.max) fps_stats.max = fps_stats.current;
+    // Clamp to reasonable values to avoid spikes
+    if (current_fps > 200.0f) current_fps = 200.0f;
+    if (current_fps < 1.0f) current_fps = 1.0f;
 
-        fps_stats.total += fps_stats.current;
-        fps_stats.frame_count++;
-        fps_stats.avg = fps_stats.total / fps_stats.frame_count;
+    fps_stats.current = current_fps;
+    fps_stats.frame_times[fps_stats.frame_index] = current_fps;
+    fps_stats.frame_index = (fps_stats.frame_index + 1) % FPS_SAMPLE_WINDOW;
+
+    if (fps_stats.sample_count < FPS_SAMPLE_WINDOW) {
+        fps_stats.sample_count++;
     }
-}
 
+    // Calculate average over last 6 seconds
+    float sum = 0.0f;
+    fps_stats.min = 9999.0f;
+    fps_stats.max = 0.0f;
+
+    for (int i = 0; i < fps_stats.sample_count; i++) {
+        float fps = fps_stats.frame_times[i];
+        sum += fps;
+        if (fps < fps_stats.min) fps_stats.min = fps;
+        if (fps > fps_stats.max) fps_stats.max = fps;
+    }
+
+    fps_stats.avg = sum / fps_stats.sample_count;
+}
 // =============================================================================
 // FPS Display
 // =============================================================================
@@ -64,7 +96,7 @@ void draw_fps_display(float current, float avg, float min, float max, int partic
 
 void draw_triangle_indicator(int x, int y) {
     rdpq_set_prim_color(RGBA32(255, 165, 0, 255));  // Orange
-    
+
     // Large triangle pointing right (14 pixels tall)
     rdpq_fill_rectangle(x, y + 6, x + 2, y + 8);
     rdpq_fill_rectangle(x + 2, y + 5, x + 4, y + 9);
@@ -77,7 +109,7 @@ void draw_triangle_indicator(int x, int y) {
 
 void draw_circle_indicator(int x, int y) {
     rdpq_set_prim_color(RGBA32(0, 191, 255, 255));  // Deep sky blue
-    
+
     // Simple circle approximation
     rdpq_fill_rectangle(x + 4, y, x + 10, y + 2);
     rdpq_fill_rectangle(x + 2, y + 2, x + 12, y + 4);
@@ -88,7 +120,7 @@ void draw_circle_indicator(int x, int y) {
 
 void draw_station_indicator(int x, int y) {
     rdpq_set_prim_color(RGBA32(0, 255, 0, 255));  // Green
-    
+
     // Simple house/station shape
     rdpq_fill_rectangle(x + 6, y, x + 8, y + 2);
     rdpq_fill_rectangle(x + 4, y + 2, x + 10, y + 4);
@@ -101,6 +133,11 @@ void draw_station_indicator(int x, int y) {
 // =============================================================================
 
 void draw_pause_menu(void) {
+
+    if (game.game_over) {
+        // game.game_over = false;
+        game.game_over_pause = true;
+    }
     int padding_x = display_get_width() * 0.2f;
     int padding_y = SCREEN_HEIGHT * 0.15f;
 
@@ -141,7 +178,7 @@ void draw_pause_menu(void) {
     }, FONT_CUSTOM, 0, y1 + 15, "AsteRisk");
 
     // Menu options
-    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y, "%s", 
+    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y, "%s",
                      game.game_over_pause ? "Restart" : "Resume");
     rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height,
                      "Camera: %s", game.fps_mode ? "FPS" : "ISO");

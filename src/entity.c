@@ -8,7 +8,7 @@
 // Entity Creation
 // =============================================================================
 
-Entity create_entity(const char *model_path, T3DVec3 position, float scale, 
+Entity create_entity(const char *model_path, T3DVec3 position, float scale,
                      color_t color, DrawType draw_type, float collision_radius) {
     Entity entity = {
         .model = t3d_model_load(model_path),
@@ -72,7 +72,10 @@ void draw_entity_with_fade(Entity *entity, float fade_distance) {
         float dx = camera.position.v[0] - entity->position.v[0];
         float dy = camera.position.v[1] - entity->position.v[1];
         float dz = camera.position.v[2] - entity->position.v[2];
-        float distance = sqrtf(dx * dx + dy * dy + dz * dz);
+        float distance_sq = dx * dx + dy * dy + dz * dz;
+
+        // Use fast inverse sqrt to get distance: dist = dist_sq * (1/sqrt(dist_sq))
+        float distance = distance_sq * fast_inv_sqrt(distance_sq);
 
         float min_distance = 50.0f;
         float max_distance = fade_distance;

@@ -1,10 +1,10 @@
 #include "input.h"
 #include "constants.h"
 #include "game_state.h"
-#include "utils.h"
 #include "camera.h"
 #include "audio.h"
 #include "ui.h"
+#include "utils.h"
 #include <math.h>
 
 // =============================================================================
@@ -37,7 +37,13 @@ void update_input(void) {
     input.stick_x = joypad.stick_x;
     input.stick_y = joypad.stick_y;
     input.stick_magnitude_sq = input.stick_x * input.stick_x + input.stick_y * input.stick_y;
-    input.stick_magnitude = sqrtf(input.stick_magnitude_sq);
+
+    // Use fast inverse sqrt: magnitude = magnitude_sq * (1/sqrt(magnitude_sq))
+    if (input.stick_magnitude_sq > 0.0f) {
+        input.stick_magnitude = input.stick_magnitude_sq * fast_inv_sqrt(input.stick_magnitude_sq);
+    } else {
+        input.stick_magnitude = 0.0f;
+    }
 
     input.pressed = joypad_get_buttons_pressed(JOYPAD_PORT_1);
     input.held = joypad_get_buttons_held(JOYPAD_PORT_1);
@@ -77,6 +83,8 @@ void process_menu_input(void) {
                 if (game.game_over_pause) {
                     // Reset game state for restart
                     game.game_over_pause = false;
+                    game.reset = true;  // <-- Only in input.c
+
                     // Call reset function (defined elsewhere)
                 }
                 set_bgm_volume(0.5f);
@@ -260,8 +268,8 @@ void update_cursor_movement(float delta_time, Entity *cursor_entity) {
     float max_speed_sq = CURSOR_MAX_SPEED * CURSOR_MAX_SPEED;
 
     if (speed_sq > max_speed_sq) {
-        float speed = sqrtf(speed_sq);
-        float scale = CURSOR_MAX_SPEED / speed;
+        // Use fast inverse sqrt: scale = max_speed / speed = max_speed * (1/sqrt(speed_sq))
+        float scale = CURSOR_MAX_SPEED * fast_inv_sqrt(speed_sq);
         game.cursor_velocity.v[0] *= scale;
         game.cursor_velocity.v[2] *= scale;
     }

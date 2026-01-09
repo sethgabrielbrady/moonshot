@@ -37,13 +37,17 @@ void draw_game_over_screen(void);
 // FPS Stats Tracking
 // =============================================================================
 
+#define FPS_SAMPLE_WINDOW 180  // 6 seconds at 30fps
+
 typedef struct {
     float current;
+    float avg;
     float min;
     float max;
-    float avg;
-    float total;
-    int frame_count;
+    float frame_times[FPS_SAMPLE_WINDOW];  // Add this
+    int frame_index;                        // Add this
+    int sample_count;                       // Add this
+    uint32_t frame_count;
 } FPSStats;
 
 extern FPSStats fps_stats;

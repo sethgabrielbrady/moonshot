@@ -40,47 +40,8 @@ static Entity *cursor_entity = NULL;
 static bool asteroid_visible[ASTEROID_COUNT];
 static bool resource_visible[RESOURCE_COUNT];
 
-// =============================================================================
-// Mining Light (kept local as it's rendering-specific)
-// =============================================================================
 
-static T3DMat4FP *miningLightMatFP = NULL;
-static rspq_block_t *miningDplLight = NULL;
 
-static void load_point_light(void) {
-    miningLightMatFP = malloc_uncached(sizeof(T3DMat4FP));
-    rspq_block_begin();
-    miningDplLight = rspq_block_end();
-}
-
-static void draw_mining_point_light(T3DVec3 cursor_pos, T3DVec3 look_dir) {
-    if (!game.cursor_is_mining || game.cursor_mining_resource < 0) return;
-
-    int flicker = rand() % 100;
-    uint8_t brightness;
-
-    if (flicker < 40) {
-        brightness = 255;
-    } else if (flicker < 60) {
-        brightness = 200 + (rand() % 55);
-    } else if (flicker < 80) {
-        brightness = 120 + (rand() % 80);
-    } else if (flicker < 95) {
-        brightness = 50 + (rand() % 70);
-    } else {
-        brightness = 10 + (rand() % 40);
-    }
-
-    uint8_t light_color[4] = {brightness, brightness, brightness, 255};
-
-    float offset_distance = 15.0f;
-    T3DVec3 light_pos = {{
-        cursor_pos.v[0] - look_dir.v[0] * offset_distance,
-        cursor_pos.v[1] + 40.0f,
-        cursor_pos.v[2] - look_dir.v[2] * offset_distance
-    }};
-    t3d_light_set_point(1, light_color, &light_pos, 300.0f, false);
-}
 
 // =============================================================================
 // Frustum Culling
@@ -196,7 +157,10 @@ static void draw_entities_sorted(Entity *entity_array, int count, bool *skip_cul
 static void update_cursor_scale_by_distance(Entity *cursor, Entity *station, float delta_time) {
     float dx = cursor->position.v[0] - station->position.v[0];
     float dz = cursor->position.v[2] - station->position.v[2];
-    float distance = sqrtf(dx * dx + dz * dz);
+    float distance_sq = dx * dx + dz * dz;
+
+    // Use fast inverse sqrt: distance = distance_sq * (1/sqrt(distance_sq))
+    float distance = distance_sq * fast_inv_sqrt(distance_sq);
 
     const float START_DISTANCE = 40.0f;
     const float END_DISTANCE = 30.0f;
@@ -299,6 +263,20 @@ static void init_subsystems(void) {
 
     tv_type_t tv = get_tv_type();
     game.is_pal_system = (tv == TV_PAL);
+
+     // Reinitialize display with correct settings for PAL if needed
+    if (game.is_pal_system) {
+        display_close();
+        display_init(RESOLUTION_256x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
+        display_set_fps_limit(25);
+        debugf("PAL system detected - 256x240 @ 25fps\n");
+    } else {
+        display_set_fps_limit(30);
+        debugf("NTSC system detected - 320x240 @ 30fps\n");
+    }
+
+    // Reset FPS stats after setting limit
+    reset_fps_stats();
 
     rdpq_init();
     joypad_init();
@@ -522,9 +500,9 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
 
 static void draw_info_bars(void) {
     draw_entity_health_bar(&entities[ENTITY_STATION], STATION_MAX_HEALTH, 0, "STATION", 0);
-    draw_entity_health_bar(cursor_entity, CURSOR_MAX_HEALTH, 15, "CURSOR", 1);
-    draw_entity_resource_bar(game.cursor_resource_val, CURSOR_RESOURCE_CAPACITY, 15, "CURSOR", false);
-    draw_entity_resource_bar(game.drone_resource_val, DRONE_MAX_RESOURCES, 20, "DRONE", true);
+    draw_entity_health_bar(cursor_entity, CURSOR_MAX_HEALTH, 15, "Procyon", 1);
+    draw_entity_resource_bar(game.cursor_resource_val, CURSOR_RESOURCE_CAPACITY, 15, "Procyon", false);
+    draw_entity_resource_bar(game.drone_resource_val, DRONE_MAX_RESOURCES, 20, "PUP", true);
 }
 
 // =============================================================================
@@ -615,8 +593,10 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
         culled_count++;
     }
 
-    // Draw grid last
+
+    // rdpq_mode_zbuf(true, false);
     draw_entity(&entities[ENTITY_GRID]);
+    // rdpq_mode_zbuf(true, true);
 
     // Render particles at ~30Hz
     game.particle_render_timer += delta_time;
@@ -682,7 +662,8 @@ int main(void) {
 
     cursor_entity = &entities[ENTITY_CURSOR];
 
-    load_point_light();
+
+    //maybe items
     init_ambient_particles();
 
     // Load audio
@@ -704,7 +685,7 @@ int main(void) {
     for (;;) {
         float current_time = get_time_s();
         float delta_time = current_time - last_time;
-        last_time = current_time;
+        // last_time = current_time;
 
         joypad_poll();
         update_input();
@@ -750,13 +731,6 @@ int main(void) {
             update_asteroids(asteroids, ASTEROID_COUNT, delta_time);
             update_resources(resources, RESOURCE_COUNT, delta_time);
             update_particles(delta_time);
-
-            // Ambient particles at ~20Hz
-            game.ambient_particle_timer += delta_time;
-            if (game.ambient_particle_timer >= 0.05f) {
-                update_ambient_particles(game.ambient_particle_timer);
-                game.ambient_particle_timer = 0.0f;
-            }
 
             // Update matrices
             update_entity_matrices(entities, ENTITY_COUNT);
@@ -809,14 +783,26 @@ int main(void) {
 
             game.blink_timer++;
             if (game.blink_timer > 20) game.blink_timer = 0;
+
+            if (game.reset) {
+                entities[ENTITY_CURSOR].value = CURSOR_MAX_HEALTH;
+                entities[ENTITY_STATION].value = STATION_MAX_HEALTH;
+                game.reset = false;
+
+            }
         }
 
         render_frame(&viewport, background, game.cam_yaw, delta_time);
         update_audio();
         rspq_wait();
+
+        // Update last_time AFTER vsync/wait
+        last_time = current_time;
+
     }
 
     // Cleanup
+
     cleanup_particles();
     sprite_free(background);
     sprite_free(station_icon);

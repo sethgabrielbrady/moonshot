@@ -55,7 +55,7 @@ void trigger_camera_zoom(T3DVec3 target, float duration);
 
 void reset_cam_yaw(float *cam_yaw);
 void teleport_to_position(float x, float z, float *cam_yaw, T3DVec3 *cursor_position);
-void update_camera(T3DViewport *viewport, float cam_yaw, float delta_time, 
+void update_camera(T3DViewport *viewport, float cam_yaw, float delta_time,
                    T3DVec3 cursor_position, bool fps_mode, Entity *cursor_entity);
 
 #endif // CAMERA_H

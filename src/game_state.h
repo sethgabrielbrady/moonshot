@@ -25,10 +25,10 @@ typedef struct {
     GameState state;
     bool game_over;
     bool game_over_pause;
-    
+
     // Menu
     int menu_selection;
-    
+
     // Display/rendering options
     bool fps_mode;
     bool render_debug;
@@ -37,23 +37,23 @@ typedef struct {
     bool render_background_enabled;
     int fps_limit;          // 0=30fps, 1=60fps, 2=uncapped
     bool is_pal_system;
-    
+
     // Audio
     int bgm_track;          // 0=off, 1=track1, 2=track2, 3=track3
-    
+
     // Blink timer for UI animations
     int blink_timer;
-    
+
     // Damage tracking for UI
     int station_last_damage;
     int cursor_last_damage;
-    
+
     // Resource values
     int resource_val;
     int cursor_resource_val;
     int drone_resource_val;
     int highlighted_resource;
-    
+
     // Mining state
     float cursor_mining_accumulated;
     float drone_mining_accumulated;
@@ -61,7 +61,7 @@ typedef struct {
     int drone_mining_resource;
     bool cursor_is_mining;
     bool drone_is_mining;
-    
+
     // Drone state
     bool move_drone;
     bool drone_heal;
@@ -71,34 +71,38 @@ typedef struct {
     bool drone_full;
     T3DVec3 drone_target_position;
     float drone_target_rotation;
-    
+
     // Tile state
     int tile_following_resource;
     float tile_scale_multiplier;
-    
+
     // Cursor state
     float cursor_scale_multiplier;
     T3DVec3 cursor_position;
     T3DVec3 cursor_velocity;
-    
+
     // Camera
     float cam_yaw;
-    
+
     // Iframe timers
     float station_iframe_timer;
-    
+
     // Frame counting
     int frame_count;
-    
+
     // Time accumulators for throttled updates
     float particle_render_timer;
-    float ambient_particle_timer;
+    // float ambient_particle_timer;
     float asteroid_matrix_timer;
     float collision_timer;
-    
+
     // Fixed timestep accumulator
     float accumulator;
-    
+
+    bool reset;
+
+
+
 } GameStateData;
 
 // =============================================================================

@@ -22,14 +22,12 @@ void clear_all_particles(void);
 void spawn_explosion(T3DVec3 position);
 void spawn_mining_sparks(T3DVec3 position);
 void spawn_station_explosion(T3DVec3 position);
-void spawn_exhaust(T3DVec3 position, T3DVec3 direction);
 
 // =============================================================================
 // Ambient Particles
 // =============================================================================
 
 void init_ambient_particles(void);
-void update_ambient_particles(float delta_time);
 
 // =============================================================================
 // Debug

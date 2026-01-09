@@ -35,24 +35,6 @@ T3DVec3 camera_zoom_target = {{0, 0, 0}};
 static float camera_zoom_duration = 0.0f;
 
 // =============================================================================
-// Cached Camera Values (for isometric mode)
-// =============================================================================
-
-static float cached_horizontal_dist = 0.0f;
-static float cached_vertical_dist = 0.0f;
-static float cached_pitch_rad = 0.0f;
-static bool cache_initialized = false;
-
-static inline void init_camera_cache(void) {
-    if (!cache_initialized) {
-        cached_pitch_rad = T3D_DEG_TO_RAD(CAM_ANGLE_PITCH);
-        cached_horizontal_dist = CAM_DISTANCE * cosf(cached_pitch_rad);
-        cached_vertical_dist = CAM_DISTANCE * sinf(cached_pitch_rad);
-        cache_initialized = true;
-    }
-}
-
-// =============================================================================
 // Screen Shake Functions
 // =============================================================================
 
@@ -103,7 +85,7 @@ void teleport_to_position(float x, float z, float *cam_yaw, T3DVec3 *cursor_posi
 // Main Camera Update
 // =============================================================================
 
-void update_camera(T3DViewport *viewport, float cam_yaw, float delta_time, 
+void update_camera(T3DViewport *viewport, float cam_yaw, float delta_time,
                    T3DVec3 cursor_position, bool fps_mode, Entity *cursor_entity) {
 
     // Handle camera zoom to station (for explosions/game over)
@@ -192,9 +174,12 @@ void update_camera(T3DViewport *viewport, float cam_yaw, float delta_time,
 
     } else {
         // Isometric mode
-        init_camera_cache();
-
+        float pitch_rad = T3D_DEG_TO_RAD(CAM_ANGLE_PITCH);
         float yaw_rad = T3D_DEG_TO_RAD(cam_yaw);
+
+        float horizontal_dist = CAM_DISTANCE * cosf(pitch_rad);
+        float vertical_dist = CAM_DISTANCE * sinf(pitch_rad);
+
         float sin_yaw = sinf(yaw_rad);
         float cos_yaw = cosf(yaw_rad);
 
@@ -207,9 +192,9 @@ void update_camera(T3DViewport *viewport, float cam_yaw, float delta_time,
         camera.target.v[0] = clampf(camera.target.v[0], -PLAY_AREA_HALF_X, PLAY_AREA_HALF_X);
         camera.target.v[2] = clampf(camera.target.v[2], -PLAY_AREA_HALF_Z, PLAY_AREA_HALF_Z);
 
-        camera.position.v[0] = camera.target.v[0] + cached_horizontal_dist * sin_yaw;
-        camera.position.v[1] = camera.target.v[1] + cached_vertical_dist;
-        camera.position.v[2] = camera.target.v[2] + cached_horizontal_dist * cos_yaw;
+        camera.position.v[0] = camera.target.v[0] + horizontal_dist * sin_yaw;
+        camera.position.v[1] = camera.target.v[1] + vertical_dist;
+        camera.position.v[2] = camera.target.v[2] + horizontal_dist * cos_yaw;
     }
 
     // Apply screen shake

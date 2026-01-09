@@ -5,13 +5,16 @@
 #include "camera.h"
 #include "types.h"
 #include <rdpq.h>
+#include <malloc.h>
+#include <n64sys.h>
+
 
 // =============================================================================
 // Debug UI Rendering
 // =============================================================================
 
-void render_debug_ui(T3DVec3 cursor_position, Entity entities[], Entity resources[], 
-                     int resource_count, int culled_count, int cursor_resource_val, 
+void render_debug_ui(T3DVec3 cursor_position, Entity entities[], Entity resources[],
+                     int resource_count, int culled_count, int cursor_resource_val,
                      int drone_resource_val) {
     rdpq_sync_pipe();
 
@@ -41,7 +44,13 @@ void render_debug_ui(T3DVec3 cursor_position, Entity entities[], Entity resource
     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
                      "game_over?: %d", game.game_over ? 1 : 0);
 
+
+   struct mallinfo mem_info = mallinfo();
+    int total_ram_kb = get_memory_size() / 1024;
+    int heap_used_kb = mem_info.uordblks / 1024;
+
     y += DEBUG_LINE_HEIGHT;
     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
-                     "culled: %d", culled_count);
+                     "RAM: %dKB / %dKB", heap_used_kb, total_ram_kb);
+
 }
