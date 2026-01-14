@@ -19,7 +19,7 @@ void clear_all_particles(void);
 // Particle Spawning
 // =============================================================================
 
-void spawn_explosion(T3DVec3 position);
+void spawn_explosion(T3DVec3 position, color_t color);
 void spawn_mining_sparks(T3DVec3 position);
 void spawn_station_explosion(T3DVec3 position);
 

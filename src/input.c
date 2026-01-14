@@ -1,6 +1,7 @@
 #include "input.h"
 #include "constants.h"
 #include "game_state.h"
+#include "collision.h"
 #include "camera.h"
 #include "audio.h"
 #include "ui.h"
@@ -38,6 +39,10 @@ void update_input(void) {
     input.stick_y = joypad.stick_y;
     input.stick_magnitude_sq = input.stick_x * input.stick_x + input.stick_y * input.stick_y;
 
+    // input.stick_x = joypad.stick_x;
+    // input.stick_y = joypad.stick_y;
+    // input.stick_magnitude_sq = input.stick_x * input.stick_x + input.stick_y * input.stick_y;
+
     // Use fast inverse sqrt: magnitude = magnitude_sq * (1/sqrt(magnitude_sq))
     if (input.stick_magnitude_sq > 0.0f) {
         input.stick_magnitude = input.stick_magnitude_sq * fast_inv_sqrt(input.stick_magnitude_sq);
@@ -55,6 +60,9 @@ void update_input(void) {
 // =============================================================================
 
 void process_menu_input(void) {
+
+
+
     // Decrease delay timer
     if (menu_input_delay > 0) menu_input_delay--;
 
@@ -169,10 +177,10 @@ void process_system_input(T3DViewport *viewport) {
     if (input.pressed.d_left) game.show_fps = !game.show_fps;
     if (input.pressed.l) reset_fps_stats();
 
-    // Camera mode toggle
-    if (!input.held.r && input.pressed.c_up) {
-        game.fps_mode = !game.fps_mode;
-    }
+    // // Camera mode toggle
+    // if (!input.held.r && input.pressed.c_up) {
+    //     game.fps_mode = !game.fps_mode;
+    // }
 }
 
 // =============================================================================
@@ -181,6 +189,9 @@ void process_system_input(T3DViewport *viewport) {
 
 void process_game_input(float delta_time) {
     // Camera rotation (isometric mode only)
+
+    check_deflect_input();
+
     if (!game.fps_mode) {
         float rotation_speed = CAM_ROTATION_SPEED * delta_time;
         if (input.held.r) game.cam_yaw -= rotation_speed;
@@ -188,15 +199,27 @@ void process_game_input(float delta_time) {
     }
 
     // Drone heal mode
-    game.drone_heal = input.held.b;
+    if (input.pressed.c_up) {
+        game.drone_heal = true;
 
-    // Send drone to cursor position
-    if (input.pressed.b) {
+        game.drone_target_position.v[0] = game.cursor_position.v[0];
+        game.drone_target_position.v[1] = game.cursor_position.v[1];
+        game.drone_target_position.v[2] = game.cursor_position.v[2];
+        game.move_drone = true;
+        game.drone_moving_to_resource = false;
+        game.drone_moving_to_station = false;
+        game.tile_following_resource = -1;
+        play_sfx(2);
+    }
+
+    // Send drone to tile position
+    if (input.pressed.c_left) {
         float offset_distance = 30.0f;
         game.drone_target_position.v[0] = game.cursor_position.v[0] - cursor_look_direction.v[0] * offset_distance;
         game.drone_target_position.v[1] = game.cursor_position.v[1];
         game.drone_target_position.v[2] = game.cursor_position.v[2] - cursor_look_direction.v[2] * offset_distance;
         game.move_drone = true;
+        game.drone_heal = false;
         game.drone_moving_to_resource = true;
         game.drone_moving_to_station = false;
         game.tile_following_resource = -1;
@@ -211,6 +234,7 @@ void process_game_input(float delta_time) {
         game.move_drone = true;
         game.drone_moving_to_station = true;
         game.drone_moving_to_resource = false;
+        game.drone_heal = false;
     }
 }
 

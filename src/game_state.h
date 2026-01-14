@@ -100,7 +100,15 @@ typedef struct {
     float accumulator;
 
     bool reset;
+        // Deflection state
+    float deflect_timer;        // Time remaining in deflection window (500ms)
+    bool deflect_active;        // Is deflection window active
+    int deflect_count;          // Successful deflection counter
+    bool disabled_controls;
+    int player_lives;
 
+    float death_timer;          // Counts up to 10 seconds
+    bool death_timer_active;    // Is timer running
 
 
 } GameStateData;
@@ -138,5 +146,8 @@ void reset_game_state(void);
 void pause_game(void);
 void unpause_game(void);
 void set_game_over(void);
+
+
+
 
 #endif // GAME_STATE_H

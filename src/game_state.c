@@ -20,7 +20,7 @@ GameStateData game = {
     .render_debug = false,
     .hi_res_mode = false,
     .show_fps = false,
-    .render_background_enabled = false,
+    .render_background_enabled = true,
     .fps_limit = 0,
     .is_pal_system = false,
 
@@ -84,7 +84,17 @@ GameStateData game = {
 
     // Fixed timestep
     .accumulator = 0.0f,
-    .reset = false
+    .reset = false,
+    // Deflection state
+    .deflect_timer = 0.0f,
+    .deflect_active = false,
+    .deflect_count = 0,
+    .disabled_controls = false,
+    .player_lives = 3,
+
+    // Death timer
+    .death_timer = 0.0f,
+    .death_timer_active = false,
 
 };
 
@@ -174,6 +184,20 @@ void reset_game_state(void) {
     game.asteroid_matrix_timer = 0.0f;
     game.collision_timer = 0.0f;
     game.reset = true;
+
+        // Reset deflection
+    game.deflect_timer = 0.0f;
+    game.deflect_active = false;
+    game.deflect_count = 0;
+
+    game.disabled_controls = false;
+    game.player_lives = 3;
+
+        // Reset death timer
+    game.death_timer = 0.0f;
+    game.death_timer_active = false;
+
+
 
 }
 

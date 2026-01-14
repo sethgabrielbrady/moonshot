@@ -53,4 +53,8 @@ void render_debug_ui(T3DVec3 cursor_position, Entity entities[], Entity resource
     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
                      "RAM: %dKB / %dKB", heap_used_kb, total_ram_kb);
 
+    y += DEBUG_LINE_HEIGHT;
+    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
+                     "Disabled: %d", game.disabled_controls ? 1 : 0);
+
 }

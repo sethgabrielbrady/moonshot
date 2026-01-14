@@ -107,14 +107,18 @@ static void spawn_particle(T3DVec3 position, T3DVec3 velocity, color_t color, fl
     p->active = true;
 }
 
-void spawn_explosion(T3DVec3 position) {
+void spawn_explosion(T3DVec3 position, color_t color) {
+    if (!color.r && !color.g && !color.b) {
+        color = COLOR_SPARKS;
+    }
+
     for (int i = 0; i < 16; i++) {
         T3DVec3 velocity = {{
             (rand() % 250 - 100) * 1.0f,
             (rand() % 80 + 20) * 1.0f,
             (rand() % 250 - 100) * 1.0f
         }};
-        spawn_particle(position, velocity, COLOR_SPARKS, 0.04f, 0.4f);
+        spawn_particle(position, velocity, color, 0.04f, 0.4f);
     }
 }
 
@@ -312,10 +316,11 @@ void draw_particles(T3DViewport *viewport) {
         tpx->posA[2] = tpx->posB[2] = pz;
         tpx->sizeA = tpx->sizeB = size_fp;
 
-        tpx->colorA[0] = tpx->colorB[0] = 255;
-        tpx->colorA[1] = tpx->colorB[1] = 248;
-        tpx->colorA[2] = tpx->colorB[2] = 5;
-        tpx->colorA[3] = tpx->colorB[3] = 255;
+        // Asteroid ambient color  RGBA32(108, 136, 64, 255)
+        tpx->colorA[0] = tpx->colorB[0] = 54;
+        tpx->colorA[1] = tpx->colorB[1] = 68;
+        tpx->colorA[2] = tpx->colorB[2] = 32;
+        tpx->colorA[3] = tpx->colorB[3] = 200;
 
         tpx++;
         active_count++;

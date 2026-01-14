@@ -109,7 +109,7 @@ void check_station_asteroid_collisions(Entity *station, Entity *asteroids, int c
                     damage = MAX_DAMAGE;
                 }
 
-                spawn_explosion(asteroids[i].position);
+                spawn_explosion(asteroids[i].position, COLOR_SPARKS);
 
                 station->value -= damage;
                 game.station_last_damage = (int)damage;
@@ -136,9 +136,11 @@ void check_station_asteroid_collisions(Entity *station, Entity *asteroids, int c
 // Cursor/Ship Collisions
 // =============================================================================
 
-static float ship_damage_multiplier = 1.0f;
+static float ship_damage_multiplier = 3.0f;
 
 void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, int count, bool *visibility) {
+    if (game.deflect_active) return;
+
     for (int i = 0; i < count; i++) {
         // Skip culled asteroids
         if (visibility && !visibility[i]) continue;
@@ -153,15 +155,23 @@ void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, int cou
         if (check_entity_intersection(cursor, &asteroids[i])) {
             play_sfx(4);
             float damage = calculate_asteroid_damage(&asteroids[i]);
-            if (damage >= MAX_DAMAGE * ship_damage_multiplier) {
+            if (damage <= MAX_DAMAGE * ship_damage_multiplier) {
                 damage = MAX_DAMAGE * ship_damage_multiplier;
             }
-            spawn_explosion(asteroids[i].position);
+            // if (damage >= MAX_DAMAGE * ship_damage_multiplier) {
+            //     damage = MAX_DAMAGE * ship_damage_multiplier;
+            // }
+            spawn_explosion(asteroids[i].position, COLOR_SPARKS);
             cursor->value -= damage;
             game.cursor_last_damage = (int)damage;
 
             if (cursor->value < 0) {
                 cursor->value = 0;
+                // game.game_over = true;
+                game.disabled_controls = true;
+                // maybe spawn an explosion here?
+            } else {
+                game.disabled_controls = false;
             }
 
             // Add asteroid velocity to cursor velocity (knockback)
@@ -177,10 +187,90 @@ void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, int cou
     }
 }
 
+
+int stored_cursor_resource_val = 0;
+float value_multiplier = 0.2f;
 void check_cursor_station_collision(Entity *cursor, Entity *station) {
+    stored_cursor_resource_val = game.cursor_resource_val;
     if (check_entity_intersection(cursor, station)) {
-        station->value += game.cursor_resource_val;
+
+        if (cursor->value < CURSOR_MAX_HEALTH && game.cursor_resource_val == 100) {
+            cursor->value += 50;
+            if (cursor->value > CURSOR_MAX_HEALTH) {
+                cursor->value = CURSOR_MAX_HEALTH;
+            }
+        } else if (cursor->value < CURSOR_MAX_HEALTH && game.cursor_resource_val < 100) {
+            cursor->value += stored_cursor_resource_val * value_multiplier;
+            if (cursor->value > CURSOR_MAX_HEALTH) {
+                cursor->value = CURSOR_MAX_HEALTH;
+            }
+        }
+
+        station->value += stored_cursor_resource_val;
+
         game.cursor_resource_val = 0;
+        stored_cursor_resource_val = 0;
+
+        //  resources should be transferred over time and not instantly TODO
+
+        // if (station->value <= STATION_MAX_HEALTH && game.cursor_resource_val != 0) {
+        //     if (station->value < STATION_MAX_HEALTH) {
+        //         station->value += 1;
+        //     } else if (station->value >= STATION_MAX_HEALTH) {
+        //         game.cursor_resource_val = 0;
+        //     }
+
+
+        //     if (station->value > STATION_MAX_HEALTH) {
+        //         station->value = STATION_MAX_HEALTH;
+        //     }
+        // }
+
+
+    }
+}
+
+
+void check_cursor_asteroid_deflection(Entity *cursor, Entity *asteroids, int count) {
+
+    if (!game.deflect_active) return;
+
+    // Check for A button press to start deflection window
+    joypad_buttons_t pressed = joypad_get_buttons_pressed(JOYPAD_PORT_1);
+    if (pressed.b && !game.deflect_active) {
+        game.deflect_active = true;
+        game.deflect_timer = DEFLECT_DURATION;
+    }
+
+
+    // Only deflect if window is active
+    if (!game.deflect_active) return;
+
+    // is this right?
+    float deflect_radius_sq = DEFLECT_RADIUS * DEFLECT_RADIUS;
+
+    for (int i = 0; i < count; i++) {
+        float dx = cursor->position.v[0] - asteroids[i].position.v[0];
+        float dz = cursor->position.v[2] - asteroids[i].position.v[2];
+        float dist_sq = dx * dx + dz * dz;
+
+        if (dist_sq < deflect_radius_sq) {
+            spawn_explosion(asteroids[i].position, COLOR_ASTEROID);
+            play_sfx(SFX_SHIP_HIT);
+            reset_entity(&asteroids[i], ASTEROID);
+            game.deflect_count++;
+        }
+    }
+}
+
+
+void update_deflect_timer(float delta_time) {
+    if (game.deflect_active) {
+        game.deflect_timer -= delta_time;
+        if (game.deflect_timer <= 0.0f) {
+            game.deflect_active = false;
+            game.deflect_timer = 0.0f;
+        }
     }
 }
 
@@ -349,6 +439,9 @@ void check_drone_cursor_collisions(Entity *drone, Entity *cursor, int count) {
         cursor->value += game.drone_resource_val;
         game.drone_resource_val = 0;
         drone->value = game.drone_resource_val;
+        if (cursor->value > 0) {
+            game.disabled_controls = false;
+        }
     }
 }
 
@@ -395,5 +488,14 @@ void reset_resource_colors(Entity *resources, int count) {
         } else if (resources[i].value <= 0) {
             resources[i].color = COLOR_ASTEROID;
         }
+    }
+}
+
+void check_deflect_input(void) {
+    // Check for A button press to start deflection window (called every frame)
+    joypad_buttons_t pressed = joypad_get_buttons_pressed(JOYPAD_PORT_1);
+    if (pressed.b && !game.deflect_active) {
+        game.deflect_active = true;
+        game.deflect_timer = DEFLECT_DURATION;
     }
 }

@@ -31,10 +31,13 @@
 // Entity Arrays (not in game_state - too large)
 // =============================================================================
 
+
 static Entity entities[ENTITY_COUNT];
 static Entity asteroids[ASTEROID_COUNT];
 static Entity resources[RESOURCE_COUNT];
 static Entity *cursor_entity = NULL;
+
+
 
 // Visibility arrays for culling
 static bool asteroid_visible[ASTEROID_COUNT];
@@ -309,7 +312,7 @@ static void init_subsystems(void) {
 // =============================================================================
 
 static void setup_lighting(void) {
-    uint8_t color_ambient[4] = {0x50, 0x50, 0x50, 0xFF};
+    uint8_t color_ambient[4] = {0x60, 0x60, 0x60, 0xFF};
     uint8_t color_directional[4] = {0xFF, 0xFF, 0xFF, 0xFF};
 
     T3DVec3 light_dir = {{300.0f, 100.0f, 1.0f}};
@@ -342,6 +345,16 @@ static void render_background(sprite_t *background, float cam_yaw) {
 // =============================================================================
 // UI Drawing
 // =============================================================================
+
+static void draw_death_timer (void) {
+    if (!game.death_timer_active) return;
+
+    rdpq_sync_pipe();
+    rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
+                     SCREEN_WIDTH / 2 - 30, 10, "%f", game.death_timer);
+}
+
+
 
 static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset, const char *label, int cursor) {
     if (entity->value < 0) entity->value = 0;
@@ -386,6 +399,9 @@ static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset
     rdpq_sync_pipe();
     rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
                      x + bar_width + 5, y + bar_height, "%s", label);
+
+    rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
+                    x, y + 10, "%d", entity->value);
 }
 
 static void draw_entity_resource_bar(int resource_val, float max_value, int y_offset, const char *label, bool show_triangle) {
@@ -481,6 +497,18 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
                 });
                 game.drone_collecting_resource = false;
                 game.drone_moving_to_resource = false;
+            } else if (game.drone_heal) {
+                rdpq_sync_pipe();
+                rdpq_set_mode_standard();
+                rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
+                rdpq_set_prim_color(RGBA32(0, 180, 20, 255));
+                rdpq_mode_alphacompare(1);
+                rdpq_sprite_blit(health_icon, action_x, action_y, &(rdpq_blitparms_t){
+                    .scale_x = 1.0f, .scale_y = 1.0f
+                });
+                game.drone_collecting_resource = false;
+                game.drone_moving_to_resource = false;
+                game.drone_moving_to_station = false;
             } else if (game.drone_full) {
                 rdpq_sync_pipe();
                 rdpq_set_mode_standard();
@@ -499,7 +527,7 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
 }
 
 static void draw_info_bars(void) {
-    draw_entity_health_bar(&entities[ENTITY_STATION], STATION_MAX_HEALTH, 0, "STATION", 0);
+    draw_entity_health_bar(&entities[ENTITY_STATION], STATION_MAX_HEALTH, 0, "S", 0);
     draw_entity_health_bar(cursor_entity, CURSOR_MAX_HEALTH, 15, "Procyon", 1);
     draw_entity_resource_bar(game.cursor_resource_val, CURSOR_RESOURCE_CAPACITY, 15, "Procyon", false);
     draw_entity_resource_bar(game.drone_resource_val, DRONE_MAX_RESOURCES, 20, "PUP", true);
@@ -519,6 +547,7 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
         rdpq_set_mode_fill(RGBA32(0, 0, 0, 255));
         rdpq_fill_rectangle(0, 0, display_get_width(), display_get_height());
     }
+
 
     t3d_frame_start();
     t3d_viewport_attach(viewport);
@@ -559,6 +588,10 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
 
             if (game.drone_moving_to_station) {
                 entities[i].color = RGBA32(255, 0, 255, 255);
+            } else if (game.drone_heal) {
+                entities[i].color = RGBA32(0, 255, 0, 155);
+            } else if (game.tile_following_resource) {
+                entities[i].color = COLOR_TILE;
             }
 
             T3DMat4 temp_mat;
@@ -570,6 +603,30 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
             draw_entity(&entities[i]);
             entities[i].color = original_color;
             entities[i].scale = original_scale;
+            continue;
+        }
+
+        // Deflection ring - only draw when active
+        if (i == ENTITY_DEFLECT_RING) {
+            if (game.deflect_active) {
+                float deflect_scale = DEFLECT_RADIUS / 15.0f;
+
+                T3DMat4 deflect_mat;
+                t3d_mat4_from_srt_euler(&deflect_mat,
+                    (float[3]){deflect_scale, 0.5f, deflect_scale},
+                    (float[3]){0, 0, 0},
+                    (float[3]){entities[ENTITY_CURSOR].position.v[0],
+                            entities[ENTITY_CURSOR].position.v[1] + 1.0f,
+                            entities[ENTITY_CURSOR].position.v[2]});
+                t3d_mat4_to_fixed(entities[ENTITY_DEFLECT_RING].matrix, &deflect_mat);
+                //increase alpha for fade-in effect
+                uint8_t alpha = (uint8_t)(200.0f * (game.deflect_timer / DEFLECT_DURATION));
+                if (alpha > 200) alpha = 200;
+                entities[ENTITY_DEFLECT_RING].color = RGBA32(0, 150, 255, alpha);
+
+                draw_entity(&entities[ENTITY_DEFLECT_RING]);
+
+            }
             continue;
         }
 
@@ -611,6 +668,19 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     }
 
     draw_info_bars();
+
+
+    // Draw death timer if active
+    if (game.death_timer_active) {
+        int center_x = display_get_width() / 2;
+        float time_remaining = 10.0f - game.death_timer;
+        if (time_remaining < 0.0f) time_remaining = 0.0f;
+
+        int seconds = (int)time_remaining;
+        int tenths = (int)((time_remaining - seconds) * 10);
+
+        rdpq_text_printf(NULL, FONT_CUSTOM, center_x - 20, 15, "%d.%d", seconds, tenths);
+    }
 
     if (game.render_debug) {
         render_debug_ui(game.cursor_position, entities, resources, RESOURCE_COUNT, culled_count,
@@ -654,6 +724,9 @@ int main(void) {
                                             0.55f, COLOR_DRONE, DRAW_SHADED, 30.0f);
     entities[ENTITY_TILE] = create_entity("rom:/tile2.t3dm", (T3DVec3){{0, 1000, 0}},
                                            1.0f, COLOR_TILE, DRAW_SHADED, 10.0f);
+
+    entities[ENTITY_DEFLECT_RING] = create_entity("rom:/tile2.t3dm", (T3DVec3){{0, 1000, 0}},
+                                       1.0f, RGBA32(0, 150, 255, 200), DRAW_SHADED, 0.0f);
     entities[ENTITY_GRID] = create_entity("rom:/grid.t3dm", (T3DVec3){{0, 1, 0}},
                                            1.0f, COLOR_MAP, DRAW_SHADED, 0.0f);
 
@@ -692,9 +765,15 @@ int main(void) {
         process_system_input(&viewport);
 
         if (game.state == STATE_PLAYING && !game.game_over) {
-            process_game_input(delta_time);
-            update_cursor_movement(delta_time, cursor_entity);
+            if (!game.disabled_controls)  {
+                update_cursor_movement(delta_time, cursor_entity);
+            }
             update_cursor_scale_by_distance(&entities[ENTITY_CURSOR], &entities[ENTITY_STATION], delta_time);
+
+            process_game_input(delta_time);
+
+             // Check deflect input every frame (before 30Hz collision check)
+            // check_deflect_input();
 
             update_camera(&viewport, game.cam_yaw, delta_time, game.cursor_position, game.fps_mode, cursor_entity);
             update_screen_shake(delta_time);
@@ -770,12 +849,42 @@ int main(void) {
                 check_drone_cursor_collisions(&entities[ENTITY_DRONE], &entities[ENTITY_CURSOR], 1);
             }
 
+            if (cursor_entity->value > 0) {
+                game.disabled_controls = false;
+            } else {
+                game.disabled_controls = true;
+            }
+
             // Asteroid collisions at ~30Hz
             game.collision_timer += delta_time;
             if (game.collision_timer >= 0.033f) {
+                check_cursor_asteroid_deflection(&entities[ENTITY_CURSOR], asteroids, ASTEROID_COUNT);
                 check_cursor_asteroid_collisions(&entities[ENTITY_CURSOR], asteroids, ASTEROID_COUNT, asteroid_visible);
-                check_station_asteroid_collisions(&entities[ENTITY_STATION], asteroids, ASTEROID_COUNT, delta_time);
+                // check_station_asteroid_collisions(&entities[ENTITY_STATION], asteroids, ASTEROID_COUNT, delta_time);
                 game.collision_timer = 0.0f;
+            }
+
+               // Update deflection timer
+            update_deflect_timer(delta_time);
+
+            // Update death timer (when cursor health = 0)
+            if (entities[ENTITY_CURSOR].value <= 0) {
+                if (!game.death_timer_active) {
+                    game.death_timer_active = true;
+                    game.death_timer = 0.0f;
+                }
+                game.death_timer += delta_time;
+
+                if (game.death_timer >= 10.0f) {
+                    // 10 seconds reached - do something here
+                    spawn_station_explosion(entities[ENTITY_STATION].position);
+                    game.game_over = true;
+                    game.death_timer = 10.0f;
+                }
+            } else {
+                // Reset if health restored
+                game.death_timer_active = false;
+                game.death_timer = 0.0f;
             }
 
             update_color_flashes(delta_time);
@@ -787,8 +896,15 @@ int main(void) {
             if (game.reset) {
                 entities[ENTITY_CURSOR].value = CURSOR_MAX_HEALTH;
                 entities[ENTITY_STATION].value = STATION_MAX_HEALTH;
+                game.cursor_resource_val = 0;
+                game.drone_resource_val = 0;
+                game.drone_full = false;
+                game.move_drone = false;
+                game.drone_mining_resource = -1;
+                game.tile_following_resource = -1;
+                game.deflect_active = false;
+                game.disabled_controls = false;
                 game.reset = false;
-
             }
         }
 
@@ -821,6 +937,7 @@ int main(void) {
     free_all_entities(asteroids, ASTEROID_COUNT);
     free_all_entities(resources, RESOURCE_COUNT);
     t3d_destroy();
+
 
     return 0;
 }

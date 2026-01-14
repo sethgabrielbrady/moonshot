@@ -42,6 +42,7 @@ typedef enum {
     ENTITY_CURSOR,
     ENTITY_DRONE,
     ENTITY_TILE,
+    ENTITY_DEFLECT_RING,
     ENTITY_GRID,
     ENTITY_COUNT
 } EntityID;
