@@ -504,7 +504,7 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
                 rdpq_set_prim_color(RGBA32(0, 180, 20, 255));
                 rdpq_mode_alphacompare(1);
                 rdpq_sprite_blit(health_icon, action_x, action_y, &(rdpq_blitparms_t){
-                    .scale_x = 1.0f, .scale_y = 1.0f
+                    .scale_x = 0.240f, .scale_y = 0.240f
                 });
                 game.drone_collecting_resource = false;
                 game.drone_moving_to_resource = false;
@@ -513,7 +513,7 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
                 rdpq_sync_pipe();
                 rdpq_set_mode_standard();
                 rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
-                rdpq_set_prim_color(RGBA32(137, 252, 0, 255));
+                rdpq_set_prim_color(RGBA32(137, 242, 0, 255));
                 rdpq_mode_alphacompare(1);
                 rdpq_sprite_blit(drone_full_icon, action_x, action_y, &(rdpq_blitparms_t){
                     .scale_x = 1.0f, .scale_y = 1.0f
