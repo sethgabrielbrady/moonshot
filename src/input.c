@@ -98,9 +98,9 @@ void process_menu_input(void) {
                 set_bgm_volume(0.5f);
                 break;
 
-            case MENU_OPTION_CAMERA:
-                game.fps_mode = !game.fps_mode;
-                break;
+            // case MENU_OPTION_CAMERA:
+            //     game.fps_mode = !game.fps_mode;
+            //     break;
 
             case MENU_OPTION_HIRES:
                 game.hi_res_mode = !game.hi_res_mode;
@@ -178,9 +178,9 @@ void process_system_input(T3DViewport *viewport) {
     if (input.pressed.l) reset_fps_stats();
 
     // // Camera mode toggle
-    // if (!input.held.r && input.pressed.c_up) {
-    //     game.fps_mode = !game.fps_mode;
-    // }
+    if (input.pressed.d_down) {
+        game.fps_mode = !game.fps_mode;
+    }
 }
 
 // =============================================================================

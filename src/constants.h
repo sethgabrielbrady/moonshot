@@ -136,12 +136,12 @@
 // =============================================================================
 
 #define MENU_OPTION_RESUME   0
-#define MENU_OPTION_CAMERA   1
-#define MENU_OPTION_HIRES    2
-#define MENU_OPTION_AUDIO    3
-#define MENU_OPTION_30HZ     4
-#define MENU_OPTION_BG       5
-#define MENU_OPTIONS_COUNT   6
+// #define MENU_OPTION_CAMERA   1
+#define MENU_OPTION_HIRES    1
+#define MENU_OPTION_AUDIO    2
+#define MENU_OPTION_30HZ     3
+#define MENU_OPTION_BG       4
+#define MENU_OPTIONS_COUNT   5
 
 // =============================================================================
 // Fixed Timestep

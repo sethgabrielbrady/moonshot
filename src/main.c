@@ -42,6 +42,7 @@ static Entity *cursor_entity = NULL;
 // Visibility arrays for culling
 static bool asteroid_visible[ASTEROID_COUNT];
 static bool resource_visible[RESOURCE_COUNT];
+static bool decrease_money = false;
 
 
 
@@ -346,17 +347,8 @@ static void render_background(sprite_t *background, float cam_yaw) {
 // UI Drawing
 // =============================================================================
 
-static void draw_death_timer (void) {
-    if (!game.death_timer_active) return;
 
-    rdpq_sync_pipe();
-    rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-                     SCREEN_WIDTH / 2 - 30, 10, "%f", game.death_timer);
-}
-
-
-
-static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset, const char *label, int cursor) {
+static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset, const char *label, int cursor, bool station_entity) {
     if (entity->value < 0) entity->value = 0;
 
     int x = 10;
@@ -396,12 +388,20 @@ static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset
         rdpq_fill_rectangle(x + fill_width, y, x + bar_width, y + bar_height);
     }
 
+
     rdpq_sync_pipe();
     rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
                      x + bar_width + 5, y + bar_height, "%s", label);
 
-    rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
+    if (station_entity) {
+        rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
+                 x, y + 10, ">");
+        rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
+                 x + 5, y + 10, "%d", game.accumulated_credits);
+    } else {
+        rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
                     x, y + 10, "%d", entity->value);
+    }
 }
 
 static void draw_entity_resource_bar(int resource_val, float max_value, int y_offset, const char *label, bool show_triangle) {
@@ -497,6 +497,7 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
                 });
                 game.drone_collecting_resource = false;
                 game.drone_moving_to_resource = false;
+
             } else if (game.drone_heal) {
                 rdpq_sync_pipe();
                 rdpq_set_mode_standard();
@@ -504,7 +505,7 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
                 rdpq_set_prim_color(RGBA32(0, 180, 20, 255));
                 rdpq_mode_alphacompare(1);
                 rdpq_sprite_blit(health_icon, action_x, action_y, &(rdpq_blitparms_t){
-                    .scale_x = 0.240f, .scale_y = 0.240f
+                    .scale_x = 0.50f, .scale_y = 0.50f
                 });
                 game.drone_collecting_resource = false;
                 game.drone_moving_to_resource = false;
@@ -527,11 +528,48 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
 }
 
 static void draw_info_bars(void) {
-    draw_entity_health_bar(&entities[ENTITY_STATION], STATION_MAX_HEALTH, 0, "S", 0);
-    draw_entity_health_bar(cursor_entity, CURSOR_MAX_HEALTH, 15, "Procyon", 1);
+    draw_entity_health_bar(&entities[ENTITY_STATION], STATION_MAX_HEALTH, 0, "S", 0, true);
+    draw_entity_health_bar(cursor_entity, CURSOR_MAX_HEALTH, 15, "Procyon", 1, false);
     draw_entity_resource_bar(game.cursor_resource_val, CURSOR_RESOURCE_CAPACITY, 15, "Procyon", false);
     draw_entity_resource_bar(game.drone_resource_val, DRONE_MAX_RESOURCES, 20, "PUP", true);
 }
+
+
+// update station value to drop resources over time
+static float station_drain_accumulated = 0.0f;
+
+static void update_station_resources(float delta_time) {
+    const float RESOURCE_DRAIN_RATE = 1.50f; // resources per second
+
+    station_drain_accumulated += RESOURCE_DRAIN_RATE * delta_time;
+
+    // Only drain whole units
+    if (station_drain_accumulated >= 1.0f) {
+        int drain = (int)station_drain_accumulated;
+        entities[ENTITY_STATION].value -= drain;
+        station_drain_accumulated -= drain;
+
+        if (entities[ENTITY_STATION].value < 0) {
+            entities[ENTITY_STATION].value = 0;
+        }
+    }
+
+    decrease_money = (entities[ENTITY_STATION].value <= 0);
+}
+
+// update money if station resources are depleted
+// static void update_money_depletion(float delta_time) {
+//     const float MONEY_DECREASE_RATE = 5.0f; // money units per second
+//     if (decrease_money) {
+//         game.money -= MONEY_DECREASE_RATE * delta_time;
+//         if (game.money < 0) {
+//             game.money = 0;
+//         }
+//     }
+// }
+
+
+
 
 // =============================================================================
 // Frame Rendering
@@ -860,11 +898,10 @@ int main(void) {
             if (game.collision_timer >= 0.033f) {
                 check_cursor_asteroid_deflection(&entities[ENTITY_CURSOR], asteroids, ASTEROID_COUNT);
                 check_cursor_asteroid_collisions(&entities[ENTITY_CURSOR], asteroids, ASTEROID_COUNT, asteroid_visible);
-                // check_station_asteroid_collisions(&entities[ENTITY_STATION], asteroids, ASTEROID_COUNT, delta_time);
                 game.collision_timer = 0.0f;
             }
 
-               // Update deflection timer
+            // Update deflection timer
             update_deflect_timer(delta_time);
 
             // Update death timer (when cursor health = 0)
@@ -877,7 +914,7 @@ int main(void) {
 
                 if (game.death_timer >= 10.0f) {
                     // 10 seconds reached - do something here
-                    spawn_station_explosion(entities[ENTITY_STATION].position);
+                    // spawn_station_explosion(entities[ENTITY_STATION].position);
                     game.game_over = true;
                     game.death_timer = 10.0f;
                 }
@@ -889,6 +926,7 @@ int main(void) {
 
             update_color_flashes(delta_time);
             update_fps_stats(delta_time);
+            update_station_resources(delta_time);
 
             game.blink_timer++;
             if (game.blink_timer > 20) game.blink_timer = 0;

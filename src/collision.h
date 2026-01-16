@@ -14,7 +14,7 @@ void update_color_flashes(float delta_time);
 // Station Collisions
 // =============================================================================
 
-void check_station_asteroid_collisions(Entity *station, Entity *asteroids, int count, float delta_time);
+// void check_station_asteroid_collisions(Entity *station, Entity *asteroids, int count, float delta_time);
 
 // =============================================================================
 // Cursor/Ship Collisions

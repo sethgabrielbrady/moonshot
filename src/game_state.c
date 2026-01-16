@@ -95,6 +95,7 @@ GameStateData game = {
     // Death timer
     .death_timer = 0.0f,
     .death_timer_active = false,
+    .accumulated_credits = 0,
 
 };
 
@@ -196,7 +197,7 @@ void reset_game_state(void) {
         // Reset death timer
     game.death_timer = 0.0f;
     game.death_timer_active = false;
-
+    game.accumulated_credits = 0;
 
 
 }

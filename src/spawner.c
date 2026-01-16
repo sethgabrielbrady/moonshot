@@ -30,10 +30,12 @@ static void init_rotation_tables(void) {
 // =============================================================================
 
 static float asteroid_speed_multiplier = 200.0f;
+static float asteroid_min_scale = 0.3f;
+static float asteroid_max_scale = 1.3f;
 
 static void get_asteroid_velocity_and_scale(Entity *asteroid, T3DVec3 *out_velocity) {
-    asteroid->speed = randomize_float(asteroid_speed_multiplier, 450.0f);
-    asteroid->scale = randomize_float(0.1f, 1.3f);
+    asteroid->speed = randomize_float(asteroid_speed_multiplier, 450.0f); // what is this number?
+    asteroid->scale = randomize_float(asteroid_min_scale, asteroid_max_scale);
 }
 
 static void get_resource_velocity_and_scale(Entity *resource, T3DVec3 *out_velocity) {

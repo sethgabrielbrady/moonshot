@@ -26,19 +26,6 @@ void reset_fps_stats(void) {
     fps_stats.avg = 0.0f;
 }
 
-// void update_fps_stats(float delta_time) {
-//     fps_stats.current = 1.0f / delta_time;
-
-//     if (fps_stats.current > 1.0f && fps_stats.current < 1000.0f) {
-//         if (fps_stats.current < fps_stats.min) fps_stats.min = fps_stats.current;
-//         if (fps_stats.current > fps_stats.max) fps_stats.max = fps_stats.current;
-
-//         fps_stats.total += fps_stats.current;
-//         fps_stats.frame_count++;
-//         fps_stats.avg = fps_stats.total / fps_stats.frame_count;
-//     }
-// }
-
 void update_fps_stats(float delta_time) {
     // Use delta_time directly - it's the actual time between frames
     float current_fps = (delta_time > 0.0f) ? (1.0f / delta_time) : 0.0f;
@@ -90,9 +77,11 @@ void draw_fps_display(float current, float avg, float min, float max, int partic
                      "Particles: %d", particle_count);
 }
 
+
 // =============================================================================
-// Status Indicators
+// Pause Menu
 // =============================================================================
+
 
 void draw_triangle_indicator(int x, int y) {
     rdpq_set_prim_color(RGBA32(255, 165, 0, 255));  // Orange
@@ -106,31 +95,6 @@ void draw_triangle_indicator(int x, int y) {
     rdpq_fill_rectangle(x + 10, y + 1, x + 12, y + 13);
     rdpq_fill_rectangle(x + 12, y, x + 14, y + 14);
 }
-
-void draw_circle_indicator(int x, int y) {
-    rdpq_set_prim_color(RGBA32(0, 191, 255, 255));  // Deep sky blue
-
-    // Simple circle approximation
-    rdpq_fill_rectangle(x + 4, y, x + 10, y + 2);
-    rdpq_fill_rectangle(x + 2, y + 2, x + 12, y + 4);
-    rdpq_fill_rectangle(x, y + 4, x + 14, y + 10);
-    rdpq_fill_rectangle(x + 2, y + 10, x + 12, y + 12);
-    rdpq_fill_rectangle(x + 4, y + 12, x + 10, y + 14);
-}
-
-void draw_station_indicator(int x, int y) {
-    rdpq_set_prim_color(RGBA32(0, 255, 0, 255));  // Green
-
-    // Simple house/station shape
-    rdpq_fill_rectangle(x + 6, y, x + 8, y + 2);
-    rdpq_fill_rectangle(x + 4, y + 2, x + 10, y + 4);
-    rdpq_fill_rectangle(x + 2, y + 4, x + 12, y + 6);
-    rdpq_fill_rectangle(x + 2, y + 6, x + 12, y + 14);
-}
-
-// =============================================================================
-// Pause Menu
-// =============================================================================
 
 void draw_pause_menu(void) {
 
@@ -178,11 +142,14 @@ void draw_pause_menu(void) {
     }, FONT_CUSTOM, 0, y1 + 15, "AsteRisk");
 
     // Menu options
+
     rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y, "%s",
                      game.game_over_pause ? "Restart" : "Resume");
-    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height,
-                     "Camera: %s", game.fps_mode ? "FPS" : "ISO");
-    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 2,
+
+    // rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height,
+    //                  "Camera: %s", game.fps_mode ? "FPS" : "ISO");
+
+    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height ,
                      "Resolution: %s", game.hi_res_mode ? "640x240" : "320x240");
 
     const char *bgm_text;
@@ -190,7 +157,7 @@ void draw_pause_menu(void) {
     else if (game.bgm_track == 1) bgm_text = "Nebula Run";
     else if (game.bgm_track == 2) bgm_text = "Orbit Oddyssey";
     else bgm_text = "Lunar Rampage";
-    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 3,
+    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 2,
                      "Music: %s", bgm_text);
 
     const char *fps_text;
@@ -203,9 +170,9 @@ void draw_pause_menu(void) {
         else if (game.fps_limit == 1) fps_text = "60";
         else fps_text = "Uncapped";
     }
-    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 4,
+    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 3,
                      "FPS Limit: %s", fps_text);
-    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 5,
+    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 4,
                      "Background: %s", game.render_background_enabled ? "ON" : "OFF");
 
     // Controls hint

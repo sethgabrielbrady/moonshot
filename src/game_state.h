@@ -109,6 +109,7 @@ typedef struct {
 
     float death_timer;          // Counts up to 10 seconds
     bool death_timer_active;    // Is timer running
+    int accumulated_credits;    // Credits accumulated during play session
 
 
 } GameStateData;
