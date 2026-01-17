@@ -170,7 +170,7 @@ void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, int cou
                 // game.game_over = true;
                 game.disabled_controls = true;
                 // maybe spawn an explosion here?
-            } else {
+            } else if (cursor->value > 0 && game.ship_fuel > 0) {
                 game.disabled_controls = false;
             }
 
@@ -208,34 +208,24 @@ void check_cursor_station_collision(Entity *cursor, Entity *station) {
             }
         }
 
-        if (station->value < STATION_MAX_HEALTH) {
-            station->value += stored_cursor_resource_val;
-            if (station->value > STATION_MAX_HEALTH) {
-                station->value = STATION_MAX_HEALTH;
-            }
-        }
-
-        // station->value += stored_cursor_resource_val;
-        game.accumulated_credits += stored_cursor_resource_val;
-
-        game.cursor_resource_val = 0;
-        stored_cursor_resource_val = 0;
-
-        //  resources should be transferred over time and not instantly TODO
-
-        // if (station->value <= STATION_MAX_HEALTH && game.cursor_resource_val != 0) {
-        //     if (station->value < STATION_MAX_HEALTH) {
-        //         station->value += 1;
-        //     } else if (station->value >= STATION_MAX_HEALTH) {
-        //         game.cursor_resource_val = 0;
-        //     }
-
-
+        // if (station->value < STATION_MAX_HEALTH) {
+        //     station->value += stored_cursor_resource_val;
         //     if (station->value > STATION_MAX_HEALTH) {
         //         station->value = STATION_MAX_HEALTH;
         //     }
         // }
 
+        if (game.ship_fuel < CURSOR_MAX_FUEL) {
+            game.ship_fuel = CURSOR_MAX_FUEL;
+            if (game.ship_fuel > CURSOR_MAX_FUEL) {
+                game.ship_fuel = CURSOR_MAX_FUEL;
+            }
+        }
+
+        game.accumulated_credits += stored_cursor_resource_val;
+
+        game.cursor_resource_val = 0;
+        stored_cursor_resource_val = 0;
 
     }
 }
@@ -504,8 +494,12 @@ void reset_resource_colors(Entity *resources, int count) {
 void check_deflect_input(void) {
     // Check for A button press to start deflection window (called every frame)
     joypad_buttons_t pressed = joypad_get_buttons_pressed(JOYPAD_PORT_1);
-    if (pressed.b && !game.deflect_active) {
-        game.deflect_active = true;
-        game.deflect_timer = DEFLECT_DURATION;
+    if (game.ship_fuel >= DEFLECT_FUEL_COST) {
+        if (pressed.b && !game.deflect_active) {
+            game.deflect_active = true;
+            game.deflect_timer = DEFLECT_DURATION;
+            game.ship_fuel -= DEFLECT_FUEL_COST;
+        }
     }
+
 }

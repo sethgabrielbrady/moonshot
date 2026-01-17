@@ -54,6 +54,7 @@
 #define CURSOR_THRUST          10.0f
 #define CURSOR_DRAG            1.110f
 #define CURSOR_MAX_SPEED       300.0f
+#define CURSOR_MAX_FUEL        100.0f
 #define FPS_ROTATION_SPEED     3.0f
 #define KNOCKBACK_STRENGTH     500.5f
 
@@ -136,7 +137,6 @@
 // =============================================================================
 
 #define MENU_OPTION_RESUME   0
-// #define MENU_OPTION_CAMERA   1
 #define MENU_OPTION_HIRES    1
 #define MENU_OPTION_AUDIO    2
 #define MENU_OPTION_30HZ     3
@@ -155,5 +155,14 @@
 
 #define BG_WIDTH  1024
 #define BG_HEIGHT 240
+
+
+
+#define ASTEROID_SPEED_MULTIPLIER 0.0f
+#define ASTEROID_MIN_SCALE 0.3f
+#define ASTEROID_MAX_SCALE 1.3f
+
+#define DEFLECT_FUEL_COST      5.0f
+
 
 #endif // CONSTANTS_H

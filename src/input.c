@@ -61,8 +61,6 @@ void update_input(void) {
 
 void process_menu_input(void) {
 
-
-
     // Decrease delay timer
     if (menu_input_delay > 0) menu_input_delay--;
 
@@ -188,10 +186,11 @@ void process_system_input(T3DViewport *viewport) {
 // =============================================================================
 
 void process_game_input(float delta_time) {
-    // Camera rotation (isometric mode only)
+
 
     check_deflect_input();
 
+    // Camera rotation (isometric mode only)Pspaw
     if (!game.fps_mode) {
         float rotation_speed = CAM_ROTATION_SPEED * delta_time;
         if (input.held.r) game.cam_yaw -= rotation_speed;
@@ -251,6 +250,13 @@ void update_cursor_movement(float delta_time, Entity *cursor_entity) {
     float rotated_z = (input.stick_x * sin_yaw + input.stick_y * cos_yaw);
 
     float deadzone_sq = CURSOR_DEADZONE * CURSOR_DEADZONE;
+
+    //if stick magnitude greated than deadzone, decrease game.ship_fuel
+    if (input.stick_magnitude_sq > deadzone_sq) {
+        game.ship_acceleration = true;
+    } else {
+        game.ship_acceleration = false;
+    }
 
     if (game.fps_mode) {
         // FPS mode: thrust forward/backward only

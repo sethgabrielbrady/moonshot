@@ -96,7 +96,8 @@ GameStateData game = {
     .death_timer = 0.0f,
     .death_timer_active = false,
     .accumulated_credits = 0,
-
+    .ship_fuel = CURSOR_MAX_FUEL,
+    .ship_acceleration = false
 };
 
 // =============================================================================
@@ -198,8 +199,8 @@ void reset_game_state(void) {
     game.death_timer = 0.0f;
     game.death_timer_active = false;
     game.accumulated_credits = 0;
-
-
+    game.ship_fuel = CURSOR_MAX_FUEL;
+    game.ship_acceleration = false;
 }
 
 void pause_game(void) {

@@ -347,6 +347,32 @@ static void render_background(sprite_t *background, float cam_yaw) {
 // UI Drawing
 // =============================================================================
 
+static void draw_cursor_fuel_bar() {
+    int x = 7;
+    int y = SCREEN_HEIGHT - 26;
+    int bar_width = 40;
+    int bar_height = 4;
+
+    float fuel_percent = game.ship_fuel / CURSOR_MAX_FUEL;
+    if (fuel_percent > 1.0f) fuel_percent = 1.0f;
+    if (fuel_percent < 0.0f) fuel_percent = 0.0f;
+
+    int fill_width = (int)(bar_width * fuel_percent);
+    color_t bar_color = RGBA32(200, 0, 200, 255);
+
+    rdpq_sync_pipe();
+    rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
+
+    if (fill_width > 0) {
+        rdpq_set_prim_color(bar_color);
+        rdpq_fill_rectangle(x, y, x + fill_width, y + bar_height);
+    }
+
+    if (fill_width < bar_width) {
+        rdpq_set_prim_color(RGBA32(50, 50, 60, 255));
+        rdpq_fill_rectangle(x + bar_width + 5, y, x + bar_width, y + bar_height);
+    }
+}
 
 static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset, const char *label, int cursor, bool station_entity) {
     if (entity->value < 0) entity->value = 0;
@@ -376,31 +402,30 @@ static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset
     }
 
     rdpq_sync_pipe();
-    rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
-
-    if (fill_width > 0) {
-        rdpq_set_prim_color(bar_color);
-        rdpq_fill_rectangle(x, y, x + fill_width, y + bar_height);
-    }
-
-    if (fill_width < bar_width) {
-        rdpq_set_prim_color(RGBA32(80, 80, 80, 255));
-        rdpq_fill_rectangle(x + fill_width, y, x + bar_width, y + bar_height);
-    }
-
-
-    rdpq_sync_pipe();
-    rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-                     x + bar_width + 5, y + bar_height, "%s", label);
+    // rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
+    //                  x + bar_width + 5, y + bar_height, "%s", label);
 
     if (station_entity) {
         rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-                 x, y + 10, ">");
+                 x, y, ">");
         rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-                 x + 5, y + 10, "%d", game.accumulated_credits);
+                 x + 5, y, "%d", game.accumulated_credits);
     } else {
+        rdpq_sync_pipe();
+        rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
+
+        if (fill_width > 0) {
+            rdpq_set_prim_color(bar_color);
+            rdpq_fill_rectangle(x, y, x + fill_width, y + bar_height);
+        }
+
+        if (fill_width < bar_width) {
+            rdpq_set_prim_color(RGBA32(80, 80, 80, 255));
+            rdpq_fill_rectangle(x + fill_width, y, x + bar_width, y + bar_height);
+        }
+
         rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-                    x, y + 10, "%d", entity->value);
+                x + bar_width + 5, y + bar_height, "%s", label);
     }
 }
 
@@ -529,46 +554,35 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
 
 static void draw_info_bars(void) {
     draw_entity_health_bar(&entities[ENTITY_STATION], STATION_MAX_HEALTH, 0, "S", 0, true);
-    draw_entity_health_bar(cursor_entity, CURSOR_MAX_HEALTH, 15, "Procyon", 1, false);
-    draw_entity_resource_bar(game.cursor_resource_val, CURSOR_RESOURCE_CAPACITY, 15, "Procyon", false);
-    draw_entity_resource_bar(game.drone_resource_val, DRONE_MAX_RESOURCES, 20, "PUP", true);
+    draw_cursor_fuel_bar();
+    draw_entity_health_bar(cursor_entity, CURSOR_MAX_HEALTH, 20, "Procyon", 1, false);
+    draw_entity_resource_bar(game.cursor_resource_val, CURSOR_RESOURCE_CAPACITY, 25, "Procyon", false);
+    draw_entity_resource_bar(game.drone_resource_val, DRONE_MAX_RESOURCES, 225, "PUP", true);
 }
 
 
 // update station value to drop resources over time
-static float station_drain_accumulated = 0.0f;
+static float fuel_drain_accumulated = 0.0f;
+static void update_ship_fuel(float delta_time) {
+    const float FUEL_DRAIN_RATE = 1.50f; // resources per second
 
-static void update_station_resources(float delta_time) {
-    const float RESOURCE_DRAIN_RATE = 1.50f; // resources per second
-
-    station_drain_accumulated += RESOURCE_DRAIN_RATE * delta_time;
+    fuel_drain_accumulated += FUEL_DRAIN_RATE * delta_time;
 
     // Only drain whole units
-    if (station_drain_accumulated >= 1.0f) {
-        int drain = (int)station_drain_accumulated;
-        entities[ENTITY_STATION].value -= drain;
-        station_drain_accumulated -= drain;
+    if (fuel_drain_accumulated >= 1.0f) {
+        int drain = (int)fuel_drain_accumulated;
+        game.ship_fuel -= drain;
+        fuel_drain_accumulated -= drain;
 
-        if (entities[ENTITY_STATION].value < 0) {
-            entities[ENTITY_STATION].value = 0;
+        if (game.ship_fuel < 0) {
+            game.ship_fuel = 0;
+            game.disabled_controls = true;
+        }
+        if (game.ship_fuel > 0 && entities[ENTITY_CURSOR].value > 0) {
+            game.disabled_controls = false;
         }
     }
-
-    decrease_money = (entities[ENTITY_STATION].value <= 0);
 }
-
-// update money if station resources are depleted
-// static void update_money_depletion(float delta_time) {
-//     const float MONEY_DECREASE_RATE = 5.0f; // money units per second
-//     if (decrease_money) {
-//         game.money -= MONEY_DECREASE_RATE * delta_time;
-//         if (game.money < 0) {
-//             game.money = 0;
-//         }
-//     }
-// }
-
-
 
 
 // =============================================================================
@@ -727,6 +741,7 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
 
     if (game.state == STATE_PAUSED || game.game_over) {
         draw_pause_menu();
+
     }
 
     rdpq_detach_show();
@@ -887,9 +902,9 @@ int main(void) {
                 check_drone_cursor_collisions(&entities[ENTITY_DRONE], &entities[ENTITY_CURSOR], 1);
             }
 
-            if (cursor_entity->value > 0) {
+            if (cursor_entity->value > 0 && game.ship_fuel > 0) {
                 game.disabled_controls = false;
-            } else {
+            } else  {
                 game.disabled_controls = true;
             }
 
@@ -917,6 +932,7 @@ int main(void) {
                     // spawn_station_explosion(entities[ENTITY_STATION].position);
                     game.game_over = true;
                     game.death_timer = 10.0f;
+                    game.reset = true;
                 }
             } else {
                 // Reset if health restored
@@ -926,14 +942,18 @@ int main(void) {
 
             update_color_flashes(delta_time);
             update_fps_stats(delta_time);
-            update_station_resources(delta_time);
+            // if (game.ship_acceleration) {
+            //     update_ship_fuel(delta_time);
+            // }
+            update_ship_fuel(delta_time);
+
+
 
             game.blink_timer++;
             if (game.blink_timer > 20) game.blink_timer = 0;
 
             if (game.reset) {
                 entities[ENTITY_CURSOR].value = CURSOR_MAX_HEALTH;
-                entities[ENTITY_STATION].value = STATION_MAX_HEALTH;
                 game.cursor_resource_val = 0;
                 game.drone_resource_val = 0;
                 game.drone_full = false;
@@ -942,6 +962,7 @@ int main(void) {
                 game.tile_following_resource = -1;
                 game.deflect_active = false;
                 game.disabled_controls = false;
+                game.ship_fuel = CURSOR_MAX_FUEL;
                 game.reset = false;
             }
         }
