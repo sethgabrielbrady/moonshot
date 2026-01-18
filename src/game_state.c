@@ -185,7 +185,7 @@ void reset_game_state(void) {
     // game.ambient_particle_timer = 0.0f;
     game.asteroid_matrix_timer = 0.0f;
     game.collision_timer = 0.0f;
-    game.reset = true;
+    game.reset = false;
 
         // Reset deflection
     game.deflect_timer = 0.0f;

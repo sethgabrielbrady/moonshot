@@ -920,13 +920,13 @@ int main(void) {
             update_deflect_timer(delta_time);
 
             // Update death timer (when cursor health = 0)
-            if (entities[ENTITY_CURSOR].value <= 0) {
+            if (entities[ENTITY_CURSOR].value <= 0 || game.ship_fuel <= 0) {
                 if (!game.death_timer_active) {
                     game.death_timer_active = true;
                     game.death_timer = 0.0f;
                 }
-                game.death_timer += delta_time;
 
+                game.death_timer += delta_time;
                 if (game.death_timer >= 10.0f) {
                     // 10 seconds reached - do something here
                     // spawn_station_explosion(entities[ENTITY_STATION].position);
@@ -938,6 +938,7 @@ int main(void) {
                 // Reset if health restored
                 game.death_timer_active = false;
                 game.death_timer = 0.0f;
+                game.reset = false;
             }
 
             update_color_flashes(delta_time);
@@ -963,7 +964,7 @@ int main(void) {
                 game.deflect_active = false;
                 game.disabled_controls = false;
                 game.ship_fuel = CURSOR_MAX_FUEL;
-                game.reset = false;
+                game.accumulated_credits -= 25;
             }
         }
 

@@ -190,44 +190,49 @@ void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, int cou
 
 int stored_cursor_resource_val = 0;
 float value_multiplier = 0.2f;
+
 void check_cursor_station_collision(Entity *cursor, Entity *station) {
+    if (!check_entity_intersection(cursor, station)) return;
+
+    // Only process if we have resources to deposit
+    if (game.cursor_resource_val <= 0) return;
 
     stored_cursor_resource_val = game.cursor_resource_val;
-    if (check_entity_intersection(cursor, station)) {
 
-        if (cursor->value < CURSOR_MAX_HEALTH && game.cursor_resource_val == 100) {
+    // Health restoration
+    if (cursor->value < CURSOR_MAX_HEALTH) {
+        if (stored_cursor_resource_val >= 100) {
             cursor->value += 50;
-            stored_cursor_resource_val += 50;
-            if (cursor->value > CURSOR_MAX_HEALTH) {
-                cursor->value = CURSOR_MAX_HEALTH;
-            }
-        } else if (cursor->value < CURSOR_MAX_HEALTH && game.cursor_resource_val < 100) {
+        } else {
             cursor->value += stored_cursor_resource_val * value_multiplier;
-            if (cursor->value > CURSOR_MAX_HEALTH) {
-                cursor->value = CURSOR_MAX_HEALTH;
-            }
         }
-
-        // if (station->value < STATION_MAX_HEALTH) {
-        //     station->value += stored_cursor_resource_val;
-        //     if (station->value > STATION_MAX_HEALTH) {
-        //         station->value = STATION_MAX_HEALTH;
-        //     }
-        // }
-
-        if (game.ship_fuel < CURSOR_MAX_FUEL) {
-            game.ship_fuel = CURSOR_MAX_FUEL;
-            if (game.ship_fuel > CURSOR_MAX_FUEL) {
-                game.ship_fuel = CURSOR_MAX_FUEL;
-            }
+        if (cursor->value > CURSOR_MAX_HEALTH) {
+            cursor->value = CURSOR_MAX_HEALTH;
         }
-
-        game.accumulated_credits += stored_cursor_resource_val;
-
-        game.cursor_resource_val = 0;
-        stored_cursor_resource_val = 0;
-
     }
+
+    // Fuel restoration
+    if (game.ship_fuel < CURSOR_MAX_FUEL) {
+        if (stored_cursor_resource_val >= 70) {
+            game.ship_fuel = CURSOR_MAX_FUEL;
+        } else {
+            game.ship_fuel += stored_cursor_resource_val * 0.7f;
+        }
+        if (game.ship_fuel > CURSOR_MAX_FUEL) {
+            game.ship_fuel = CURSOR_MAX_FUEL;
+        }
+    }
+
+    // Credits - bonus for full load
+    if (stored_cursor_resource_val >= 100) {
+        game.accumulated_credits += stored_cursor_resource_val + 25;
+    } else {
+        game.accumulated_credits += stored_cursor_resource_val;
+    }
+
+    // Clear resources
+    game.cursor_resource_val = 0;
+    stored_cursor_resource_val = 0;
 }
 
 
@@ -437,6 +442,19 @@ void check_drone_station_collisions(Entity *drone, Entity *station, int count) {
 void check_drone_cursor_collisions(Entity *drone, Entity *cursor, int count) {
     if (check_entity_intersection(drone, cursor)) {
         cursor->value += game.drone_resource_val;
+
+        game.ship_fuel += game.drone_resource_val * 0.3f;
+
+        if (game.ship_fuel < 10) {
+            game.ship_fuel = 10;
+        }
+        if (cursor->value > CURSOR_MAX_HEALTH) {
+            cursor->value = CURSOR_MAX_HEALTH;
+        }
+        if (game.ship_fuel > CURSOR_MAX_FUEL) {
+            game.ship_fuel = CURSOR_MAX_FUEL;
+        }
+
         game.drone_resource_val = 0;
         drone->value = game.drone_resource_val;
         if (cursor->value > 0) {
