@@ -980,7 +980,7 @@ int main(void) {
             game.collision_timer += delta_time;
             if (game.collision_timer >= 0.033f) {
                 check_cursor_asteroid_deflection(&entities[ENTITY_CURSOR], asteroids, ASTEROID_COUNT);
-                check_cursor_asteroid_collisions(&entities[ENTITY_CURSOR], asteroids, ASTEROID_COUNT, asteroid_visible);
+                check_cursor_asteroid_collisions(&entities[ENTITY_CURSOR], asteroids, ASTEROID_COUNT, asteroid_visible, delta_time);
                 game.collision_timer = 0.0f;
             }
 

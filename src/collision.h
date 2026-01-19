@@ -20,7 +20,7 @@ void update_color_flashes(float delta_time);
 // Cursor/Ship Collisions
 // =============================================================================
 
-void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, int count, bool *asteroid_visible);
+void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, int count, bool *asteroid_visible, float delta_time);
 void check_cursor_station_collision(Entity *cursor, Entity *station);
 void check_cursor_resource_collisions(Entity *cursor, Entity *resources, int count, float delta_time);
 void check_cursor_asteroid_deflection(Entity *cursor, Entity *asteroids, int count);

@@ -71,7 +71,7 @@ GameStateData game = {
     .cam_yaw = CAM_ANGLE_YAW,
 
     // Iframe timers
-    .station_iframe_timer = 0.0f,
+    .cursor_iframe_timer = 0.0f,
 
     // Frame counting
     .frame_count = 0,
@@ -183,7 +183,7 @@ void reset_game_state(void) {
     game.cursor_last_damage = 0;
 
     // Reset iframe
-    game.station_iframe_timer = 0.0f;
+    game.cursor_iframe_timer = 0.0f;
 
     // Reset frame count
     game.frame_count = 0;
@@ -213,6 +213,7 @@ void reset_game_state(void) {
     // Reset difficulty progression
     game.game_time = 0.0f;
     game.difficulty_multiplier = 1.0f;
+
 }
 
 void pause_game(void) {

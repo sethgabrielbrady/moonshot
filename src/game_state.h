@@ -86,7 +86,7 @@ typedef struct {
     float cam_yaw;
 
     // Iframe timers
-    float station_iframe_timer;
+    float cursor_iframe_timer;
 
     // Frame counting
     int frame_count;

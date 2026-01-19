@@ -85,7 +85,7 @@
 
 #define STATION_DECAY_RATE     0.02f
 #define STATION_MAX_HEALTH     100.0f
-#define STATION_IFRAME_DURATION 1.0f
+#define CURSOR_IFRAME_DURATION 10.0f
 
 // =============================================================================
 // Combat

@@ -138,8 +138,11 @@ float calculate_asteroid_damage(Entity *asteroid) {
 
 static float ship_damage_multiplier = 3.0f;
 
-void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, int count, bool *visibility) {
+void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, int count, bool *visibility, float delta_time) {
     if (game.deflect_active) return;
+    if (game.cursor_iframe_timer > 0.0f) {
+        game.cursor_iframe_timer -= delta_time;
+    }
 
     for (int i = 0; i < count; i++) {
         // Skip culled asteroids
@@ -153,36 +156,39 @@ void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, int cou
         if (dist_sq > max_range * max_range) continue;
 
         if (check_entity_intersection(cursor, &asteroids[i])) {
-            play_sfx(4);
-            float damage = calculate_asteroid_damage(&asteroids[i]);
-            if (damage <= MAX_DAMAGE * ship_damage_multiplier) {
-                damage = MAX_DAMAGE * ship_damage_multiplier;
-            }
-            // if (damage >= MAX_DAMAGE * ship_damage_multiplier) {
-            //     damage = MAX_DAMAGE * ship_damage_multiplier;
-            // }
-            spawn_explosion(asteroids[i].position, COLOR_SPARKS);
-            cursor->value -= damage;
-            game.cursor_last_damage = (int)damage;
 
-            if (cursor->value < 0) {
-                cursor->value = 0;
-                // game.game_over = true;
-                game.disabled_controls = true;
-                // maybe spawn an explosion here?
-            } else if (cursor->value > 0 && game.ship_fuel > 0) {
-                game.disabled_controls = false;
-            }
+            if (game.cursor_iframe_timer <= 0.0f) {
+                play_sfx(4);
+                float damage = calculate_asteroid_damage(&asteroids[i]);
+                if (damage <= MAX_DAMAGE * ship_damage_multiplier) {
+                    damage = MAX_DAMAGE * ship_damage_multiplier;
+                }
+                // if (damage >= MAX_DAMAGE * ship_damage_multiplier) {
+                //     damage = MAX_DAMAGE * ship_damage_multiplier;
+                // }
+                spawn_explosion(asteroids[i].position, COLOR_SPARKS);
+                cursor->value -= damage;
+                game.cursor_last_damage = (int)damage;
 
-            // Add asteroid velocity to cursor velocity (knockback)
-            game.cursor_velocity.v[0] += asteroids[i].velocity.v[0] * KNOCKBACK_STRENGTH;
-            game.cursor_velocity.v[2] += asteroids[i].velocity.v[2] * KNOCKBACK_STRENGTH;
+                if (cursor->value < 0) {
+                    cursor->value = 0;
+                    game.disabled_controls = true;
+                } else if (cursor->value > 0 && game.ship_fuel > 0) {
+                    game.disabled_controls = false;
+                }
 
-            other_shake_enabled = damage > 0 ? true : false;
-            if (other_shake_enabled) {
-                trigger_screen_shake(3.0f, 0.25f);
+                // Add asteroid velocity to cursor velocity (knockback)
+                game.cursor_velocity.v[0] += asteroids[i].velocity.v[0] * KNOCKBACK_STRENGTH;
+                game.cursor_velocity.v[2] += asteroids[i].velocity.v[2] * KNOCKBACK_STRENGTH;
+
+                other_shake_enabled = damage > 0 ? true : false;
+                if (other_shake_enabled) {
+                    trigger_screen_shake(3.0f, 0.25f);
+                }
+                game.cursor_iframe_timer = CURSOR_IFRAME_DURATION;
             }
             reset_entity(&asteroids[i], ASTEROID);
+
         }
     }
 }
