@@ -217,6 +217,7 @@ void check_cursor_station_collision(Entity *cursor, Entity *station) {
             game.ship_fuel = CURSOR_MAX_FUEL;
         } else {
             game.ship_fuel += stored_cursor_resource_val * 0.7f;
+            // game.ship_fuel += CURSOR_MAX_FUEL * 0.5f;
         }
         if (game.ship_fuel > CURSOR_MAX_FUEL) {
             game.ship_fuel = CURSOR_MAX_FUEL;

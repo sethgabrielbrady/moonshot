@@ -10,6 +10,7 @@
 // =============================================================================
 
 typedef enum {
+    STATE_COUNTDOWN,
     STATE_PLAYING,
     STATE_PAUSED,
     STATE_GAME_OVER,
@@ -114,6 +115,13 @@ typedef struct {
     float ship_fuel;            // Current ship fuel level
     bool ship_acceleration;     // Is ship currently accelerating
 
+    // Difficulty progression
+    float game_time;            // Total elapsed game time in seconds
+    float difficulty_multiplier; // Scales from 1.0 upward based on time
+
+    // Countdown
+    float countdown_timer;      // Counts down from 3.0 to 0
+
 } GameStateData;
 
 // =============================================================================
@@ -149,6 +157,8 @@ void reset_game_state(void);
 void pause_game(void);
 void unpause_game(void);
 void set_game_over(void);
+void update_difficulty(float delta_time);
+float get_asteroid_speed_for_difficulty(void);
 
 
 

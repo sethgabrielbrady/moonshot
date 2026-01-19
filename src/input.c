@@ -35,20 +35,32 @@ static int menu_input_delay = 0;
 void update_input(void) {
     joypad_inputs_t joypad = joypad_get_inputs(JOYPAD_PORT_1);
 
+    // Always read stick input for menu navigation
+    // Only block it for gameplay when controls are disabled
     input.stick_x = joypad.stick_x;
     input.stick_y = joypad.stick_y;
+
+    // Zero out for gameplay purposes if controls disabled (but menus still work)
+    if (game.disabled_controls && game.state == STATE_PLAYING && !game.game_over) {
+        input.stick_x = 0.0f;
+        input.stick_y = 0.0f;
+    }
     input.stick_magnitude_sq = input.stick_x * input.stick_x + input.stick_y * input.stick_y;
+
 
     // input.stick_x = joypad.stick_x;
     // input.stick_y = joypad.stick_y;
     // input.stick_magnitude_sq = input.stick_x * input.stick_x + input.stick_y * input.stick_y;
 
     // Use fast inverse sqrt: magnitude = magnitude_sq * (1/sqrt(magnitude_sq))
+
     if (input.stick_magnitude_sq > 0.0f) {
         input.stick_magnitude = input.stick_magnitude_sq * fast_inv_sqrt(input.stick_magnitude_sq);
     } else {
         input.stick_magnitude = 0.0f;
     }
+
+
 
     input.pressed = joypad_get_buttons_pressed(JOYPAD_PORT_1);
     input.held = joypad_get_buttons_held(JOYPAD_PORT_1);
@@ -145,7 +157,7 @@ void process_menu_input(void) {
 // =============================================================================
 
 void process_system_input(T3DViewport *viewport) {
-    // Toggle pause with START
+    // Toggle pause with START (but not during countdown)
     if (input.pressed.start) {
         if (game.state == STATE_PLAYING) {
             game.state = STATE_PAUSED;
@@ -156,6 +168,7 @@ void process_system_input(T3DViewport *viewport) {
             game.state = STATE_PLAYING;
             set_bgm_volume(0.5f);
         }
+        // Don't allow pause during STATE_COUNTDOWN
         return;
     }
 
@@ -170,14 +183,16 @@ void process_system_input(T3DViewport *viewport) {
         return;
     }
 
-    // Debug toggles (only when not paused)
-    if (input.pressed.d_up) game.render_debug = !game.render_debug;
-    if (input.pressed.d_left) game.show_fps = !game.show_fps;
-    if (input.pressed.l) reset_fps_stats();
+    // Debug toggles (only when playing, not during countdown)
+    if (game.state != STATE_COUNTDOWN) {
+        if (input.pressed.d_up) game.render_debug = !game.render_debug;
+        if (input.pressed.d_left) game.show_fps = !game.show_fps;
+        if (input.pressed.l) reset_fps_stats();
 
-    // // Camera mode toggle
-    if (input.pressed.d_down) {
-        game.fps_mode = !game.fps_mode;
+        // Camera mode toggle
+        if (input.pressed.d_down) {
+            game.fps_mode = !game.fps_mode;
+        }
     }
 }
 

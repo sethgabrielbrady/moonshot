@@ -135,16 +135,27 @@ void draw_pause_menu(void) {
 
     rdpq_sync_pipe();
 
-    // Title
-    rdpq_text_printf(&(rdpq_textparms_t){
-        .align = ALIGN_CENTER,
-        .width = display_get_width(),
-    }, FONT_CUSTOM, 0, y1 + 15, "AsteRisk");
+    // Title - show lives remaining if game over
+    if (game.game_over_pause) {
+        rdpq_text_printf(&(rdpq_textparms_t){
+            .align = ALIGN_CENTER,
+            .width = display_get_width(),
+        }, FONT_CUSTOM, 0, y1 + 15, "Lives: %d", game.player_lives);
+    } else {
+        rdpq_text_printf(&(rdpq_textparms_t){
+            .align = ALIGN_CENTER,
+            .width = display_get_width(),
+        }, FONT_CUSTOM, 0, y1 + 15, "AsteRisk");
+    }
 
     // Menu options
-
-    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y, "%s",
-                     game.game_over_pause ? "Restart" : "Resume");
+    const char *first_option;
+    if (game.game_over_pause) {
+        first_option = (game.player_lives > 1) ? "Continue" : "Restart";
+    } else {
+        first_option = "Resume";
+    }
+    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y, "%s", first_option);
 
     // rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height,
     //                  "Camera: %s", game.fps_mode ? "FPS" : "ISO");

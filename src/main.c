@@ -349,9 +349,9 @@ static void render_background(sprite_t *background, float cam_yaw) {
 
 static void draw_cursor_fuel_bar() {
     int x = 7;
-    int y = SCREEN_HEIGHT - 26;
+    int y = SCREEN_HEIGHT - 23;
     int bar_width = 40;
-    int bar_height = 4;
+    int bar_height = 3;
 
     float fuel_percent = game.ship_fuel / CURSOR_MAX_FUEL;
     if (fuel_percent > 1.0f) fuel_percent = 1.0f;
@@ -369,21 +369,21 @@ static void draw_cursor_fuel_bar() {
     }
 
     if (fill_width < bar_width) {
-        rdpq_set_prim_color(RGBA32(50, 50, 60, 255));
-        rdpq_fill_rectangle(x + bar_width + 5, y, x + bar_width, y + bar_height);
+        rdpq_set_prim_color(RGBA32(110, 0, 110, 115));
+        rdpq_fill_rectangle(x + fill_width, y, x + bar_width, y + bar_height);
     }
 }
 
 static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset, const char *label, int cursor, bool station_entity) {
     if (entity->value < 0) entity->value = 0;
 
-    int x = 10;
+    int x = 6;
     int y = 10 + y_offset;
     int bar_width = 40;
-    int bar_height = 4;
+    int bar_height = 3;
 
     if (cursor) {
-        y = SCREEN_HEIGHT - 20;
+        y = SCREEN_HEIGHT - 26;
     }
 
     float health_percent = entity->value / max_value;
@@ -402,8 +402,7 @@ static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset
     }
 
     rdpq_sync_pipe();
-    // rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-    //                  x + bar_width + 5, y + bar_height, "%s", label);
+
 
     if (station_entity) {
         rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
@@ -420,7 +419,7 @@ static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset
         }
 
         if (fill_width < bar_width) {
-            rdpq_set_prim_color(RGBA32(80, 80, 80, 255));
+            rdpq_set_prim_color(RGBA32(0, 155, 0, 105));
             rdpq_fill_rectangle(x + fill_width, y, x + bar_width, y + bar_height);
         }
 
@@ -431,13 +430,13 @@ static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset
 
 static void draw_entity_resource_bar(int resource_val, float max_value, int y_offset, const char *label, bool show_triangle) {
     int bar_width = 40;
-    int bar_height = 4;
+    int bar_height = 3;
 
-    int x = display_get_width() - bar_width - 10;
+    int x = display_get_width() - bar_width - 2;
     int y = SCREEN_HEIGHT - y_offset;
 
     if (!show_triangle) {
-        y = SCREEN_HEIGHT - 24;
+        y = SCREEN_HEIGHT - 20;
         x = 8;
     }
 
@@ -458,7 +457,7 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
         }
 
         if (fill_width < bar_width) {
-            rdpq_set_prim_color(RGBA32(50, 50, 60, 255));
+            rdpq_set_prim_color(RGBA32(50, 130, 165, 105));
             rdpq_fill_rectangle(x + fill_width, y, x + bar_width, y + bar_height);
         }
     }
@@ -552,12 +551,49 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
     }
 }
 
+static void draw_countdown(void) {
+    int center_x = display_get_width() / 2;
+    int center_y = SCREEN_HEIGHT / 2;
+
+    // Get the current countdown number (3, 2, 1, or "GO!")
+    int count = (int)game.countdown_timer + 1;
+
+    if (count > 0 && count <= 3) {
+        rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
+                 center_x - 5, center_y, "%d", count);
+    } else if (game.countdown_timer > -0.5f) {
+        // Show "GO!" briefly after countdown hits 0
+        rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
+                 center_x - 12, center_y, "GO!");
+    }
+}
+
+static void draw_game_timer(void) {
+    // Convert game_time (seconds) to MM:SS format
+    int total_seconds = (int)game.game_time;
+    int minutes = total_seconds / 60;
+    int seconds = total_seconds % 60;
+
+    // Position in bottom right corner
+    int x = display_get_width() - 38;
+    int y = SCREEN_HEIGHT - 10;
+
+    // Draw difficulty multiplier above the timer
+    rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
+             x, y - 10, "x%.2f", game.difficulty_multiplier);
+
+    // Draw timer
+    rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
+             x, y, "%d:%02d", minutes, seconds);
+}
+
 static void draw_info_bars(void) {
     draw_entity_health_bar(&entities[ENTITY_STATION], STATION_MAX_HEALTH, 0, "S", 0, true);
     draw_cursor_fuel_bar();
     draw_entity_health_bar(cursor_entity, CURSOR_MAX_HEALTH, 20, "Procyon", 1, false);
     draw_entity_resource_bar(game.cursor_resource_val, CURSOR_RESOURCE_CAPACITY, 25, "Procyon", false);
     draw_entity_resource_bar(game.drone_resource_val, DRONE_MAX_RESOURCES, 225, "PUP", true);
+    draw_game_timer();
 }
 
 
@@ -744,6 +780,11 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
 
     }
 
+    // Draw countdown overlay
+    if (game.state == STATE_COUNTDOWN) {
+        draw_countdown();
+    }
+
     rdpq_detach_show();
 }
 
@@ -817,10 +858,23 @@ int main(void) {
         update_input();
         process_system_input(&viewport);
 
-        if (game.state == STATE_PLAYING && !game.game_over) {
-            if (!game.disabled_controls)  {
-                update_cursor_movement(delta_time, cursor_entity);
+        // Handle countdown state
+        if (game.state == STATE_COUNTDOWN) {
+            game.countdown_timer -= delta_time;
+
+            // Update camera during countdown so scene is visible
+            update_camera(&viewport, game.cam_yaw, delta_time, game.cursor_position, game.fps_mode, cursor_entity);
+
+            // Transition to playing when countdown finishes
+            if (game.countdown_timer <= -0.5f) {
+                game.state = STATE_PLAYING;
+                game.game_over = false;
             }
+        }
+
+        if (game.state == STATE_PLAYING && !game.game_over) {
+            update_cursor_movement(delta_time, cursor_entity);
+
             update_cursor_scale_by_distance(&entities[ENTITY_CURSOR], &entities[ENTITY_STATION], delta_time);
 
             process_game_input(delta_time);
@@ -928,17 +982,16 @@ int main(void) {
 
                 game.death_timer += delta_time;
                 if (game.death_timer >= 10.0f) {
-                    // 10 seconds reached - do something here
-                    // spawn_station_explosion(entities[ENTITY_STATION].position);
+                    // 10 seconds reached - show game over menu
                     game.game_over = true;
+                    game.game_over_pause = true;
                     game.death_timer = 10.0f;
-                    game.reset = true;
+                    // Don't set reset here - let the menu handle it
                 }
             } else {
                 // Reset if health restored
                 game.death_timer_active = false;
                 game.death_timer = 0.0f;
-                game.reset = false;
             }
 
             update_color_flashes(delta_time);
@@ -947,25 +1000,49 @@ int main(void) {
             //     update_ship_fuel(delta_time);
             // }
             update_ship_fuel(delta_time);
+            update_difficulty(delta_time);
 
 
 
             game.blink_timer++;
             if (game.blink_timer > 20) game.blink_timer = 0;
+        }
 
-            if (game.reset) {
-                entities[ENTITY_CURSOR].value = CURSOR_MAX_HEALTH;
-                game.cursor_resource_val = 0;
-                game.drone_resource_val = 0;
-                game.drone_full = false;
-                game.move_drone = false;
-                game.drone_mining_resource = -1;
-                game.tile_following_resource = -1;
-                game.deflect_active = false;
-                game.disabled_controls = false;
-                game.ship_fuel = CURSOR_MAX_FUEL;
-                game.accumulated_credits -= 25;
+        // Handle reset (can happen from pause menu even when game_over)
+        if (game.reset) {
+            // Subtract a life on game over
+            game.player_lives--;
+
+            if (game.player_lives <= 0) {
+                // Full reset - out of lives
+                game.player_lives = 3;
+                game.game_time = 0.0f;
+                game.difficulty_multiplier = 1.0f;
+                game.accumulated_credits = 0;
+
+                // Start countdown
+                game.state = STATE_COUNTDOWN;
+                game.countdown_timer = 3.0f;
+            } else {
+                // Still have lives, go back to playing
+                game.state = STATE_PLAYING;
             }
+
+            entities[ENTITY_CURSOR].value = CURSOR_MAX_HEALTH;
+            game.cursor_resource_val = 0;
+            game.drone_resource_val = 0;
+            game.drone_full = false;
+            game.move_drone = false;
+            game.drone_mining_resource = -1;
+            game.tile_following_resource = -1;
+            game.deflect_active = false;
+            game.disabled_controls = false;
+            game.ship_fuel = CURSOR_MAX_FUEL;
+            game.death_timer_active = false;
+            game.death_timer = 0.0f;
+            game.game_over = false;
+            game.game_over_pause = false;
+            game.reset = false;
         }
 
         render_frame(&viewport, background, game.cam_yaw, delta_time);

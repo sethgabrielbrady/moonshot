@@ -8,7 +8,7 @@
 
 GameStateData game = {
     // Core game state
-    .state = STATE_PLAYING,
+    .state = STATE_COUNTDOWN,
     .game_over = false,
     .game_over_pause = false,
 
@@ -97,7 +97,14 @@ GameStateData game = {
     .death_timer_active = false,
     .accumulated_credits = 0,
     .ship_fuel = CURSOR_MAX_FUEL,
-    .ship_acceleration = false
+    .ship_acceleration = false,
+
+    // Difficulty progression
+    .game_time = 0.0f,
+    .difficulty_multiplier = 1.0f,
+
+    // Countdown
+    .countdown_timer = 3.0f
 };
 
 // =============================================================================
@@ -123,7 +130,8 @@ sprite_t *health_icon = NULL;
 // =============================================================================
 
 void init_game_state(void) {
-    game.state = STATE_PLAYING;
+    game.state = STATE_COUNTDOWN;
+    game.countdown_timer = 3.0f;
     game.game_over = false;
     game.game_over_pause = false;
     game.cam_yaw = CAM_ANGLE_YAW;
@@ -201,6 +209,10 @@ void reset_game_state(void) {
     game.accumulated_credits = 0;
     game.ship_fuel = CURSOR_MAX_FUEL;
     game.ship_acceleration = false;
+
+    // Reset difficulty progression
+    game.game_time = 0.0f;
+    game.difficulty_multiplier = 1.0f;
 }
 
 void pause_game(void) {
@@ -214,4 +226,38 @@ void unpause_game(void) {
 void set_game_over(void) {
     game.state = STATE_GAME_OVER;
     game.game_over = true;
+}
+
+// =============================================================================
+// Difficulty Progression
+// =============================================================================
+
+// Configuration - tweak these to adjust difficulty curve
+#define DIFFICULTY_INTERVAL      60.0f   // Seconds between each speed increase
+#define DIFFICULTY_INCREASE      0.25f   // 25% increase per interval
+#define DIFFICULTY_MAX_MULTIPLIER 5.0f   // Cap to prevent insane speeds
+
+void update_difficulty(float delta_time) {
+    game.game_time += delta_time;
+
+    // Calculate how many 60-second intervals have passed
+    int intervals = (int)(game.game_time / DIFFICULTY_INTERVAL);
+
+    // Each interval adds 25%: 1.0, 1.25, 1.5625, 1.953, etc. (compound)
+    // Using compound: multiplier = (1 + 0.25)^intervals
+    float multiplier = 1.0f;
+    for (int i = 0; i < intervals; i++) {
+        multiplier *= (1.0f + DIFFICULTY_INCREASE);
+    }
+
+    // Cap at maximum
+    if (multiplier > DIFFICULTY_MAX_MULTIPLIER) {
+        multiplier = DIFFICULTY_MAX_MULTIPLIER;
+    }
+
+    game.difficulty_multiplier = multiplier;
+}
+
+float get_asteroid_speed_for_difficulty(void) {
+    return game.difficulty_multiplier;
 }

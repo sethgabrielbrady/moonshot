@@ -2,6 +2,7 @@
 #include "constants.h"
 #include "utils.h"
 #include "entity.h"
+#include "game_state.h"
 #include <math.h>
 #include <stdint.h>
 
@@ -31,7 +32,18 @@ static void init_rotation_tables(void) {
 
 
 static void get_asteroid_velocity_and_scale(Entity *asteroid, T3DVec3 *out_velocity) {
-    asteroid->speed = randomize_float(ASTEROID_SPEED_MULTIPLIER, 450.0f); // what is this number?
+    // Base speed range (slower starting values)
+    float base_min_speed = 100.0f;   // Starting minimum speed
+    float base_max_speed = 200.0f;  // Starting maximum speed
+
+    // Get difficulty multiplier from game state (1.0 to 3.0)
+    float difficulty = get_asteroid_speed_for_difficulty();
+
+    // Scale speed by difficulty
+    float min_speed = base_min_speed * difficulty;
+    float max_speed = base_max_speed * difficulty;
+
+    asteroid->speed = randomize_float(min_speed, max_speed);
     asteroid->scale = randomize_float(ASTEROID_MIN_SCALE, ASTEROID_MAX_SCALE);
 }
 
