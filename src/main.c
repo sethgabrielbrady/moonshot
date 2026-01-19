@@ -37,15 +37,9 @@ static Entity asteroids[ASTEROID_COUNT];
 static Entity resources[RESOURCE_COUNT];
 static Entity *cursor_entity = NULL;
 
-
-
 // Visibility arrays for culling
 static bool asteroid_visible[ASTEROID_COUNT];
 static bool resource_visible[RESOURCE_COUNT];
-static bool decrease_money = false;
-
-
-
 
 // =============================================================================
 // Frustum Culling
@@ -888,14 +882,8 @@ int main(void) {
 
         if (game.state == STATE_PLAYING && !game.game_over) {
             update_cursor_movement(delta_time, cursor_entity);
-
             update_cursor_scale_by_distance(&entities[ENTITY_CURSOR], &entities[ENTITY_STATION], delta_time);
-
             process_game_input(delta_time);
-
-             // Check deflect input every frame (before 30Hz collision check)
-            // check_deflect_input();
-
             update_camera(&viewport, game.cam_yaw, delta_time, game.cursor_position, game.fps_mode, cursor_entity);
             update_screen_shake(delta_time);
             update_tile_visibility(&entities[ENTITY_TILE]);
@@ -1041,6 +1029,7 @@ int main(void) {
                 // Still have lives, go back to playing
                 game.state = STATE_PLAYING;
             }
+
 
             entities[ENTITY_CURSOR].value = CURSOR_MAX_HEALTH;
             game.cursor_resource_val = 0;

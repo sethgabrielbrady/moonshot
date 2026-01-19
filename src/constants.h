@@ -85,7 +85,7 @@
 
 #define STATION_DECAY_RATE     0.02f
 #define STATION_MAX_HEALTH     100.0f
-#define CURSOR_IFRAME_DURATION 10.0f
+#define CURSOR_IFRAME_DURATION 1.0f
 
 // =============================================================================
 // Combat
@@ -157,11 +157,8 @@
 #define BG_HEIGHT 240
 
 
-
-#define ASTEROID_SPEED_MULTIPLIER 0.0f
 #define ASTEROID_MIN_SCALE 0.3f
 #define ASTEROID_MAX_SCALE 1.3f
-
 #define DEFLECT_FUEL_COST      5.0f
 
 

@@ -153,7 +153,6 @@ extern sprite_t *health_icon;
 // =============================================================================
 
 void init_game_state(void);
-void reset_game_state(void);
 void pause_game(void);
 void unpause_game(void);
 void set_game_over(void);

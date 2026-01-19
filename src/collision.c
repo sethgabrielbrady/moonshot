@@ -8,16 +8,6 @@
 #include "spawner.h"
 #include <math.h>
 
-// =============================================================================
-// External References (from main.c - will be moved to game_state later)
-// =============================================================================
-
-// These need to be passed in or accessed via game state
-// For now, declare as extern until full migration
-extern bool *asteroid_visible;
-extern bool *resource_visible;
-extern Entity *cursor_entity;
-extern T3DVec3 cursor_velocity;
 
 // =============================================================================
 // Color Flash System
@@ -84,55 +74,6 @@ float calculate_asteroid_damage(Entity *asteroid) {
 }
 
 // =============================================================================
-// Station Collisions
-// =============================================================================
-
-// void check_station_asteroid_collisions(Entity *station, Entity *asteroids, int count, float delta_time) {
-//     // Update iframe timer
-//     if (game.station_iframe_timer > 0.0f) {
-//         game.station_iframe_timer -= delta_time;
-//     }
-
-//     for (int i = 0; i < count; i++) {
-//         // Distance-based early rejection - skip if too far away
-//         float dx = station->position.v[0] - asteroids[i].position.v[0];
-//         float dz = station->position.v[2] - asteroids[i].position.v[2];
-//         float dist_sq = dx * dx + dz * dz;
-//         float max_range = station->collision_radius + asteroids[i].collision_radius + 50.0f;
-//         if (dist_sq > max_range * max_range) continue;
-
-//         if (check_entity_intersection(station, &asteroids[i])) {
-//             // Only apply damage if not in iframe period
-//             if (game.station_iframe_timer <= 0.0f) {
-//                 float damage = calculate_asteroid_damage(&asteroids[i]);
-//                 if (damage >= MAX_DAMAGE) {
-//                     damage = MAX_DAMAGE;
-//                 }
-
-//                 spawn_explosion(asteroids[i].position, COLOR_SPARKS);
-
-//                 station->value -= damage;
-//                 game.station_last_damage = (int)damage;
-
-//                 // Clamp to zero
-//                 if (station->value < 0) {
-//                     station->value = 0;
-//                     spawn_station_explosion(station->position);
-//                     start_entity_color_flash(station, RGBA32(255, 255, 0, 125), 0.5f);
-//                     play_sfx(5);
-//                 }
-
-//                 // Start iframe period
-//                 game.station_iframe_timer = STATION_IFRAME_DURATION;
-//             }
-
-//             // Always reset asteroid to prevent multiple collisions
-//             reset_entity(&asteroids[i], ASTEROID);
-//         }
-//     }
-// }
-
-// =============================================================================
 // Cursor/Ship Collisions
 // =============================================================================
 
@@ -193,11 +134,9 @@ void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, int cou
     }
 }
 
-
-int stored_cursor_resource_val = 0;
-float value_multiplier = 0.2f;
-
 void check_cursor_station_collision(Entity *cursor, Entity *station) {
+    int stored_cursor_resource_val = 0;
+    float value_multiplier = 0.2f;
     if (!check_entity_intersection(cursor, station)) return;
 
     // Only process if we have resources to deposit
@@ -244,7 +183,6 @@ void check_cursor_station_collision(Entity *cursor, Entity *station) {
 
 
 void check_cursor_asteroid_deflection(Entity *cursor, Entity *asteroids, int count) {
-
     if (!game.deflect_active) return;
 
     // Check for A button press to start deflection window
