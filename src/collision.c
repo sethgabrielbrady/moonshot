@@ -434,7 +434,8 @@ void check_drone_resource_collisions(Entity *entity, Entity *resources, int coun
 
 void check_drone_station_collisions(Entity *drone, Entity *station, int count) {
     if (check_entity_intersection(drone, station)) {
-        station->value += game.drone_resource_val;
+        // station->value += game.drone_resource_val;
+        game.accumulated_credits += game.drone_resource_val;
         game.drone_resource_val = 0;
         drone->value = game.drone_resource_val;
     }

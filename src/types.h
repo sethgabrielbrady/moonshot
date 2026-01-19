@@ -72,6 +72,16 @@ typedef enum {
     ASTEROID_A18,
     ASTEROID_A19,
     ASTEROID_A20,
+    ASTEROID_A21,
+    ASTEROID_A22,
+    ASTEROID_A23,
+    ASTEROID_A24,
+    ASTEROID_A25,
+    // ASTEROID_A26,
+    // ASTEROID_A27,
+    // ASTEROID_A28,
+    // ASTEROID_A29,
+    // ASTEROID_A30,
     ASTEROID_COUNT
 } AsteroidID;
 

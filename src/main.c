@@ -841,6 +841,20 @@ int main(void) {
 
     if (game.bgm_track == 1) {
         play_bgm("rom:/nebrun.wav64");
+    } else if (game.bgm_track == 2) {
+        play_bgm("rom:/orbodd.wav64");
+    } else if (game.bgm_track == 3) {
+        play_bgm("rom:/lunram.wav64");
+    } else if (game.bgm_track == 4) {
+        // Random - pick 1, 2, or 3
+        int random_track = (rand() % 3) + 1;
+        if (random_track == 1) {
+            play_bgm("rom:/nebrun.wav64");
+        } else if (random_track == 2) {
+            play_bgm("rom:/orbodd.wav64");
+        } else {
+            play_bgm("rom:/lunram.wav64");
+        }
     }
 
     float last_time = get_time_s() - (1.0f / 60.0f);
@@ -1069,12 +1083,12 @@ int main(void) {
     wav64_close(&sfx_dfull);
     wav64_close(&sfx_shiphit);
 
+
     stop_bgm();
     free_all_entities(entities, ENTITY_COUNT);
     free_all_entities(asteroids, ASTEROID_COUNT);
     free_all_entities(resources, RESOURCE_COUNT);
     t3d_destroy();
-
 
     return 0;
 }
