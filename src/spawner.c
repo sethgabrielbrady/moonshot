@@ -7,6 +7,12 @@
 #include <stdint.h>
 
 // =============================================================================
+// Shared Models (loaded once, reused by all instances)
+// =============================================================================
+
+static T3DModel *shared_asteroid_model = NULL;
+
+// =============================================================================
 // Pre-computed Rotation Lookup Tables
 // =============================================================================
 
@@ -32,16 +38,12 @@ static void init_rotation_tables(void) {
 
 
 static void get_asteroid_velocity_and_scale(Entity *asteroid, T3DVec3 *out_velocity) {
-    // Base speed range (slower starting values)
-    float base_min_speed = 100.0f;   // Starting minimum speed
-    float base_max_speed = 200.0f;  // Starting maximum speed
-
-    // Get difficulty multiplier from game state (1.0 to 3.0)
+    // Get difficulty multiplier from game state (1.0 to 5.0)
     float difficulty = get_asteroid_speed_for_difficulty();
 
     // Scale speed by difficulty
-    float min_speed = base_min_speed * difficulty;
-    float max_speed = base_max_speed * difficulty;
+    float min_speed = ASTEROID_BASE_MIN_SPEED * difficulty;
+    float max_speed = ASTEROID_BASE_MAX_SPEED * difficulty;
 
     asteroid->speed = randomize_float(min_speed, max_speed);
     asteroid->scale = randomize_float(ASTEROID_MIN_SCALE, ASTEROID_MAX_SCALE);
@@ -130,10 +132,22 @@ void move_entity(Entity *entity, float delta_time, EntityType type) {
     entity->position.v[0] += entity->velocity.v[0] * move_amount;
     entity->position.v[2] += entity->velocity.v[2] * move_amount;
 
-    // Y rotation
-    entity->rotation.v[1] += move_amount * 0.03f;
-    while (entity->rotation.v[1] >= 360.0f) entity->rotation.v[1] -= 360.0f;
-    while (entity->rotation.v[1] < 0.0f) entity->rotation.v[1] += 360.0f;
+    // Y rotation - only for nearby entities (optimization)
+    if (type == ASTEROID) {
+        float dx = entity->position.v[0] - game.cursor_position.v[0];
+        float dz = entity->position.v[2] - game.cursor_position.v[2];
+        float dist_sq = dx * dx + dz * dz;
+
+        if (dist_sq < ASTEROID_ROTATE_DISTANCE_SQ) {
+            entity->rotation.v[1] += move_amount * 0.03f;
+            while (entity->rotation.v[1] >= 360.0f) entity->rotation.v[1] -= 360.0f;
+            while (entity->rotation.v[1] < 0.0f) entity->rotation.v[1] += 360.0f;
+        }
+    } else {
+        entity->rotation.v[1] += move_amount * 0.03f;
+        while (entity->rotation.v[1] >= 360.0f) entity->rotation.v[1] -= 360.0f;
+        while (entity->rotation.v[1] < 0.0f) entity->rotation.v[1] += 360.0f;
+    }
 
     // Boundary check
     float bound_x = ASTEROID_BOUND_X + ASTEROID_PADDING;
@@ -158,8 +172,13 @@ void update_asteroids(Entity *asteroids, int count, float delta_time) {
 void init_asteroids(Entity *asteroids, int count) {
     init_rotation_tables();
 
+    // Load asteroid model once and share it
+    if (shared_asteroid_model == NULL) {
+        shared_asteroid_model = t3d_model_load("rom:/asteroid1.t3dm");
+    }
+
     for (int i = 0; i < count; i++) {
-        asteroids[i] = create_entity("rom:/asteroid1.t3dm", (T3DVec3){{0, 10, 0}},
+        asteroids[i] = create_entity_shared(shared_asteroid_model, (T3DVec3){{0, 10, 0}},
                                       randomize_float(0.1f, 1.3f), COLOR_ASTEROID, DRAW_SHADED, 10.0f);
         reset_entity(&asteroids[i], ASTEROID);
         // Scatter across field initially
@@ -181,11 +200,27 @@ void update_resources(Entity *resources, int count, float delta_time) {
 void init_resources(Entity *resources, int count) {
     init_rotation_tables();
 
+    // Use same shared model as asteroids (load if not already loaded)
+    if (shared_asteroid_model == NULL) {
+        shared_asteroid_model = t3d_model_load("rom:/asteroid1.t3dm");
+    }
+
     for (int i = 0; i < count; i++) {
-        resources[i] = create_entity("rom:/asteroid1.t3dm", (T3DVec3){{0, 10, 0}},
+        resources[i] = create_entity_shared(shared_asteroid_model, (T3DVec3){{0, 10, 0}},
                                       1.0f, COLOR_RESOURCE, DRAW_SHADED, 10.0f);
         reset_entity(&resources[i], RESOURCE);
         resources[i].position.v[0] = randomize_float(-RESOURCE_BOUND_X, RESOURCE_BOUND_X);
         resources[i].position.v[2] = randomize_float(-RESOURCE_BOUND_Z, RESOURCE_BOUND_Z);
+    }
+}
+
+// =============================================================================
+// Cleanup
+// =============================================================================
+
+void free_shared_models(void) {
+    if (shared_asteroid_model != NULL) {
+        t3d_model_free(shared_asteroid_model);
+        shared_asteroid_model = NULL;
     }
 }

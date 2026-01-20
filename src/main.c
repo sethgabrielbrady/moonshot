@@ -1079,5 +1079,6 @@ int main(void) {
     free_all_entities(resources, RESOURCE_COUNT);
     t3d_destroy();
 
+
     return 0;
 }

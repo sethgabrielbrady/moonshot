@@ -91,10 +91,12 @@
 // Combat
 // =============================================================================
 
-#define DAMAGE_MULTIPLIER  0.001f
-#define VALUE_MULTIPLIER   20.0f
-#define MAX_DAMAGE         20.0f
-#define MAX_COLOR_FLASHES  8
+#define DAMAGE_MULTIPLIER        0.001f
+#define VALUE_MULTIPLIER         20.0f
+#define MAX_DAMAGE               20.0f
+#define MAX_COLOR_FLASHES        8
+#define SHIP_DAMAGE_MULTIPLIER   3.0f
+#define SPAWN_INVINCIBILITY_TIME 3.0f
 
 // =============================================================================
 // Debug UI
@@ -156,10 +158,23 @@
 #define BG_WIDTH  1024
 #define BG_HEIGHT 240
 
+// =============================================================================
+// Asteroid Speed (base values, scaled by difficulty)
+// =============================================================================
 
-#define ASTEROID_MIN_SCALE 0.3f
-#define ASTEROID_MAX_SCALE 1.3f
-#define DEFLECT_FUEL_COST      5.0f
+#define ASTEROID_MIN_SCALE       0.3f
+#define ASTEROID_MAX_SCALE       1.3f
+#define ASTEROID_BASE_MIN_SPEED  100.0f
+#define ASTEROID_BASE_MAX_SPEED  200.0f
 
+// Distance-based culling (from cursor position)
+#define ASTEROID_DRAW_DISTANCE_SQ    (1200.0f * 1200.0f)  // Don't draw beyond 1200 units
+#define ASTEROID_ROTATE_DISTANCE_SQ  (800.0f * 800.0f)    // Don't rotate beyond 800 units
+
+// =============================================================================
+// Deflect
+// =============================================================================
+
+#define DEFLECT_FUEL_COST  5.0f
 
 #endif // CONSTANTS_H

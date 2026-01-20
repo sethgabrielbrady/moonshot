@@ -26,6 +26,25 @@ Entity create_entity(const char *model_path, T3DVec3 position, float scale,
     return entity;
 }
 
+// Create entity with shared model (no model loading, reuses existing)
+Entity create_entity_shared(T3DModel *shared_model, T3DVec3 position, float scale,
+                            color_t color, DrawType draw_type, float collision_radius) {
+    Entity entity = {
+        .model = shared_model,
+        .matrix = malloc_uncached(sizeof(T3DMat4FP)),
+        .position = position,
+        .velocity = {{0.0f, 0.0f, 0.0f}},
+        .scale = scale,
+        .color = color,
+        .rotation = {{0.0f, 0.0f, 0.0f}},
+        .speed = 1.0f,
+        .collision_radius = collision_radius,
+        .value = 0,
+        .draw_type = draw_type,
+    };
+    return entity;
+}
+
 // =============================================================================
 // Entity Matrix Updates
 // =============================================================================
@@ -145,8 +164,23 @@ void free_entity(Entity *entity) {
     }
 }
 
+// Free entity that uses a shared model (don't free the model)
+void free_entity_shared(Entity *entity) {
+    entity->model = NULL;  // Don't free shared model
+    if (entity->matrix) {
+        free_uncached(entity->matrix);
+        entity->matrix = NULL;
+    }
+}
+
 void free_all_entities(Entity *entity_array, int count) {
     for (int i = 0; i < count; i++) {
         free_entity(&entity_array[i]);
+    }
+}
+
+void free_all_entities_shared(Entity *entity_array, int count) {
+    for (int i = 0; i < count; i++) {
+        free_entity_shared(&entity_array[i]);
     }
 }

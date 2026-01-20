@@ -25,4 +25,10 @@ void init_resources(Entity *resources, int count);
 void update_resources(Entity *resources, int count, float delta_time);
 void scale_resource_based_on_value(Entity *resource);
 
+// =============================================================================
+// Cleanup
+// =============================================================================
+
+void free_shared_models(void);
+
 #endif // SPAWNER_H

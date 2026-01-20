@@ -8,8 +8,12 @@
 // Entity Creation
 // =============================================================================
 
-Entity create_entity(const char *model_path, T3DVec3 position, float scale, 
+Entity create_entity(const char *model_path, T3DVec3 position, float scale,
                      color_t color, DrawType draw_type, float collision_radius);
+
+// Create entity with shared model (doesn't load new model, uses provided one)
+Entity create_entity_shared(T3DModel *shared_model, T3DVec3 position, float scale,
+                            color_t color, DrawType draw_type, float collision_radius);
 
 // =============================================================================
 // Entity Matrix Updates
@@ -43,6 +47,8 @@ bool check_entity_intersection(Entity *a, Entity *b);
 // =============================================================================
 
 void free_entity(Entity *entity);
+void free_entity_shared(Entity *entity);  // For entities with shared models
 void free_all_entities(Entity *entity_array, int count);
+void free_all_entities_shared(Entity *entity_array, int count);  // For entities with shared models
 
 #endif // ENTITY_H

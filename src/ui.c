@@ -29,7 +29,6 @@ void reset_fps_stats(void) {
 void update_fps_stats(float delta_time) {
     // Use delta_time directly - it's the actual time between frames
     float current_fps = (delta_time > 0.0f) ? (1.0f / delta_time) : 0.0f;
-
     // Clamp to reasonable values to avoid spikes
     if (current_fps > 200.0f) current_fps = 200.0f;
     if (current_fps < 1.0f) current_fps = 1.0f;
