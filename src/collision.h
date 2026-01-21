@@ -11,13 +11,14 @@ void start_entity_color_flash(Entity *entity, color_t flash_color, float duratio
 void update_color_flashes(float delta_time);
 
 // =============================================================================
-// Station Collisions
+// Cursor/Ship Collisions (Optimized Asteroid struct)
 // =============================================================================
 
-// void check_station_asteroid_collisions(Entity *station, Entity *asteroids, int count, float delta_time);
+void check_cursor_asteroid_collisions_opt(Entity *cursor, Asteroid *asteroids, int count, bool *asteroid_visible, float delta_time);
+void check_cursor_asteroid_deflection_opt(Entity *cursor, Asteroid *asteroids, int count);
 
 // =============================================================================
-// Cursor/Ship Collisions
+// Cursor/Ship Collisions (Legacy Entity struct)
 // =============================================================================
 
 void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, int count, bool *asteroid_visible, float delta_time);
@@ -43,17 +44,15 @@ void check_tile_resource_collision(Entity *tile, Entity *resources, int count);
 // Utility
 // =============================================================================
 
+float calculate_asteroid_damage_opt(Asteroid *asteroid);
 float calculate_asteroid_damage(Entity *asteroid);
 void reset_resource_colors(Entity *resources, int count);
-
 
 void update_deflect_timer(float delta_time);
 void check_deflect_input(void);
 
-
 // Deflection radius for visualization
 #define DEFLECT_RADIUS 15.0f
 #define DEFLECT_DURATION 0.40f  // 400ms window
-
 
 #endif // COLLISION_H

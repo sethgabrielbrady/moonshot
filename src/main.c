@@ -33,7 +33,7 @@
 
 
 static Entity entities[ENTITY_COUNT];
-static Entity asteroids[ASTEROID_COUNT];
+static Asteroid asteroids[ASTEROID_COUNT];  // Optimized asteroid struct
 static Entity resources[RESOURCE_COUNT];
 static Entity *cursor_entity = NULL;
 
@@ -96,11 +96,53 @@ static void compute_visibility(Entity *entity_array, bool *visibility, int count
     }
 }
 
-// Asteroid-specific visibility with distance culling from cursor
-// Stores distance for use in matrix update decisions
+// Asteroid-specific visibility with distance culling (uses optimized Asteroid struct)
 static float asteroid_distance_sq[ASTEROID_COUNT];
 
-static void compute_asteroid_visibility(Entity *asteroids, bool *visibility, int count) {
+static bool is_asteroid_in_frustum(Asteroid *asteroid, T3DVec3 cam_position, T3DVec3 cam_target, float fov_degrees) {
+    float dx = asteroid->position.v[0] - cam_position.v[0];
+    float dy = asteroid->position.v[1] - cam_position.v[1];
+    float dz = asteroid->position.v[2] - cam_position.v[2];
+
+    float distance_sq = dx * dx + dy * dy + dz * dz;
+    if (distance_sq < 0.000001f) return true;
+
+    float inv_dist = fast_inv_sqrt(distance_sq);
+    dx *= inv_dist;
+    dy *= inv_dist;
+    dz *= inv_dist;
+
+    float fx = cam_target.v[0] - cam_position.v[0];
+    float fy = cam_target.v[1] - cam_position.v[1];
+    float fz = cam_target.v[2] - cam_position.v[2];
+
+    float forward_len_sq = fx * fx + fy * fy + fz * fz;
+    if (forward_len_sq < 0.000001f) return true;
+
+    float inv_forward = fast_inv_sqrt(forward_len_sq);
+    fx *= inv_forward;
+    fy *= inv_forward;
+    fz *= inv_forward;
+
+    float dot = dx * fx + dy * fy + dz * fz;
+
+    float half_fov_rad = T3D_DEG_TO_RAD(fov_degrees * 0.5f);
+    float cos_threshold = cosf(half_fov_rad * 1.2f);
+
+    if (dot < cos_threshold) {
+        return false;
+    }
+
+    float distance = 1.0f / inv_dist;
+    float radius = asteroid->scale * 50.0f;
+    if (distance - radius > CAM_FAR_PLANE) {
+        return false;
+    }
+
+    return true;
+}
+
+static void compute_asteroid_visibility(Asteroid *asteroids, bool *visibility, int count) {
     for (int i = 0; i < count; i++) {
         // Calculate distance from cursor (cheap check first)
         float dx = asteroids[i].position.v[0] - game.cursor_position.v[0];
@@ -113,7 +155,7 @@ static void compute_asteroid_visibility(Entity *asteroids, bool *visibility, int
             visibility[i] = false;
         } else {
             // Within range - check frustum
-            visibility[i] = is_entity_in_frustum(&asteroids[i], camera.position, camera.target, CAM_DEFAULT_FOV);
+            visibility[i] = is_asteroid_in_frustum(&asteroids[i], camera.position, camera.target, CAM_DEFAULT_FOV);
         }
     }
 }
@@ -747,8 +789,8 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
         }
     }
 
-    // Draw asteroids and resources
-    draw_entities_sorted(asteroids, ASTEROID_COUNT, NULL, asteroid_visible);
+    // Draw asteroids (optimized with matrix pool) and resources
+    draw_asteroids_optimized(asteroids, asteroid_visible, asteroid_distance_sq, ASTEROID_COUNT);
     draw_entities_sorted(resources, RESOURCE_COUNT, NULL, resource_visible);
 
     // Draw station with fade
@@ -844,7 +886,7 @@ int main(void) {
     entities[ENTITY_GRID] = create_entity("rom:/grid.t3dm", (T3DVec3){{0, 1, 0}},
                                            1.0f, COLOR_MAP, DRAW_SHADED, 0.0f);
 
-    init_asteroids(asteroids, ASTEROID_COUNT);
+    init_asteroids_optimized(asteroids, ASTEROID_COUNT);
     init_resources(resources, RESOURCE_COUNT);
 
     cursor_entity = &entities[ENTITY_CURSOR];
@@ -942,28 +984,19 @@ int main(void) {
             }
 
             // Update world
-            update_asteroids(asteroids, ASTEROID_COUNT, delta_time);
+            update_asteroids_optimized(asteroids, ASTEROID_COUNT, delta_time);
             update_resources(resources, RESOURCE_COUNT, delta_time);
             update_particles(delta_time);
 
             // Update matrices
             update_entity_matrices(entities, ENTITY_COUNT);
 
-            // Compute visibility (asteroids use distance-based culling from cursor)
+            // Compute visibility (asteroids use optimized distance-based culling)
             compute_asteroid_visibility(asteroids, asteroid_visible, ASTEROID_COUNT);
             compute_visibility(resources, resource_visible, RESOURCE_COUNT);
 
-            // Asteroid matrices at ~30Hz - only update if visible AND within matrix distance
-            // This avoids expensive uncached RAM writes for distant asteroids
-            game.asteroid_matrix_timer += delta_time;
-            if (game.asteroid_matrix_timer >= 0.033f) {
-                for (int i = 0; i < ASTEROID_COUNT; i++) {
-                    if (asteroid_visible[i] && asteroid_distance_sq[i] < ASTEROID_ROTATE_DISTANCE_SQ) {
-                        update_entity_matrix(&asteroids[i]);
-                    }
-                }
-                game.asteroid_matrix_timer = 0.0f;
-            }
+            // Note: Asteroid matrices are now handled in draw_asteroids_optimized()
+            // using the matrix pool - no per-asteroid matrix updates needed here
 
             // Resource matrices
             for (int i = 0; i < RESOURCE_COUNT; i++) {
@@ -991,11 +1024,11 @@ int main(void) {
                 game.disabled_controls = true;
             }
 
-            // Asteroid collisions at ~30Hz
+            // Asteroid collisions at ~30Hz (using optimized functions)
             game.collision_timer += delta_time;
             if (game.collision_timer >= 0.033f) {
-                check_cursor_asteroid_deflection(&entities[ENTITY_CURSOR], asteroids, ASTEROID_COUNT);
-                check_cursor_asteroid_collisions(&entities[ENTITY_CURSOR], asteroids, ASTEROID_COUNT, asteroid_visible, delta_time);
+                check_cursor_asteroid_deflection_opt(&entities[ENTITY_CURSOR], asteroids, ASTEROID_COUNT);
+                check_cursor_asteroid_collisions_opt(&entities[ENTITY_CURSOR], asteroids, ASTEROID_COUNT, asteroid_visible, delta_time);
                 game.collision_timer = 0.0f;
             }
 
@@ -1051,7 +1084,7 @@ int main(void) {
                 game.state = STATE_COUNTDOWN;
                 game.countdown_timer = 3.0f;
                 for (int i = 0; i < ASTEROID_COUNT; i++) {
-                    reset_entity(&asteroids[i], ASTEROID);
+                    reset_asteroid(&asteroids[i]);
                 }
                 for (int i = 0; i < RESOURCE_COUNT; i++) {
                     reset_entity(&resources[i], RESOURCE);
@@ -1106,9 +1139,10 @@ int main(void) {
 
     stop_bgm();
     free_all_entities(entities, ENTITY_COUNT);
-    free_all_entities(asteroids, ASTEROID_COUNT);
-    free_all_entities(resources, RESOURCE_COUNT);
+    free_shared_models();  // Frees asteroid model and matrix pool
+    free_all_entities_shared(resources, RESOURCE_COUNT);  // Resources use shared model
     t3d_destroy();
+
 
     return 0;
 }

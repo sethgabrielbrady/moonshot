@@ -73,10 +73,10 @@ typedef enum {
     ASTEROID_A19,
     ASTEROID_A20,
     ASTEROID_A21,
-    // ASTEROID_A22,
-    // ASTEROID_A23,
-    // ASTEROID_A24,
-    // ASTEROID_A25,
+    ASTEROID_A22,
+    ASTEROID_A23,
+    ASTEROID_A24,
+    ASTEROID_A25,
     // ASTEROID_A26,
     // ASTEROID_A27,
     // ASTEROID_A28,
@@ -84,6 +84,24 @@ typedef enum {
     // ASTEROID_A30,
     ASTEROID_COUNT
 } AsteroidID;
+
+// =============================================================================
+// Optimized Asteroid Structure (32 bytes - fits in 2 cache lines)
+// Shared data (model, color, collision_radius) stored separately
+// =============================================================================
+
+typedef struct {
+    T3DVec3 position;         // 12 bytes
+    T3DVec3 velocity;         // 12 bytes
+    float scale;              // 4 bytes
+    float rotation_y;         // 4 bytes (only need Y rotation)
+    float speed;              // 4 bytes
+    int8_t matrix_index;      // 1 byte (-1 = no matrix assigned)
+    uint8_t padding[3];       // 3 bytes padding for alignment
+} Asteroid;                   // Total: 40 bytes
+
+// Maximum visible asteroids at once (matrix pool size)
+#define ASTEROID_MATRIX_POOL_SIZE 16
 
 // =============================================================================
 // Resource IDs

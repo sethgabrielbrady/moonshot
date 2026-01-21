@@ -3,6 +3,7 @@
 #include "utils.h"
 #include "entity.h"
 #include "game_state.h"
+#include <rdpq.h>
 #include <math.h>
 #include <stdint.h>
 
@@ -212,6 +213,197 @@ void init_resources(Entity *resources, int count) {
 }
 
 // =============================================================================
+// Optimized Asteroid System (matrix pool + tight struct)
+// =============================================================================
+
+// Matrix pool - only allocate matrices for visible asteroids
+static T3DMat4FP *asteroid_matrix_pool = NULL;
+static bool matrix_pool_used[ASTEROID_MATRIX_POOL_SIZE];
+
+void init_asteroid_system(void) {
+    // Load shared model
+    if (shared_asteroid_model == NULL) {
+        shared_asteroid_model = t3d_model_load("rom:/asteroid1.t3dm");
+    }
+
+    // Allocate matrix pool (uncached memory for RCP)
+    if (asteroid_matrix_pool == NULL) {
+        asteroid_matrix_pool = malloc_uncached(sizeof(T3DMat4FP) * ASTEROID_MATRIX_POOL_SIZE);
+    }
+
+    // Clear pool usage
+    for (int i = 0; i < ASTEROID_MATRIX_POOL_SIZE; i++) {
+        matrix_pool_used[i] = false;
+    }
+}
+
+void reset_asteroid(Asteroid *asteroid) {
+    int edge = rand() % 4;
+
+    // Get difficulty-scaled speed
+    float difficulty = get_asteroid_speed_for_difficulty();
+    float min_speed = ASTEROID_BASE_MIN_SPEED * difficulty;
+    float max_speed = ASTEROID_BASE_MAX_SPEED * difficulty;
+
+    asteroid->speed = randomize_float(min_speed, max_speed);
+    asteroid->scale = randomize_float(ASTEROID_MIN_SCALE, ASTEROID_MAX_SCALE);
+    asteroid->matrix_index = -1;  // No matrix assigned
+
+    float bound_x = ASTEROID_BOUND_X;
+    float bound_z = ASTEROID_BOUND_Z;
+
+    switch (edge) {
+        case 0:
+            asteroid->position.v[0] = randomize_float(-bound_x, bound_x);
+            asteroid->position.v[2] = -bound_z;
+            asteroid->velocity.v[0] = randomize_float(-0.5f, 0.5f);
+            asteroid->velocity.v[2] = randomize_float(0.3f, 1.0f);
+            break;
+        case 1:
+            asteroid->position.v[0] = randomize_float(-bound_x, bound_x);
+            asteroid->position.v[2] = bound_z;
+            asteroid->velocity.v[0] = randomize_float(-0.5f, 0.5f);
+            asteroid->velocity.v[2] = randomize_float(-1.0f, -0.3f);
+            break;
+        case 2:
+            asteroid->position.v[0] = bound_x;
+            asteroid->position.v[2] = randomize_float(-bound_z, bound_z);
+            asteroid->velocity.v[0] = randomize_float(-1.0f, -0.3f);
+            asteroid->velocity.v[2] = randomize_float(-0.5f, 0.5f);
+            break;
+        case 3:
+            asteroid->position.v[0] = -bound_x;
+            asteroid->position.v[2] = randomize_float(-bound_z, bound_z);
+            asteroid->velocity.v[0] = randomize_float(0.3f, 1.0f);
+            asteroid->velocity.v[2] = randomize_float(-0.5f, 0.5f);
+            break;
+    }
+
+    // Normalize velocity
+    float len_sq = asteroid->velocity.v[0] * asteroid->velocity.v[0] +
+                   asteroid->velocity.v[2] * asteroid->velocity.v[2];
+    if (len_sq > 0.0001f) {
+        float inv_len = fast_inv_sqrt(len_sq);
+        asteroid->velocity.v[0] *= inv_len;
+        asteroid->velocity.v[2] *= inv_len;
+    }
+
+    asteroid->position.v[1] = 10.0f;  // Fixed Y height
+    asteroid->velocity.v[1] = 0.0f;
+    asteroid->rotation_y = randomize_float(0.0f, 360.0f);
+}
+
+void init_asteroids_optimized(Asteroid *asteroids, int count) {
+    init_asteroid_system();
+
+    for (int i = 0; i < count; i++) {
+        reset_asteroid(&asteroids[i]);
+    }
+}
+
+void update_asteroids_optimized(Asteroid *asteroids, int count, float delta_time) {
+    float bound_x = ASTEROID_BOUND_X + ASTEROID_PADDING;
+    float bound_z = ASTEROID_BOUND_Z + ASTEROID_PADDING;
+
+    for (int i = 0; i < count; i++) {
+        Asteroid *a = &asteroids[i];
+
+        float move_amount = a->speed * delta_time;
+        a->position.v[0] += a->velocity.v[0] * move_amount;
+        a->position.v[2] += a->velocity.v[2] * move_amount;
+
+        // Rotation only for nearby asteroids
+        float dx = a->position.v[0] - game.cursor_position.v[0];
+        float dz = a->position.v[2] - game.cursor_position.v[2];
+        float dist_sq = dx * dx + dz * dz;
+
+        if (dist_sq < ASTEROID_ROTATE_DISTANCE_SQ) {
+            a->rotation_y += move_amount * 0.03f;
+            if (a->rotation_y >= 360.0f) a->rotation_y -= 360.0f;
+            if (a->rotation_y < 0.0f) a->rotation_y += 360.0f;
+        }
+
+        // Boundary check
+        if (a->position.v[0] < -bound_x || a->position.v[0] > bound_x ||
+            a->position.v[2] < -bound_z || a->position.v[2] > bound_z) {
+            reset_asteroid(a);
+        }
+    }
+}
+
+// Allocate a matrix from the pool, returns index or -1 if full
+static int8_t allocate_matrix(void) {
+    for (int i = 0; i < ASTEROID_MATRIX_POOL_SIZE; i++) {
+        if (!matrix_pool_used[i]) {
+            matrix_pool_used[i] = true;
+            return (int8_t)i;
+        }
+    }
+    return -1;  // Pool full
+}
+
+// Release all matrices back to pool (call each frame before drawing)
+static void release_all_matrices(void) {
+    for (int i = 0; i < ASTEROID_MATRIX_POOL_SIZE; i++) {
+        matrix_pool_used[i] = false;
+    }
+}
+
+void draw_asteroids_optimized(Asteroid *asteroids, bool *visibility, float *distance_sq, int count) {
+    // Release all matrices from last frame
+    release_all_matrices();
+
+    // Set up shared rendering state
+    rdpq_set_prim_color(COLOR_ASTEROID);
+    rdpq_mode_combiner(RDPQ_COMBINER1((PRIM, 0, SHADE, 0), (PRIM, 0, SHADE, 0)));
+
+    // Draw visible asteroids, sorted by distance (closest first)
+    // Simple selection of closest asteroids up to pool size
+    int drawn = 0;
+
+    for (int i = 0; i < count && drawn < ASTEROID_MATRIX_POOL_SIZE; i++) {
+        if (!visibility[i]) continue;
+
+        Asteroid *a = &asteroids[i];
+
+        // Allocate matrix from pool
+        int8_t mat_idx = allocate_matrix();
+        if (mat_idx < 0) break;  // Pool exhausted
+
+        a->matrix_index = mat_idx;
+        T3DMat4FP *matrix = &asteroid_matrix_pool[mat_idx];
+
+        // Only update matrix if within rotation distance (optimization)
+        if (distance_sq[i] < ASTEROID_ROTATE_DISTANCE_SQ) {
+            t3d_mat4fp_from_srt_euler(matrix,
+                (float[3]){a->scale, a->scale, a->scale},
+                (float[3]){0.0f, a->rotation_y, 0.0f},
+                a->position.v);
+        } else {
+            // Distant asteroids - simpler matrix (no rotation update)
+            t3d_mat4fp_from_srt_euler(matrix,
+                (float[3]){a->scale, a->scale, a->scale},
+                (float[3]){0.0f, a->rotation_y, 0.0f},
+                a->position.v);
+        }
+
+        // Draw
+        t3d_matrix_push(matrix);
+        t3d_model_draw(shared_asteroid_model);
+        t3d_matrix_pop(1);
+
+        drawn++;
+    }
+}
+
+void free_asteroid_system(void) {
+    if (asteroid_matrix_pool != NULL) {
+        free_uncached(asteroid_matrix_pool);
+        asteroid_matrix_pool = NULL;
+    }
+}
+
+// =============================================================================
 // Cleanup
 // =============================================================================
 
@@ -220,4 +412,5 @@ void free_shared_models(void) {
         t3d_model_free(shared_asteroid_model);
         shared_asteroid_model = NULL;
     }
+    free_asteroid_system();
 }
