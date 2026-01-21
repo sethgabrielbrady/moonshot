@@ -168,8 +168,8 @@
 #define ASTEROID_BASE_MAX_SPEED  200.0f
 
 // Distance-based culling (from cursor position)
-#define ASTEROID_DRAW_DISTANCE_SQ    (1200.0f * 1200.0f)  // Don't draw beyond 1200 units
-#define ASTEROID_ROTATE_DISTANCE_SQ  (800.0f * 800.0f)    // Don't rotate beyond 800 units
+#define ASTEROID_DRAW_DISTANCE_SQ    (1600.0f * 1600.0f)  // Don't draw beyond 1600 units
+#define ASTEROID_ROTATE_DISTANCE_SQ  (1200.0f * 1200.0f)  // Don't rotate beyond 1200 units
 
 // =============================================================================
 // Deflect

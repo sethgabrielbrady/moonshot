@@ -239,10 +239,10 @@ void draw_particles(T3DViewport *viewport) {
         tpx->sizeA = tpx->sizeB = size_fp;
 
         // Asteroid ambient color  RGBA32(108, 136, 64, 255)
-        tpx->colorA[0] = tpx->colorB[0] = 137;
-        tpx->colorA[1] = tpx->colorB[1] = 252;
-        tpx->colorA[2] = tpx->colorB[2] = 0;
-        tpx->colorA[3] = tpx->colorB[3] = 255;
+        tpx->colorA[0] = tpx->colorB[0] = 220;
+        tpx->colorA[1] = tpx->colorB[1] = 0;
+        tpx->colorA[2] = tpx->colorB[2] = 115;
+        tpx->colorA[3] = tpx->colorB[3] = 205;
 
         tpx++;
         active_count++;

@@ -96,6 +96,28 @@ static void compute_visibility(Entity *entity_array, bool *visibility, int count
     }
 }
 
+// Asteroid-specific visibility with distance culling from cursor
+// Stores distance for use in matrix update decisions
+static float asteroid_distance_sq[ASTEROID_COUNT];
+
+static void compute_asteroid_visibility(Entity *asteroids, bool *visibility, int count) {
+    for (int i = 0; i < count; i++) {
+        // Calculate distance from cursor (cheap check first)
+        float dx = asteroids[i].position.v[0] - game.cursor_position.v[0];
+        float dz = asteroids[i].position.v[2] - game.cursor_position.v[2];
+        float dist_sq = dx * dx + dz * dz;
+        asteroid_distance_sq[i] = dist_sq;
+
+        // Too far from cursor - don't draw at all
+        if (dist_sq > ASTEROID_DRAW_DISTANCE_SQ) {
+            visibility[i] = false;
+        } else {
+            // Within range - check frustum
+            visibility[i] = is_entity_in_frustum(&asteroids[i], camera.position, camera.target, CAM_DEFAULT_FOV);
+        }
+    }
+}
+
 // =============================================================================
 // Entity Drawing with Culling and Sorting
 // =============================================================================
@@ -927,15 +949,16 @@ int main(void) {
             // Update matrices
             update_entity_matrices(entities, ENTITY_COUNT);
 
-            // Compute visibility
-            compute_visibility(asteroids, asteroid_visible, ASTEROID_COUNT);
+            // Compute visibility (asteroids use distance-based culling from cursor)
+            compute_asteroid_visibility(asteroids, asteroid_visible, ASTEROID_COUNT);
             compute_visibility(resources, resource_visible, RESOURCE_COUNT);
 
-            // Asteroid matrices at ~30Hz
+            // Asteroid matrices at ~30Hz - only update if visible AND within matrix distance
+            // This avoids expensive uncached RAM writes for distant asteroids
             game.asteroid_matrix_timer += delta_time;
             if (game.asteroid_matrix_timer >= 0.033f) {
                 for (int i = 0; i < ASTEROID_COUNT; i++) {
-                    if (asteroid_visible[i]) {
+                    if (asteroid_visible[i] && asteroid_distance_sq[i] < ASTEROID_ROTATE_DISTANCE_SQ) {
                         update_entity_matrix(&asteroids[i]);
                     }
                 }
@@ -1086,7 +1109,6 @@ int main(void) {
     free_all_entities(asteroids, ASTEROID_COUNT);
     free_all_entities(resources, RESOURCE_COUNT);
     t3d_destroy();
-
 
     return 0;
 }
