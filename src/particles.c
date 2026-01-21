@@ -14,8 +14,6 @@
 #define MAX_PARTICLES 512
 #define MAX_AMBIENT_PARTICLES 400
 
-
-
 // =============================================================================
 // Debug
 // =============================================================================
@@ -133,82 +131,6 @@ void spawn_mining_sparks(T3DVec3 position) {
     }
 }
 
-void spawn_exhaust(T3DVec3 position, T3DVec3 direction) {
-    for (int i = 0; i < 2; i++) {
-        T3DVec3 velocity = {{
-            direction.v[0] * -30.0f + (rand() % 20 - 10),
-            (rand() % 20) * 0.25f,
-            direction.v[2] * -30.0f + (rand() % 20 - 10)
-        }};
-        color_t color = RGBA32(255, 248, 4, 125);
-        spawn_particle(position, velocity, color, 0.02f, 0.3f);
-    }
-}
-
-void spawn_station_explosion(T3DVec3 position) {
-    clear_all_particles();
-    trigger_screen_shake(8.0f, 1.0f);
-    trigger_camera_zoom(position, 3.0f);
-
-    // Primary explosion
-    for (int i = 0; i < 80; i++) {
-        float angle_h = (rand() % 360) * (3.14159f / 180.0f);
-        float angle_v = (rand() % 180 - 90) * (3.14159f / 180.0f);
-        float speed = 150.0f + (rand() % 200);
-
-        T3DVec3 velocity = {{
-            cosf(angle_h) * cosf(angle_v) * speed,
-            sinf(angle_v) * speed + 80.0f,
-            sinf(angle_h) * cosf(angle_v) * speed
-        }};
-
-        color_t color;
-        int color_type = rand() % 3;
-        switch (color_type) {
-            case 0: color = RGBA32(255, 220, 50, 255); break;
-            case 1: color = RGBA32(255, 120, 0, 255); break;
-            case 2: color = RGBA32(255, 50, 50, 255); break;
-        }
-
-        float size = 0.10f + (rand() % 80) * 0.001f;
-        float lifetime = 2.0f + (rand() % 150) * 0.01f;
-
-        spawn_particle(position, velocity, color, size, lifetime);
-    }
-
-    // Secondary ring burst
-    for (int i = 0; i < 40; i++) {
-        float angle = (rand() % 360) * (3.14159f / 180.0f);
-        float speed = 200.0f + (rand() % 150);
-
-        T3DVec3 velocity = {{
-            cosf(angle) * speed,
-            20.0f + (rand() % 60),
-            sinf(angle) * speed
-        }};
-
-        color_t color = RGBA32(255, 180, 50, 255);
-        float size = 0.08f + (rand() % 60) * 0.001f;
-        float lifetime = 1.5f + (rand() % 100) * 0.01f;
-
-        spawn_particle(position, velocity, color, size, lifetime);
-    }
-
-    // Debris particles
-    for (int i = 0; i < 30; i++) {
-        T3DVec3 velocity = {{
-            (rand() % 400 - 200) * 0.5f,
-            (rand() % 250) * 0.5f,
-            (rand() % 400 - 200) * 0.5f
-        }};
-
-        color_t color = RGBA32(180, 180, 180, 255);
-        float size = 0.04f + (rand() % 30) * 0.001f;
-        float lifetime = 2.5f + (rand() % 150) * 0.01f;
-
-        spawn_particle(position, velocity, color, size, lifetime);
-    }
-}
 
 // =============================================================================
 // Particle Update
@@ -317,10 +239,10 @@ void draw_particles(T3DViewport *viewport) {
         tpx->sizeA = tpx->sizeB = size_fp;
 
         // Asteroid ambient color  RGBA32(108, 136, 64, 255)
-        tpx->colorA[0] = tpx->colorB[0] = 54;
-        tpx->colorA[1] = tpx->colorB[1] = 68;
-        tpx->colorA[2] = tpx->colorB[2] = 32;
-        tpx->colorA[3] = tpx->colorB[3] = 200;
+        tpx->colorA[0] = tpx->colorB[0] = 137;
+        tpx->colorA[1] = tpx->colorB[1] = 252;
+        tpx->colorA[2] = tpx->colorB[2] = 0;
+        tpx->colorA[3] = tpx->colorB[3] = 255;
 
         tpx++;
         active_count++;

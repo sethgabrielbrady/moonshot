@@ -593,10 +593,14 @@ static void draw_info_bars(void) {
 
 // update station value to drop resources over time
 static float fuel_drain_accumulated = 0.0f;
-static void update_ship_fuel(float delta_time) {
+static void update_ship_fuel(float delta_time, bool accelerating) {
     const float FUEL_DRAIN_RATE = 1.50f; // resources per second
-
-    fuel_drain_accumulated += FUEL_DRAIN_RATE * delta_time;
+    if (accelerating) {
+        fuel_drain_accumulated += FUEL_DRAIN_RATE * 2.0f * delta_time;
+    } else {
+        fuel_drain_accumulated += FUEL_DRAIN_RATE * 0.5f * delta_time;
+    }
+    // fuel_drain_accumulated += FUEL_DRAIN_RATE * delta_time;
 
     // Only drain whole units
     if (fuel_drain_accumulated >= 1.0f) {
@@ -972,6 +976,7 @@ int main(void) {
                 game.collision_timer = 0.0f;
             }
 
+
             // Update deflection timer
             update_deflect_timer(delta_time);
 
@@ -996,15 +1001,12 @@ int main(void) {
                 game.death_timer = 0.0f;
             }
 
+
             update_color_flashes(delta_time);
             update_fps_stats(delta_time);
-            // if (game.ship_acceleration) {
-            //     update_ship_fuel(delta_time);
-            // }
-            update_ship_fuel(delta_time);
+            update_ship_fuel(delta_time, game.ship_acceleration);
+            // update_ship_fuel(delta_time);
             update_difficulty(delta_time);
-
-
 
             game.blink_timer++;
             if (game.blink_timer > 20) game.blink_timer = 0;
@@ -1013,7 +1015,7 @@ int main(void) {
         // Handle reset (can happen from pause menu even when game_over)
         if (game.reset) {
             // Subtract a life on game over
-            game.player_lives--;
+                game.player_lives--;
 
             if (game.player_lives <= 0) {
                 // Full reset - out of lives
@@ -1025,6 +1027,12 @@ int main(void) {
                 // Start countdown
                 game.state = STATE_COUNTDOWN;
                 game.countdown_timer = 3.0f;
+                for (int i = 0; i < ASTEROID_COUNT; i++) {
+                    reset_entity(&asteroids[i], ASTEROID);
+                }
+                for (int i = 0; i < RESOURCE_COUNT; i++) {
+                    reset_entity(&resources[i], RESOURCE);
+                }
             } else {
                 // Still have lives, go back to playing
                 game.state = STATE_PLAYING;

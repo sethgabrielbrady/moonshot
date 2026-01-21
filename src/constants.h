@@ -120,12 +120,11 @@
 #define COLOR_CURSOR       RGBA32(240, 240, 240, 255)
 #define COLOR_DRONE        RGBA32(255, 0, 155, 255)
 #define COLOR_STATION      RGBA32(220, 220, 220, 255)
-#define COLOR_RING         RGBA32(150, 150, 150, 255)
 #define COLOR_TILE         RGBA32(255, 149, 5, 250)
-#define COLOR_ASTEROID     RGBA32(108, 136, 64, 255)
+#define COLOR_ASTEROID     RGBA32(220, 0, 115, 255)
 #define COLOR_AMBIENT      RGBA32(162, 204, 96, 155)
-#define COLOR_SPARKS       RGBA32(255, 220, 0, 255)
-#define COLOR_RESOURCE     RGBA32(27, 154, 170, 255)
+#define COLOR_SPARKS       RGBA32(255, 74, 28, 255)
+#define COLOR_RESOURCE     RGBA32(81, 229, 255, 255)
 
 // =============================================================================
 // Font IDs
@@ -133,6 +132,7 @@
 
 #define FONT_CUSTOM        2
 #define FONT_ICON          3
+
 
 // =============================================================================
 // Menu Options

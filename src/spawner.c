@@ -181,9 +181,6 @@ void init_asteroids(Entity *asteroids, int count) {
         asteroids[i] = create_entity_shared(shared_asteroid_model, (T3DVec3){{0, 10, 0}},
                                       randomize_float(0.1f, 1.3f), COLOR_ASTEROID, DRAW_SHADED, 10.0f);
         reset_entity(&asteroids[i], ASTEROID);
-        // Scatter across field initially
-        asteroids[i].position.v[0] = randomize_float(-ASTEROID_BOUND_X, ASTEROID_BOUND_X);
-        asteroids[i].position.v[2] = randomize_float(-ASTEROID_BOUND_Z, ASTEROID_BOUND_Z);
     }
 }
 
