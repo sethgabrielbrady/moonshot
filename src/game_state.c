@@ -131,7 +131,7 @@ sprite_t *health_icon = NULL;
 
 void init_game_state(void) {
     game.state = STATE_COUNTDOWN;
-    game.countdown_timer = 3.0f;
+    game.countdown_timer = 4.0f;
     game.game_over = false;
     game.game_over_pause = false;
     game.cam_yaw = CAM_ANGLE_YAW;

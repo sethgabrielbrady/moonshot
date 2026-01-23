@@ -1,17 +1,14 @@
 #ifndef PARTICLES_H
 #define PARTICLES_H
 
-#include <libdragon.h>
 #include <t3d/t3d.h>
-#include <t3d/tpx.h>
+#include <libdragon.h>
 
 // =============================================================================
-// Particle System
+// Initialization / Cleanup
 // =============================================================================
 
 void init_particles(void);
-void update_particles(float delta_time);
-void draw_particles(T3DViewport *viewport);
 void cleanup_particles(void);
 void clear_all_particles(void);
 
@@ -21,6 +18,14 @@ void clear_all_particles(void);
 
 void spawn_explosion(T3DVec3 position, color_t color);
 void spawn_mining_sparks(T3DVec3 position);
+void spawn_ship_trail(T3DVec3 position, T3DVec3 velocity, color_t color);
+
+// =============================================================================
+// Update / Draw
+// =============================================================================
+
+void update_particles(float delta_time);
+void draw_particles(T3DViewport *viewport);
 
 // =============================================================================
 // Ambient Particles

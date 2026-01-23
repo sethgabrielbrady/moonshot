@@ -132,6 +132,47 @@ void spawn_mining_sparks(T3DVec3 position) {
 }
 
 
+#define TRAIL_SPEED_THRESHOLD   200.0f   // Min speed² to show trail (50² = 2500)
+#define TRAIL_OFFSET_DISTANCE   14.0f     // How far behind ship to spawn
+#define TRAIL_PARTICLE_SIZE     0.02f     // Particle size
+#define TRAIL_LIFETIME          0.35f     // How long particles last
+#define TRAIL_SPREAD            5.0f      // Random spread amount
+#define TRAIL_PARTICLE_COUNT    2         // Particles per call (1-3 recommended)
+#define TRAIL_HEIGHT            5.0f      // Fixed height for trail particles
+
+void spawn_ship_trail(T3DVec3 position, T3DVec3 velocity, color_t color) {
+    // Only spawn if ship is moving fast enough
+    float speed_sq = velocity.v[0] * velocity.v[0] + velocity.v[2] * velocity.v[2];
+    if (speed_sq < TRAIL_SPEED_THRESHOLD) return;
+
+    // Calculate direction behind ship
+    float inv_speed = 1.0f / sqrtf(speed_sq);
+    float dir_x = -velocity.v[0] * inv_speed;
+    float dir_z = -velocity.v[2] * inv_speed;
+
+    for (int i = 0; i < TRAIL_PARTICLE_COUNT; i++) {
+        // Spawn position: behind ship with slight random spread
+        float spread_x = (rand() % (int)(TRAIL_SPREAD * 2 + 1)) - TRAIL_SPREAD;
+        float spread_z = (rand() % (int)(TRAIL_SPREAD * 2 + 1)) - TRAIL_SPREAD;
+
+        T3DVec3 spawn_pos = {{
+            position.v[0] + dir_x * TRAIL_OFFSET_DISTANCE + spread_x,
+            TRAIL_HEIGHT,  // Fixed height
+            position.v[2] + dir_z * TRAIL_OFFSET_DISTANCE + spread_z
+        }};
+
+        // Particles drift outward only (no Y movement)
+        T3DVec3 particle_vel = {{
+            dir_x * 30.0f + (rand() % 20 - 10),
+            0.0f,  // No vertical movement
+            dir_z * 30.0f + (rand() % 20 - 10)
+        }};
+
+        spawn_particle(spawn_pos, particle_vel, color, TRAIL_PARTICLE_SIZE, TRAIL_LIFETIME);
+    }
+}
+
+
 // =============================================================================
 // Particle Update
 // =============================================================================

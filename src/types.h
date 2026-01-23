@@ -44,6 +44,7 @@ typedef enum {
     ENTITY_TILE,
     ENTITY_DEFLECT_RING,
     ENTITY_GRID,
+    ENTITY_WALL,      // Boundary wall (reused for all edges)
     ENTITY_COUNT
 } EntityID;
 
@@ -77,11 +78,31 @@ typedef enum {
     ASTEROID_A23,
     ASTEROID_A24,
     ASTEROID_A25,
-    // ASTEROID_A26,
-    // ASTEROID_A27,
-    // ASTEROID_A28,
-    // ASTEROID_A29,
-    // ASTEROID_A30,
+    ASTEROID_A26,
+    ASTEROID_A27,
+    ASTEROID_A28,
+    ASTEROID_A29,
+    ASTEROID_A30,
+    ASTEROID_A31,
+    ASTEROID_A32,
+    ASTEROID_A33,
+    ASTEROID_A34,
+    ASTEROID_A35,
+    // ASTEROID_A36,
+    // ASTEROID_A37,
+    // ASTEROID_A38,
+    // ASTEROID_A39,
+    // ASTEROID_A40,
+    // ASTEROID_A41,
+    // ASTEROID_A42,
+    // ASTEROID_A43,
+    // ASTEROID_A44,
+    // ASTEROID_A45,
+    // ASTEROID_A46,
+    // ASTEROID_A47,
+    // ASTEROID_A48,
+    // ASTEROID_A49,
+    // ASTEROID_A50,
     ASTEROID_COUNT
 } AsteroidID;
 

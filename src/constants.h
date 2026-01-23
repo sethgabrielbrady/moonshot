@@ -33,6 +33,14 @@
 #define PLAY_AREA_SIZE     840.0f
 
 // =============================================================================
+// Boundary Wall
+// =============================================================================
+
+#define WALL_FADE_START    50.0f   // Distance from edge where wall starts fading in
+#define WALL_FADE_END      10.0f    // Distance from edge where wall is fully visible
+#define WALL_HEIGHT        10.0f    // Y position of wall
+
+// =============================================================================
 // Drone
 // =============================================================================
 
@@ -125,6 +133,9 @@
 #define COLOR_AMBIENT      RGBA32(162, 204, 96, 155)
 #define COLOR_SPARKS       RGBA32(255, 74, 28, 255)
 #define COLOR_RESOURCE     RGBA32(81, 229, 255, 255)
+#define COLOR_WARNING      RGBA32(255, 0, 0, 200)
+#define COLOR_FLAME        RGBA32(255, 74, 28, 200)
+
 
 // =============================================================================
 // Font IDs

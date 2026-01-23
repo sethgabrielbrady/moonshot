@@ -313,6 +313,82 @@ static void check_tile_following_status(Entity *drone) {
 }
 
 // =============================================================================
+// Boundary Wall
+// =============================================================================
+
+typedef enum {
+    WALL_NONE,
+    WALL_NORTH,  // +Z edge
+    WALL_SOUTH,  // -Z edge
+    WALL_EAST,   // +X edge
+    WALL_WEST    // -X edge
+} WallEdge;
+
+static void update_boundary_wall(Entity *wall, T3DVec3 cursor_pos) {
+    // Calculate distance to each edge
+    float dist_to_east = PLAY_AREA_HALF_X - cursor_pos.v[0];
+    float dist_to_west = PLAY_AREA_HALF_X + cursor_pos.v[0];
+    float dist_to_north = PLAY_AREA_HALF_Z - cursor_pos.v[2];
+    float dist_to_south = PLAY_AREA_HALF_Z + cursor_pos.v[2];
+
+    // Find closest edge
+    float min_dist = dist_to_east;
+    WallEdge closest = WALL_EAST;
+
+    if (dist_to_west < min_dist) { min_dist = dist_to_west; closest = WALL_WEST; }
+    if (dist_to_north < min_dist) { min_dist = dist_to_north; closest = WALL_NORTH; }
+    if (dist_to_south < min_dist) { min_dist = dist_to_south; closest = WALL_SOUTH; }
+
+    // Calculate alpha based on distance (fade in as we approach)
+    uint8_t alpha = 0;
+    if (min_dist < WALL_FADE_START) {
+        if (min_dist <= WALL_FADE_END) {
+            alpha = 55;
+        } else {
+            // Linear fade from 0 to 255
+            float t = 1.0f - (min_dist - WALL_FADE_END) / (WALL_FADE_START - WALL_FADE_END);
+            alpha = (uint8_t)(t * 55.0f);
+        }
+    }
+
+    // Hide wall if not close to any edge
+    if (alpha == 0) {
+        wall->position.v[1] = 1000.0f;  // Hide off-screen
+        return;
+    }
+
+    // Position wall at center of the edge (x=0 or z=0)
+    wall->position.v[1] = WALL_HEIGHT;
+    wall->color = RGBA32(255, 78, 25, alpha);
+
+    switch (closest) {
+        case WALL_EAST:
+            wall->position.v[0] = PLAY_AREA_HALF_X;
+            wall->position.v[2] = 0.0f;  // Center of edge
+            wall->rotation.v[1] = T3D_DEG_TO_RAD(270.0f);  // Face west (-X)
+            break;
+        case WALL_WEST:
+            wall->position.v[0] = -PLAY_AREA_HALF_X;
+            wall->position.v[2] = 0.0f;  // Center of edge
+            wall->rotation.v[1] = T3D_DEG_TO_RAD(90.0f);   // Face east (+X)
+            break;
+        case WALL_NORTH:
+            wall->position.v[0] = 0.0f;  // Center of edge
+            wall->position.v[2] = PLAY_AREA_HALF_Z;
+            wall->rotation.v[1] = T3D_DEG_TO_RAD(180.0f);  // Face south (-Z)
+            break;
+        case WALL_SOUTH:
+            wall->position.v[0] = 0.0f;  // Center of edge
+            wall->position.v[2] = -PLAY_AREA_HALF_Z;
+            wall->rotation.v[1] = T3D_DEG_TO_RAD(0.0f);    // Face north (+Z)
+            break;
+        default:
+            wall->position.v[1] = 1000.0f;  // Hide
+            break;
+    }
+}
+
+// =============================================================================
 // Initialization
 // =============================================================================
 
@@ -348,7 +424,7 @@ static void init_subsystems(void) {
     rdpq_text_register_font(FONT_BUILTIN_DEBUG_MONO, rdpq_font_load_builtin(FONT_BUILTIN_DEBUG_MONO));
 
     custom_font = rdpq_font_load("rom:/Nebula.font64");
-    icon_font = rdpq_font_load("rom:/IconBitOne.font64");
+    icon_font = rdpq_font_load("rom:/m12.font64");
 
     rdpq_text_register_font(FONT_CUSTOM, custom_font);
     rdpq_text_register_font(FONT_ICON, icon_font);
@@ -616,14 +692,18 @@ static void draw_countdown(void) {
     // Get the current countdown number (3, 2, 1, or "GO!")
     int count = (int)game.countdown_timer + 1;
 
-    if (count > 0 && count <= 3) {
-        rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-                 center_x - 5, center_y, "%d", count);
-    } else if (game.countdown_timer > -0.5f) {
+    if (count > 1 && count <= 4) {
+        rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_FLAME});
+        rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_ICON,
+                 center_x - 5, center_y, "%d", count - 1);
+    } else if (game.countdown_timer < 2) {
         // Show "GO!" briefly after countdown hits 0
-        rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-                 center_x - 12, center_y, "GO!");
+        rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_ICON,
+                 center_x - 12, center_y, "GO");
+    } else {
+         rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(137, 252, 0, 255)});
     }
+
 }
 
 static void draw_game_timer(void) {
@@ -661,6 +741,8 @@ static void update_ship_fuel(float delta_time, bool accelerating) {
     const float FUEL_DRAIN_RATE = 1.50f; // resources per second
     if (accelerating) {
         fuel_drain_accumulated += FUEL_DRAIN_RATE * 2.0f * delta_time;
+        spawn_ship_trail(entities[ENTITY_CURSOR].position, game.cursor_velocity, RGBA32(255, 150, 50, 255));
+
     } else {
         fuel_drain_accumulated += FUEL_DRAIN_RATE * 0.5f * delta_time;
     }
@@ -772,7 +854,7 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
                 //increase alpha for fade-in effect
                 uint8_t alpha = (uint8_t)(200.0f * (game.deflect_timer / DEFLECT_DURATION));
                 if (alpha > 200) alpha = 200;
-                entities[ENTITY_DEFLECT_RING].color = RGBA32(0, 150, 255, alpha);
+                entities[ENTITY_DEFLECT_RING].color = RGBA32(255, 74, 2, alpha);
 
                 draw_entity(&entities[ENTITY_DEFLECT_RING]);
 
@@ -829,7 +911,8 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
         int seconds = (int)time_remaining;
         int tenths = (int)((time_remaining - seconds) * 10);
 
-        rdpq_text_printf(NULL, FONT_CUSTOM, center_x - 20, 15, "%d.%d", seconds, tenths);
+        rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(137, 252, 0, 255)});
+        rdpq_text_printf(NULL, FONT_ICON, center_x - 20, 15, "%d.%d", seconds, tenths);
     }
 
     if (game.render_debug) {
@@ -885,6 +968,10 @@ int main(void) {
                                        1.0f, RGBA32(0, 150, 255, 200), DRAW_SHADED, 0.0f);
     entities[ENTITY_GRID] = create_entity("rom:/grid.t3dm", (T3DVec3){{0, 1, 0}},
                                            1.0f, COLOR_MAP, DRAW_SHADED, 0.0f);
+
+    // Boundary wall - hidden by default (Y = 1000)
+    entities[ENTITY_WALL] = create_entity("rom:/wall.t3dm", (T3DVec3){{0, 1000, 0}},
+                                           1.0f, RGBA32(255, 73, 25, 0), DRAW_SHADED, 0.0f);
 
     init_asteroids_optimized(asteroids, ASTEROID_COUNT);
     init_resources(resources, RESOURCE_COUNT);
@@ -955,6 +1042,7 @@ int main(void) {
             update_camera(&viewport, game.cam_yaw, delta_time, game.cursor_position, game.fps_mode, cursor_entity);
             update_screen_shake(delta_time);
             update_tile_visibility(&entities[ENTITY_TILE]);
+            update_boundary_wall(&entities[ENTITY_WALL], game.cursor_position);
 
             // Tile collision (only if drone not full)
             if (!game.drone_full) {

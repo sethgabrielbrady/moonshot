@@ -74,6 +74,8 @@ void draw_fps_display(float current, float avg, float min, float max, int partic
     y += line_height;
     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, x, y,
                      "Particles: %d", particle_count);
+
+
 }
 
 
@@ -160,7 +162,7 @@ void draw_pause_menu(void) {
     //                  "Camera: %s", game.fps_mode ? "FPS" : "ISO");
 
     rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height ,
-                     "Resolution: %s", game.hi_res_mode ? "640x240" : "320x240");
+                     "Resolution: %s", game.hi_res_mode ? "Hi-Res" : "Lo-Res");
 
     const char *bgm_text;
     if (game.bgm_track == 0) bgm_text = "OFF";
