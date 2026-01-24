@@ -312,81 +312,6 @@ static void check_tile_following_status(Entity *drone) {
     }
 }
 
-// =============================================================================
-// Boundary Wall
-// =============================================================================
-
-typedef enum {
-    WALL_NONE,
-    WALL_NORTH,  // +Z edge
-    WALL_SOUTH,  // -Z edge
-    WALL_EAST,   // +X edge
-    WALL_WEST    // -X edge
-} WallEdge;
-
-static void update_boundary_wall(Entity *wall, T3DVec3 cursor_pos) {
-    // Calculate distance to each edge
-    float dist_to_east = PLAY_AREA_HALF_X - cursor_pos.v[0];
-    float dist_to_west = PLAY_AREA_HALF_X + cursor_pos.v[0];
-    float dist_to_north = PLAY_AREA_HALF_Z - cursor_pos.v[2];
-    float dist_to_south = PLAY_AREA_HALF_Z + cursor_pos.v[2];
-
-    // Find closest edge
-    float min_dist = dist_to_east;
-    WallEdge closest = WALL_EAST;
-
-    if (dist_to_west < min_dist) { min_dist = dist_to_west; closest = WALL_WEST; }
-    if (dist_to_north < min_dist) { min_dist = dist_to_north; closest = WALL_NORTH; }
-    if (dist_to_south < min_dist) { min_dist = dist_to_south; closest = WALL_SOUTH; }
-
-    // Calculate alpha based on distance (fade in as we approach)
-    uint8_t alpha = 0;
-    if (min_dist < WALL_FADE_START) {
-        if (min_dist <= WALL_FADE_END) {
-            alpha = 55;
-        } else {
-            // Linear fade from 0 to 255
-            float t = 1.0f - (min_dist - WALL_FADE_END) / (WALL_FADE_START - WALL_FADE_END);
-            alpha = (uint8_t)(t * 55.0f);
-        }
-    }
-
-    // Hide wall if not close to any edge
-    if (alpha == 0) {
-        wall->position.v[1] = 1000.0f;  // Hide off-screen
-        return;
-    }
-
-    // Position wall at center of the edge (x=0 or z=0)
-    wall->position.v[1] = WALL_HEIGHT;
-    wall->color = RGBA32(255, 78, 25, alpha);
-
-    switch (closest) {
-        case WALL_EAST:
-            wall->position.v[0] = PLAY_AREA_HALF_X;
-            wall->position.v[2] = 0.0f;  // Center of edge
-            wall->rotation.v[1] = T3D_DEG_TO_RAD(270.0f);  // Face west (-X)
-            break;
-        case WALL_WEST:
-            wall->position.v[0] = -PLAY_AREA_HALF_X;
-            wall->position.v[2] = 0.0f;  // Center of edge
-            wall->rotation.v[1] = T3D_DEG_TO_RAD(90.0f);   // Face east (+X)
-            break;
-        case WALL_NORTH:
-            wall->position.v[0] = 0.0f;  // Center of edge
-            wall->position.v[2] = PLAY_AREA_HALF_Z;
-            wall->rotation.v[1] = T3D_DEG_TO_RAD(180.0f);  // Face south (-Z)
-            break;
-        case WALL_SOUTH:
-            wall->position.v[0] = 0.0f;  // Center of edge
-            wall->position.v[2] = -PLAY_AREA_HALF_Z;
-            wall->rotation.v[1] = T3D_DEG_TO_RAD(0.0f);    // Face north (+Z)
-            break;
-        default:
-            wall->position.v[1] = 1000.0f;  // Hide
-            break;
-    }
-}
 
 // =============================================================================
 // Initialization
@@ -492,7 +417,7 @@ static void draw_cursor_fuel_bar() {
     if (fuel_percent < 0.0f) fuel_percent = 0.0f;
 
     int fill_width = (int)(bar_width * fuel_percent);
-    color_t bar_color = RGBA32(200, 0, 200, 255);
+    color_t bar_color = COLOR_FUEL_BAR;
 
     rdpq_sync_pipe();
     rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
@@ -728,7 +653,7 @@ static void draw_game_timer(void) {
 static void draw_info_bars(void) {
     draw_entity_health_bar(&entities[ENTITY_STATION], STATION_MAX_HEALTH, 0, "S", 0, true);
     draw_cursor_fuel_bar();
-    draw_entity_health_bar(cursor_entity, CURSOR_MAX_HEALTH, 20, "Procyon", 1, false);
+    draw_entity_health_bar(cursor_entity, CURSOR_MAX_HEALTH, 20, "", 1, false);
     draw_entity_resource_bar(game.cursor_resource_val, CURSOR_RESOURCE_CAPACITY, 25, "Procyon", false);
     draw_entity_resource_bar(game.drone_resource_val, DRONE_MAX_RESOURCES, 225, "PUP", true);
     draw_game_timer();
@@ -741,7 +666,7 @@ static void update_ship_fuel(float delta_time, bool accelerating) {
     const float FUEL_DRAIN_RATE = 1.50f; // resources per second
     if (accelerating) {
         fuel_drain_accumulated += FUEL_DRAIN_RATE * 2.0f * delta_time;
-        spawn_ship_trail(entities[ENTITY_CURSOR].position, game.cursor_velocity, RGBA32(255, 150, 50, 255));
+        spawn_ship_trail(entities[ENTITY_CURSOR].position, game.cursor_velocity, COLOR_FUEL_BAR);
 
     } else {
         fuel_drain_accumulated += FUEL_DRAIN_RATE * 0.5f * delta_time;
@@ -969,9 +894,7 @@ int main(void) {
     entities[ENTITY_GRID] = create_entity("rom:/grid.t3dm", (T3DVec3){{0, 1, 0}},
                                            1.0f, COLOR_MAP, DRAW_SHADED, 0.0f);
 
-    // Boundary wall - hidden by default (Y = 1000)
-    entities[ENTITY_WALL] = create_entity("rom:/wall.t3dm", (T3DVec3){{0, 1000, 0}},
-                                           1.0f, RGBA32(255, 73, 25, 0), DRAW_SHADED, 0.0f);
+
 
     init_asteroids_optimized(asteroids, ASTEROID_COUNT);
     init_resources(resources, RESOURCE_COUNT);
@@ -1042,7 +965,6 @@ int main(void) {
             update_camera(&viewport, game.cam_yaw, delta_time, game.cursor_position, game.fps_mode, cursor_entity);
             update_screen_shake(delta_time);
             update_tile_visibility(&entities[ENTITY_TILE]);
-            update_boundary_wall(&entities[ENTITY_WALL], game.cursor_position);
 
             // Tile collision (only if drone not full)
             if (!game.drone_full) {

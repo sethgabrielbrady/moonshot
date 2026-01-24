@@ -135,6 +135,7 @@
 #define COLOR_RESOURCE     RGBA32(81, 229, 255, 255)
 #define COLOR_WARNING      RGBA32(255, 0, 0, 200)
 #define COLOR_FLAME        RGBA32(255, 74, 28, 200)
+#define COLOR_FUEL_BAR     RGBA32(138, 0, 196, 255)
 
 
 // =============================================================================

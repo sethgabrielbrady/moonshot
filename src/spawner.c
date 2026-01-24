@@ -200,7 +200,7 @@ void init_resources(Entity *resources, int count) {
 
     // Use same shared model as asteroids (load if not already loaded)
     if (shared_asteroid_model == NULL) {
-        shared_asteroid_model = t3d_model_load("rom:/asteroid1.t3dm");
+        shared_asteroid_model = t3d_model_load("rom:/asteroid7.t3dm");
     }
 
     for (int i = 0; i < count; i++) {

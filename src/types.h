@@ -44,7 +44,6 @@ typedef enum {
     ENTITY_TILE,
     ENTITY_DEFLECT_RING,
     ENTITY_GRID,
-    ENTITY_WALL,      // Boundary wall (reused for all edges)
     ENTITY_COUNT
 } EntityID;
 
