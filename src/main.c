@@ -372,12 +372,18 @@ static void init_subsystems(void) {
 // =============================================================================
 
 static void setup_lighting(void) {
-    uint8_t color_ambient[4] = {0x60, 0x60, 0x60, 0xFF};
+    // uint8_t color_ambient[4] = {0x60, 0x60, 0x60, 0xFF};
+    uint8_t color_ambient[4] = {0x40, 0x40, 0x40, 0xFF};
+
+
     uint8_t color_directional[4] = {0xFF, 0xFF, 0xFF, 0xFF};
 
-    T3DVec3 light_dir = {{300.0f, 100.0f, 1.0f}};
-    t3d_vec3_norm(&light_dir);
+    T3DVec3 light_dir = {{100.0f, 200.0f, 0.0f}};
+    //can i increae the y value to make it more top down?
+    // T3DVec3 light_dir = {{100.0f, 100.0f, 0.0f}}; --- IGNORE ---
 
+
+    t3d_vec3_norm(&light_dir);
     t3d_light_set_ambient(color_ambient);
     t3d_light_set_directional(0, color_directional, &light_dir);
 }
@@ -717,6 +723,7 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     bool entity_skip_culling[ENTITY_COUNT] = {false};
     entity_skip_culling[ENTITY_GRID] = true;
     entity_skip_culling[ENTITY_CURSOR] = true;
+    entity_skip_culling[ENTITY_STATION] = true;
 
     // Draw main entities
     for (int i = 0; i < ENTITY_COUNT; i++) {
@@ -801,11 +808,12 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     draw_entities_sorted(resources, RESOURCE_COUNT, NULL, resource_visible);
 
     // Draw station with fade
-    if (is_entity_in_frustum(&entities[ENTITY_STATION], camera.position, camera.target, CAM_DEFAULT_FOV)) {
-        draw_entity_with_fade(&entities[ENTITY_STATION], 300.0f);
-    } else {
-        culled_count++;
-    }
+    // if (is_entity_in_frustum(&entities[ENTITY_STATION], camera.position, camera.target, CAM_DEFAULT_FOV)) {
+    //     draw_entity_with_fade(&entities[ENTITY_STATION], 300.0f);
+    // } else {
+    //     culled_count++;
+    // }
+     draw_entity(&entities[ENTITY_STATION]);
 
 
     // rdpq_mode_zbuf(true, false);
@@ -876,8 +884,8 @@ int main(void) {
     health_icon = sprite_load("rom:/health.sprite");
 
     // Create entities
-    entities[ENTITY_STATION] = create_entity("rom:/stationew.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}},
-                                              0.75f, COLOR_STATION, DRAW_TEXTURED_LIT, 30.0f);
+    entities[ENTITY_STATION] = create_entity("rom:/stationring.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}},
+                                              1.0f, COLOR_STATION, DRAW_SHADED, 30.0f);
     entities[ENTITY_STATION].value = STATION_MAX_HEALTH;
 
     entities[ENTITY_CURSOR] = create_entity("rom:/cursor2.t3dm", game.cursor_position,
@@ -997,6 +1005,12 @@ int main(void) {
             update_asteroids_optimized(asteroids, ASTEROID_COUNT, delta_time);
             update_resources(resources, RESOURCE_COUNT, delta_time);
             update_particles(delta_time);
+
+            // Rotate station slowly
+            entities[ENTITY_STATION].rotation.v[1] += delta_time * 0.3f;
+            if (entities[ENTITY_STATION].rotation.v[1] > TWO_PI) {
+                entities[ENTITY_STATION].rotation.v[1] -= TWO_PI;
+            }
 
             // Update matrices
             update_entity_matrices(entities, ENTITY_COUNT);

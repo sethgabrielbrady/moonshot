@@ -12,7 +12,8 @@
 
 typedef enum {
     DRAW_SHADED,
-    DRAW_TEXTURED_LIT
+    DRAW_TEXTURED_LIT,
+    DRAW_FLAT
 } DrawType;
 
 // =============================================================================

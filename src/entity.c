@@ -119,6 +119,7 @@ void draw_entity_with_fade(Entity *entity, float fade_distance) {
     if (entity->draw_type == DRAW_SHADED) {
         rdpq_mode_combiner(RDPQ_COMBINER1((PRIM, 0, SHADE, 0), (PRIM, 0, SHADE, 0)));
     } else {
+        // Textured lit - texture with vertex shading
         rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, SHADE, 0), (TEX0, 0, SHADE, 0)));
     }
 
