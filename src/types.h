@@ -13,7 +13,6 @@
 typedef enum {
     DRAW_SHADED,
     DRAW_TEXTURED_LIT,
-    DRAW_FLAT
 } DrawType;
 
 // =============================================================================
@@ -83,11 +82,11 @@ typedef enum {
     ASTEROID_A28,
     ASTEROID_A29,
     ASTEROID_A30,
-    ASTEROID_A31,
-    ASTEROID_A32,
-    ASTEROID_A33,
-    ASTEROID_A34,
-    ASTEROID_A35,
+    // ASTEROID_A31,
+    // ASTEROID_A32,
+    // ASTEROID_A33,
+    // ASTEROID_A34,
+    // ASTEROID_A35,
     // ASTEROID_A36,
     // ASTEROID_A37,
     // ASTEROID_A38,
@@ -122,7 +121,7 @@ typedef struct {
 } Asteroid;                   // Total: 40 bytes
 
 // Maximum visible asteroids at once (matrix pool size)
-#define ASTEROID_MATRIX_POOL_SIZE 16
+#define ASTEROID_MATRIX_POOL_SIZE 48
 
 // =============================================================================
 // Resource IDs

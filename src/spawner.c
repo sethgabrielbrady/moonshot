@@ -353,17 +353,55 @@ void draw_asteroids_optimized(Asteroid *asteroids, bool *visibility, float *dist
     // Release all matrices from last frame
     release_all_matrices();
 
+    // Build sorted list of visible asteroid indices (closest first)
+    static struct { int index; float dist; } sorted[ASTEROID_MATRIX_POOL_SIZE];
+    int visible_count = 0;
+
+    for (int i = 0; i < count; i++) {
+        if (!visibility[i]) continue;
+
+        // Insert into sorted list (simple insertion sort, limited to pool size)
+        if (visible_count < ASTEROID_MATRIX_POOL_SIZE) {
+            // Find insertion point
+            int insert_at = visible_count;
+            for (int j = 0; j < visible_count; j++) {
+                if (distance_sq[i] < sorted[j].dist) {
+                    insert_at = j;
+                    break;
+                }
+            }
+            // Shift elements
+            for (int j = visible_count; j > insert_at; j--) {
+                sorted[j] = sorted[j-1];
+            }
+            sorted[insert_at].index = i;
+            sorted[insert_at].dist = distance_sq[i];
+            visible_count++;
+        } else if (distance_sq[i] < sorted[ASTEROID_MATRIX_POOL_SIZE-1].dist) {
+            // Closer than furthest in list - replace it
+            int insert_at = ASTEROID_MATRIX_POOL_SIZE - 1;
+            for (int j = 0; j < ASTEROID_MATRIX_POOL_SIZE - 1; j++) {
+                if (distance_sq[i] < sorted[j].dist) {
+                    insert_at = j;
+                    break;
+                }
+            }
+            // Shift elements (drop the last one)
+            for (int j = ASTEROID_MATRIX_POOL_SIZE - 1; j > insert_at; j--) {
+                sorted[j] = sorted[j-1];
+            }
+            sorted[insert_at].index = i;
+            sorted[insert_at].dist = distance_sq[i];
+        }
+    }
+
     // Set up shared rendering state
     rdpq_set_prim_color(COLOR_ASTEROID);
     rdpq_mode_combiner(RDPQ_COMBINER1((PRIM, 0, SHADE, 0), (PRIM, 0, SHADE, 0)));
 
-    // Draw visible asteroids, sorted by distance (closest first)
-    // Simple selection of closest asteroids up to pool size
-    int drawn = 0;
-
-    for (int i = 0; i < count && drawn < ASTEROID_MATRIX_POOL_SIZE; i++) {
-        if (!visibility[i]) continue;
-
+    // Draw sorted asteroids (closest first)
+    for (int s = 0; s < visible_count; s++) {
+        int i = sorted[s].index;
         Asteroid *a = &asteroids[i];
 
         // Allocate matrix from pool
@@ -373,26 +411,15 @@ void draw_asteroids_optimized(Asteroid *asteroids, bool *visibility, float *dist
         a->matrix_index = mat_idx;
         T3DMat4FP *matrix = &asteroid_matrix_pool[mat_idx];
 
-        // Only update matrix if within rotation distance (optimization)
-        if (distance_sq[i] < ASTEROID_ROTATE_DISTANCE_SQ) {
-            t3d_mat4fp_from_srt_euler(matrix,
-                (float[3]){a->scale, a->scale, a->scale},
-                (float[3]){0.0f, a->rotation_y, 0.0f},
-                a->position.v);
-        } else {
-            // Distant asteroids - simpler matrix (no rotation update)
-            t3d_mat4fp_from_srt_euler(matrix,
-                (float[3]){a->scale, a->scale, a->scale},
-                (float[3]){0.0f, a->rotation_y, 0.0f},
-                a->position.v);
-        }
+        t3d_mat4fp_from_srt_euler(matrix,
+            (float[3]){a->scale, a->scale, a->scale},
+            (float[3]){0.0f, a->rotation_y, 0.0f},
+            a->position.v);
 
         // Draw
         t3d_matrix_push(matrix);
         t3d_model_draw(shared_asteroid_model);
         t3d_matrix_pop(1);
-
-        drawn++;
     }
 }
 
