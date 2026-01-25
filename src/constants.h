@@ -29,7 +29,7 @@
 // =============================================================================
 
 #define PLAY_AREA_HALF_X   832.0f
-#define PLAY_AREA_HALF_Z   640.0f
+#define PLAY_AREA_HALF_Z   832.0f
 #define PLAY_AREA_SIZE     840.0f
 
 // =============================================================================
@@ -71,7 +71,7 @@
 // =============================================================================
 
 #define ASTEROID_BOUND_X   1000.0f
-#define ASTEROID_BOUND_Z   800.0f
+#define ASTEROID_BOUND_Z   1000.0f
 #define ASTEROID_PADDING   100.0f
 
 // =============================================================================
@@ -79,7 +79,7 @@
 // =============================================================================
 
 #define RESOURCE_BOUND_X   800.0f
-#define RESOURCE_BOUND_Z   600.0f
+#define RESOURCE_BOUND_Z   800.0f
 #define RESOURCE_PADDING   100.0f
 #define RESOURCE_VALUE     100.0f
 #define RESOURCE_POOL_MAX  1000.0f
@@ -133,9 +133,11 @@
 #define COLOR_AMBIENT      RGBA32(162, 204, 96, 155)
 #define COLOR_SPARKS       RGBA32(255, 74, 28, 255)
 #define COLOR_RESOURCE     RGBA32(81, 229, 255, 255)
-#define COLOR_WARNING      RGBA32(255, 0, 0, 200)
+#define COLOR_WARNING      RGBA32(255, 25, 25, 255)
 #define COLOR_FLAME        RGBA32(255, 74, 28, 200)
 #define COLOR_FUEL_BAR     RGBA32(138, 0, 196, 255)
+#define COLOR_HEALTH       RGBA32(0, 180, 20, 255)
+
 
 
 // =============================================================================

@@ -351,4 +351,5 @@ void update_cursor_movement(float delta_time, Entity *cursor_entity) {
     if (cursor_entity) {
         cursor_entity->position = game.cursor_position;
     }
+
 }

@@ -558,7 +558,7 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
                 rdpq_sync_pipe();
                 rdpq_set_mode_standard();
                 rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
-                rdpq_set_prim_color(RGBA32(220, 0, 115, 255));
+                rdpq_set_prim_color(COLOR_RESOURCE);
                 rdpq_mode_alphacompare(1);
                 rdpq_sprite_blit(drill_icon, action_x, action_y, &(rdpq_blitparms_t){
                     .scale_x = 1.0f, .scale_y = 1.0f
@@ -569,7 +569,7 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
                 rdpq_sync_pipe();
                 rdpq_set_mode_standard();
                 rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
-                rdpq_set_prim_color(RGBA32(255, 128, 13, 255));
+                rdpq_set_prim_color(COLOR_RESOURCE);
                 rdpq_mode_alphacompare(1);
                 rdpq_sprite_blit(tile_icon, action_x, action_y, &(rdpq_blitparms_t){
                     .scale_x = 1.0f, .scale_y = 1.0f
@@ -580,7 +580,7 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
                 rdpq_sync_pipe();
                 rdpq_set_mode_standard();
                 rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
-                rdpq_set_prim_color(RGBA32(200, 200, 200, 255));
+                rdpq_set_prim_color(COLOR_FUEL_BAR);
                 rdpq_mode_alphacompare(1);
                 rdpq_sprite_blit(station_icon, action_x, action_y, &(rdpq_blitparms_t){
                     .scale_x = 1.0f, .scale_y = 1.0f
@@ -592,7 +592,7 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
                 rdpq_sync_pipe();
                 rdpq_set_mode_standard();
                 rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
-                rdpq_set_prim_color(RGBA32(0, 180, 20, 255));
+                rdpq_set_prim_color(COLOR_HEALTH);
                 rdpq_mode_alphacompare(1);
                 rdpq_sprite_blit(health_icon, action_x, action_y, &(rdpq_blitparms_t){
                     .scale_x = 0.50f, .scale_y = 0.50f
@@ -604,7 +604,7 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
                 rdpq_sync_pipe();
                 rdpq_set_mode_standard();
                 rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
-                rdpq_set_prim_color(RGBA32(137, 242, 0, 255));
+                rdpq_set_prim_color(COLOR_FLAME); //
                 rdpq_mode_alphacompare(1);
                 rdpq_sprite_blit(drone_full_icon, action_x, action_y, &(rdpq_blitparms_t){
                     .scale_x = 1.0f, .scale_y = 1.0f
@@ -625,7 +625,7 @@ static void draw_countdown(void) {
     int count = (int)game.countdown_timer + 1;
 
     if (count > 1 && count <= 4) {
-        rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_FLAME});
+        rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
         rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_ICON,
                  center_x - 5, center_y, "%d", count - 1);
     } else if (game.countdown_timer < 2) {
@@ -649,13 +649,17 @@ static void draw_game_timer(void) {
     int y = SCREEN_HEIGHT - 10;
 
     // Draw difficulty multiplier above the timer
-    rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-             x, y - 10, "x%.2f", game.difficulty_multiplier);
+    // rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
+    //          x, y - 10, "x%.2f", game.difficulty_multiplier);
 
     // Draw timer
+    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
     rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
              x, y, "%d:%02d", minutes, seconds);
+    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(255, 255, 255, 255)});
+
 }
+
 
 static void draw_info_bars(void) {
     draw_entity_health_bar(&entities[ENTITY_STATION], STATION_MAX_HEALTH, 0, "S", 0, true);
@@ -787,7 +791,7 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
                 //increase alpha for fade-in effect
                 uint8_t alpha = (uint8_t)(200.0f * (game.deflect_timer / DEFLECT_DURATION));
                 if (alpha > 200) alpha = 200;
-                entities[ENTITY_DEFLECT_RING].color = RGBA32(255, 74, 2, alpha);
+                entities[ENTITY_DEFLECT_RING].color = RGBA32(138, 0, 196, alpha);
 
                 draw_entity(&entities[ENTITY_DEFLECT_RING]);
 
@@ -844,7 +848,7 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
         int seconds = (int)time_remaining;
         int tenths = (int)((time_remaining - seconds) * 10);
 
-        rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(137, 252, 0, 255)});
+        rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_WARNING}); //
         rdpq_text_printf(NULL, FONT_ICON, center_x - 20, 15, "%d.%d", seconds, tenths);
     }
 
@@ -884,7 +888,7 @@ int main(void) {
     health_icon = sprite_load("rom:/health.sprite");
 
     // Create entities
-    entities[ENTITY_STATION] = create_entity("rom:/stationring2.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}},
+    entities[ENTITY_STATION] = create_entity("rom:/stationring.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}},
                                               1.0f, COLOR_STATION, DRAW_SHADED, 30.0f);
     entities[ENTITY_STATION].value = STATION_MAX_HEALTH;
 
@@ -899,9 +903,8 @@ int main(void) {
 
     entities[ENTITY_DEFLECT_RING] = create_entity("rom:/tile2.t3dm", (T3DVec3){{0, 1000, 0}},
                                        1.0f, RGBA32(0, 150, 255, 200), DRAW_SHADED, 0.0f);
-    entities[ENTITY_GRID] = create_entity("rom:/grid.t3dm", (T3DVec3){{0, 1, 0}},
+    entities[ENTITY_GRID] = create_entity("rom:/grid2.t3dm", (T3DVec3){{0, 1, 0}},
                                            1.0f, COLOR_MAP, DRAW_SHADED, 0.0f);
-
 
 
     init_asteroids_optimized(asteroids, ASTEROID_COUNT);
