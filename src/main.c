@@ -229,6 +229,7 @@ static void update_cursor_scale_by_distance(Entity *cursor, Entity *station, flo
     const float MIN_SCALE = 0.05f;
     const float MAX_SCALE = 1.0f;
 
+
     float target_scale;
     if (distance >= START_DISTANCE) {
         target_scale = MAX_SCALE;
@@ -471,10 +472,12 @@ static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset
 
 
     if (station_entity) {
+        rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
         rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
                  x, y, ">");
         rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
                  x + 5, y, "%d", game.accumulated_credits);
+        rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(255, 255, 255, 255)});
     } else {
         rdpq_sync_pipe();
         rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
@@ -625,17 +628,17 @@ static void draw_countdown(void) {
     int count = (int)game.countdown_timer + 1;
 
     if (count > 1 && count <= 4) {
-        rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
+        rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_RESOURCE});
         rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_ICON,
                  center_x - 5, center_y, "%d", count - 1);
     } else if (game.countdown_timer < 2) {
         // Show "GO!" briefly after countdown hits 0
+        rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
         rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_ICON,
                  center_x - 12, center_y, "GO");
     } else {
-         rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(137, 252, 0, 255)});
+         rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(255,255,255, 255)});
     }
-
 }
 
 static void draw_game_timer(void) {
@@ -653,7 +656,7 @@ static void draw_game_timer(void) {
     //          x, y - 10, "x%.2f", game.difficulty_multiplier);
 
     // Draw timer
-    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
+    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_RESOURCE});
     rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
              x, y, "%d:%02d", minutes, seconds);
     rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(255, 255, 255, 255)});
@@ -678,11 +681,9 @@ static void update_ship_fuel(float delta_time, bool accelerating) {
     if (accelerating) {
         fuel_drain_accumulated += FUEL_DRAIN_RATE * 2.0f * delta_time;
         spawn_ship_trail(entities[ENTITY_CURSOR].position, game.cursor_velocity, COLOR_FUEL_BAR);
-
     } else {
         fuel_drain_accumulated += FUEL_DRAIN_RATE * 0.5f * delta_time;
     }
-    // fuel_drain_accumulated += FUEL_DRAIN_RATE * delta_time;
 
     // Only drain whole units
     if (fuel_drain_accumulated >= 1.0f) {
@@ -699,7 +700,6 @@ static void update_ship_fuel(float delta_time, bool accelerating) {
         }
     }
 }
-
 
 // =============================================================================
 // Frame Rendering
@@ -814,15 +814,10 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
 
     // Draw station - disable Z-write to prevent self Z-fighting
     rdpq_mode_zbuf(true, false);  // Z-read on, Z-write off
-    draw_asteroids_optimized(asteroids, asteroid_visible, asteroid_distance_sq, ASTEROID_COUNT);
-
     draw_entity(&entities[ENTITY_STATION]);
     rdpq_mode_zbuf(true, true);   // Restore Z-write
     rdpq_sync_pipe();
-
-    // rdpq_mode_zbuf(true, false);
     draw_entity(&entities[ENTITY_GRID]);
-    // rdpq_mode_zbuf(true, true);
 
     // Render particles at ~30Hz
     game.particle_render_timer += delta_time;

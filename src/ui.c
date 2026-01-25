@@ -103,8 +103,8 @@ void draw_pause_menu(void) {
         // game.game_over = false;
         game.game_over_pause = true;
     }
-    int padding_x = display_get_width() * 0.2f;
-    int padding_y = SCREEN_HEIGHT * 0.15f;
+    int padding_x = display_get_width() * 0.10f;
+    int padding_y = SCREEN_HEIGHT * 0.10f;
 
     int x1 = padding_x;
     int y1 = padding_y;

@@ -191,4 +191,16 @@
 
 #define DEFLECT_FUEL_COST  5.0f
 
+
+// =============================================================================
+// Particle Trail for Ship
+// =============================================================================
+#define TRAIL_SPEED_THRESHOLD   200.0f   // Min speed² to show trail (50² = 2500)
+#define TRAIL_OFFSET_DISTANCE   14.0f     // How far behind ship to spawn
+#define TRAIL_PARTICLE_SIZE     0.02f     // Particle size
+#define TRAIL_LIFETIME          0.35f     // How long particles last
+#define TRAIL_SPREAD            5.0f      // Random spread amount
+#define TRAIL_PARTICLE_COUNT    2         // Particles per call (1-3 recommended)
+#define TRAIL_HEIGHT            5.0f      // Fixed height for trail particles
+
 #endif // CONSTANTS_H
