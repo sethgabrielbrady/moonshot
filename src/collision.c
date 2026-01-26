@@ -25,32 +25,6 @@ extern T3DVec3 cursor_velocity;
 
 static ColorFlash color_flashes[MAX_COLOR_FLASHES];
 
-void start_entity_color_flash(Entity *entity, color_t flash_color, float duration_seconds) {
-    // Single pass: update existing or find free slot
-    for (int i = 0; i < MAX_COLOR_FLASHES; i++) {
-        if (color_flashes[i].active && color_flashes[i].entity == entity) {
-            color_flashes[i].timer = 0.0f;
-            color_flashes[i].duration = duration_seconds;
-            color_flashes[i].flash_color = flash_color;
-            return;
-        }
-    }
-
-    // Find free slot (only if existing flash not found)
-    for (int i = 0; i < MAX_COLOR_FLASHES; i++) {
-        if (!color_flashes[i].active) {
-            color_flashes[i].entity = entity;
-            color_flashes[i].original_color = entity->color;
-            color_flashes[i].flash_color = flash_color;
-            color_flashes[i].timer = 0.0f;
-            color_flashes[i].duration = duration_seconds;
-            color_flashes[i].active = true;
-            entity->color = flash_color;
-            return;
-        }
-    }
-}
-
 void update_color_flashes(float delta_time) {
     for (int i = 0; i < MAX_COLOR_FLASHES; i++) {
         if (!color_flashes[i].active) continue;
@@ -103,6 +77,7 @@ void check_loader_asteroid_collisions_opt(Entity *loader, Asteroid *asteroids, i
         float combined_radius = loader->collision_radius + asteroid_collision_radius;
         if (dist_sq < combined_radius * combined_radius) {
             spawn_explosion(asteroids[i].position, COLOR_SPARKS);
+            play_sfx(4);
             reset_asteroid(&asteroids[i]);
         }
     }
@@ -199,7 +174,6 @@ void check_cursor_station_collision(Entity *cursor, Entity *station) {
             game.ship_fuel = CURSOR_MAX_FUEL;
         } else {
             game.ship_fuel += stored_cursor_resource_val * 0.7f;
-            // game.ship_fuel += CURSOR_MAX_FUEL * 0.5f;
         }
         if (game.ship_fuel > CURSOR_MAX_FUEL) {
             game.ship_fuel = CURSOR_MAX_FUEL;
@@ -212,7 +186,6 @@ void check_cursor_station_collision(Entity *cursor, Entity *station) {
     } else {
         game.accumulated_credits += stored_cursor_resource_val;
     }
-
     // Clear resources
     game.cursor_resource_val = 0;
     stored_cursor_resource_val = 0;
@@ -444,6 +417,10 @@ void check_drone_cursor_collisions(Entity *drone, Entity *cursor, int count) {
         if (cursor->value > 0) {
             game.disabled_controls = false;
         }
+
+        // End heal mode after successfully healing
+        game.drone_heal = false;
+        game.move_drone = false;
     }
 }
 
@@ -573,7 +550,6 @@ void check_cursor_asteroid_collisions_opt(Entity *cursor, Asteroid *asteroids, i
 void check_cursor_asteroid_deflection_opt(Entity *cursor, Asteroid *asteroids, int count) {
     if (!game.deflect_active) return;
 
-
     float deflect_radius_sq = DEFLECT_RADIUS * DEFLECT_RADIUS;
 
     for (int i = 0; i < count; i++) {
@@ -589,3 +565,27 @@ void check_cursor_asteroid_deflection_opt(Entity *cursor, Asteroid *asteroids, i
         }
     }
 }
+
+// =============================================================================
+// Loader Asteroid Collisions (Optimized Asteroid struct)
+// =============================================================================
+
+// void check_loader_asteroid_collisions_opt(Entity *loader, Asteroid *asteroids, int count, float delta_time) {
+//     const float asteroid_collision_radius = 10.0f;
+
+//     for (int i = 0; i < count; i++) {
+//         // Distance-based early rejection
+//         float dx = loader->position.v[0] - asteroids[i].position.v[0];
+//         float dz = loader->position.v[2] - asteroids[i].position.v[2];
+//         float dist_sq = dx * dx + dz * dz;
+//         float max_range = loader->collision_radius + asteroid_collision_radius + 50.0f;
+//         if (dist_sq > max_range * max_range) continue;
+
+//         // Actual collision check
+//         float combined_radius = loader->collision_radius + asteroid_collision_radius;
+//         if (dist_sq < combined_radius * combined_radius) {
+//             spawn_explosion(asteroids[i].position, COLOR_SPARKS);
+//             reset_asteroid(&asteroids[i]);
+//         }
+//     }
+// }

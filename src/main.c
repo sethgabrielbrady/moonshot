@@ -213,38 +213,6 @@ static void draw_entities_sorted(Entity *entity_array, int count, bool *skip_cul
 }
 
 // =============================================================================
-// Cursor Scale by Distance
-// =============================================================================
-
-static void update_cursor_scale_by_distance(Entity *cursor, Entity *station, float delta_time) {
-    float dx = cursor->position.v[0] - station->position.v[0];
-    float dz = cursor->position.v[2] - station->position.v[2];
-    float distance_sq = dx * dx + dz * dz;
-
-    // Use fast inverse sqrt: distance = distance_sq * (1/sqrt(distance_sq))
-    float distance = distance_sq * fast_inv_sqrt(distance_sq);
-
-    const float START_DISTANCE = 40.0f;
-    const float END_DISTANCE = 30.0f;
-    const float MIN_SCALE = 0.05f;
-    const float MAX_SCALE = 1.0f;
-
-
-    float target_scale;
-    if (distance >= START_DISTANCE) {
-        target_scale = MAX_SCALE;
-    } else if (distance <= END_DISTANCE) {
-        target_scale = MIN_SCALE;
-    } else {
-        float t = (distance - END_DISTANCE) / (START_DISTANCE - END_DISTANCE);
-        target_scale = MIN_SCALE + (MAX_SCALE - MIN_SCALE) * t;
-    }
-
-    float scale_speed = 2.0f;
-    game.cursor_scale_multiplier += (target_scale - game.cursor_scale_multiplier) * scale_speed * delta_time;
-}
-
-// =============================================================================
 // Drone Movement
 // =============================================================================
 
@@ -258,7 +226,8 @@ static void move_drone_to_target(Entity *drone, float delta_time, bool base_retu
     float dz = game.drone_target_position.v[2] - drone->position.v[2];
     float distance_sq = dx * dx + dz * dz;
 
-    if (distance_sq < DRONE_ARRIVE_THRESHOLD * DRONE_ARRIVE_THRESHOLD) {
+    // In heal mode, don't stop moving - let collision detection handle arrival
+    if (!game.drone_heal && distance_sq < DRONE_ARRIVE_THRESHOLD * DRONE_ARRIVE_THRESHOLD) {
         game.move_drone = false;
         game.drone_moving_to_resource = false;
         game.drone_moving_to_station = false;
@@ -290,7 +259,12 @@ static void update_tile_visibility(Entity *tile) {
         game.tile_following_resource = -1;
     }
 
-    if (game.tile_following_resource >= 0 && game.tile_following_resource < RESOURCE_COUNT) {
+    if (game.drone_heal) {
+        // Follow cursor when in drone heal mode
+        tile->position.v[0] = game.cursor_position.v[0];
+        tile->position.v[1] = 8.0f;
+        tile->position.v[2] = game.cursor_position.v[2];
+    } else if (game.tile_following_resource >= 0 && game.tile_following_resource < RESOURCE_COUNT) {
         tile->position.v[0] = resources[game.tile_following_resource].position.v[0];
         tile->position.v[1] = 8.0f;
         tile->position.v[2] = resources[game.tile_following_resource].position.v[2];
@@ -375,19 +349,18 @@ static void init_subsystems(void) {
 static void setup_lighting(void) {
     // uint8_t color_ambient[4] = {0x60, 0x60, 0x60, 0xFF};
     uint8_t color_ambient[4] = {0x40, 0x40, 0x40, 0xFF};
-
-
     uint8_t color_directional[4] = {0xFF, 0xFF, 0xFF, 0xFF};
-
     T3DVec3 light_dir = {{100.0f, 200.0f, 0.0f}};
-    //can i increae the y value to make it more top down?
-    // T3DVec3 light_dir = {{100.0f, 100.0f, 0.0f}}; --- IGNORE ---
 
 
     t3d_vec3_norm(&light_dir);
-
     t3d_light_set_ambient(color_ambient);
     t3d_light_set_directional(0, color_directional, &light_dir);
+
+    // Point light at station
+    uint8_t station_light_color[4] = {0xFF, 0xCC, 0x88, 0xFF};  // Warm white/orange
+    T3DVec3 station_light_pos = {{0.0f, 10.0f, 0.0f}};
+    t3d_light_set_point(1, station_light_color, &station_light_pos, 200.0f, false);
 }
 
 // =============================================================================
@@ -723,7 +696,7 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     t3d_screen_clear_depth();
     setup_lighting();
 
-    int light_count = 1;
+    int light_count = 2;  // 1 directional + 1 point light
     t3d_light_set_count(light_count);
 
     bool entity_skip_culling[ENTITY_COUNT] = {false};
@@ -969,7 +942,6 @@ int main(void) {
 
         if (game.state == STATE_PLAYING && !game.game_over) {
             update_cursor_movement(delta_time, cursor_entity);
-            update_cursor_scale_by_distance(&entities[ENTITY_CURSOR], &entities[ENTITY_STATION], delta_time);
             process_game_input(delta_time);
             update_camera(&viewport, game.cam_yaw, delta_time, game.cursor_position, game.fps_mode, cursor_entity);
             update_screen_shake(delta_time);
@@ -998,6 +970,13 @@ int main(void) {
             }
 
             // Drone movement
+            if (game.drone_heal) {
+                // Continuously update target to follow cursor in heal mode
+                game.drone_target_position.v[0] = game.cursor_position.v[0];
+                game.drone_target_position.v[1] = game.cursor_position.v[1];
+                game.drone_target_position.v[2] = game.cursor_position.v[2];
+                game.move_drone = true;
+            }
             if (game.move_drone) {
                 move_drone_to_target(&entities[ENTITY_DRONE], delta_time, false);
             }
@@ -1172,7 +1151,5 @@ int main(void) {
     free_shared_models();  // Frees asteroid model and matrix pool
     free_all_entities_shared(resources, RESOURCE_COUNT);  // Resources use shared model
     t3d_destroy();
-
-
     return 0;
 }

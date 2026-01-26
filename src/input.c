@@ -47,21 +47,11 @@ void update_input(void) {
     }
     input.stick_magnitude_sq = input.stick_x * input.stick_x + input.stick_y * input.stick_y;
 
-
-    // input.stick_x = joypad.stick_x;
-    // input.stick_y = joypad.stick_y;
-    // input.stick_magnitude_sq = input.stick_x * input.stick_x + input.stick_y * input.stick_y;
-
-    // Use fast inverse sqrt: magnitude = magnitude_sq * (1/sqrt(magnitude_sq))
-
     if (input.stick_magnitude_sq > 0.0f) {
         input.stick_magnitude = input.stick_magnitude_sq * fast_inv_sqrt(input.stick_magnitude_sq);
     } else {
         input.stick_magnitude = 0.0f;
     }
-
-
-
     input.pressed = joypad_get_buttons_pressed(JOYPAD_PORT_1);
     input.held = joypad_get_buttons_held(JOYPAD_PORT_1);
     input.released = joypad_get_buttons_released(JOYPAD_PORT_1);
@@ -211,8 +201,6 @@ void process_system_input(T3DViewport *viewport) {
 // =============================================================================
 
 void process_game_input(float delta_time) {
-
-
     check_deflect_input();
 
     // Camera rotation (isometric mode only)Pspaw
@@ -225,7 +213,6 @@ void process_game_input(float delta_time) {
     // Drone heal mode
     if (input.pressed.c_up) {
         game.drone_heal = true;
-
         game.drone_target_position.v[0] = game.cursor_position.v[0];
         game.drone_target_position.v[1] = game.cursor_position.v[1];
         game.drone_target_position.v[2] = game.cursor_position.v[2];
