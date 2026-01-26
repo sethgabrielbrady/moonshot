@@ -60,7 +60,7 @@
 #define CURSOR_MAX_HEALTH      100.0f
 #define CURSOR_RESOURCE_CAPACITY 100.0f
 #define CURSOR_THRUST          10.0f
-#define CURSOR_DRAG            1.110f
+#define CURSOR_DRAG            0.9f
 #define CURSOR_MAX_SPEED       300.0f
 #define CURSOR_MAX_FUEL        100.0f
 #define FPS_ROTATION_SPEED     3.0f

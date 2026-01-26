@@ -310,6 +310,7 @@ void update_cursor_movement(float delta_time, Entity *cursor_entity) {
         }
     }
 
+
     // Apply drag
     float drag = CURSOR_DRAG * delta_time;
     if (drag > 1.0f) drag = 1.0f;

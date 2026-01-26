@@ -42,6 +42,7 @@ typedef enum {
     ENTITY_CURSOR,
     ENTITY_DRONE,
     ENTITY_TILE,
+    ENTITY_LOADER,
     ENTITY_DEFLECT_RING,
     ENTITY_GRID,
     ENTITY_COUNT
@@ -134,6 +135,7 @@ typedef enum {
     R4,
     R5,
     R6,
+    R7,
     RESOURCE_COUNT
 } ResourceID;
 

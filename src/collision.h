@@ -10,6 +10,9 @@
 void start_entity_color_flash(Entity *entity, color_t flash_color, float duration_seconds);
 void update_color_flashes(float delta_time);
 
+
+void check_loader_asteroid_collisions_opt(Entity *loader, Asteroid *asteroids, int count, float delta_time);
+
 // =============================================================================
 // Cursor/Ship Collisions (Optimized Asteroid struct)
 // =============================================================================
@@ -21,7 +24,7 @@ void check_cursor_asteroid_deflection_opt(Entity *cursor, Asteroid *asteroids, i
 // Cursor/Ship Collisions (Legacy Entity struct)
 // =============================================================================
 
-void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, int count, bool *asteroid_visible, float delta_time);
+// void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, int count, bool *asteroid_visible, float delta_time);
 void check_cursor_station_collision(Entity *cursor, Entity *station);
 void check_cursor_resource_collisions(Entity *cursor, Entity *resources, int count, float delta_time);
 void check_cursor_asteroid_deflection(Entity *cursor, Entity *asteroids, int count);

@@ -87,50 +87,26 @@ float calculate_asteroid_damage(Entity *asteroid) {
 // Station Collisions
 // =============================================================================
 
-// void check_station_asteroid_collisions(Entity *station, Entity *asteroids, int count, float delta_time) {
-//     // Update iframe timer
-//     if (game.station_iframe_timer > 0.0f) {
-//         game.station_iframe_timer -= delta_time;
-//     }
 
-//     for (int i = 0; i < count; i++) {
-//         // Distance-based early rejection - skip if too far away
-//         float dx = station->position.v[0] - asteroids[i].position.v[0];
-//         float dz = station->position.v[2] - asteroids[i].position.v[2];
-//         float dist_sq = dx * dx + dz * dz;
-//         float max_range = station->collision_radius + asteroids[i].collision_radius + 50.0f;
-//         if (dist_sq > max_range * max_range) continue;
+void check_loader_asteroid_collisions_opt(Entity *loader, Asteroid *asteroids, int count, float delta_time) {
+    const float asteroid_collision_radius = 10.0f;
 
-//         if (check_entity_intersection(station, &asteroids[i])) {
-//             // Only apply damage if not in iframe period
-//             if (game.station_iframe_timer <= 0.0f) {
-//                 float damage = calculate_asteroid_damage(&asteroids[i]);
-//                 if (damage >= MAX_DAMAGE) {
-//                     damage = MAX_DAMAGE;
-//                 }
+    for (int i = 0; i < count; i++) {
+        // Distance-based early rejection
+        float dx = loader->position.v[0] - asteroids[i].position.v[0];
+        float dz = loader->position.v[2] - asteroids[i].position.v[2];
+        float dist_sq = dx * dx + dz * dz;
+        float max_range = loader->collision_radius + asteroid_collision_radius + 50.0f;
+        if (dist_sq > max_range * max_range) continue;
 
-//                 spawn_explosion(asteroids[i].position, COLOR_SPARKS);
-
-//                 station->value -= damage;
-//                 game.station_last_damage = (int)damage;
-
-//                 // Clamp to zero
-//                 if (station->value < 0) {
-//                     station->value = 0;
-//                     spawn_station_explosion(station->position);
-//                     start_entity_color_flash(station, RGBA32(255, 255, 0, 125), 0.5f);
-//                     play_sfx(5);
-//                 }
-
-//                 // Start iframe period
-//                 game.station_iframe_timer = STATION_IFRAME_DURATION;
-//             }
-
-//             // Always reset asteroid to prevent multiple collisions
-//             reset_entity(&asteroids[i], ASTEROID);
-//         }
-//     }
-// }
+        // Actual collision check
+        float combined_radius = loader->collision_radius + asteroid_collision_radius;
+        if (dist_sq < combined_radius * combined_radius) {
+            spawn_explosion(asteroids[i].position, COLOR_SPARKS);
+            reset_asteroid(&asteroids[i]);
+        }
+    }
+}
 
 // =============================================================================
 // Cursor/Ship Collisions
@@ -596,6 +572,7 @@ void check_cursor_asteroid_collisions_opt(Entity *cursor, Asteroid *asteroids, i
 
 void check_cursor_asteroid_deflection_opt(Entity *cursor, Asteroid *asteroids, int count) {
     if (!game.deflect_active) return;
+
 
     float deflect_radius_sq = DEFLECT_RADIUS * DEFLECT_RADIUS;
 

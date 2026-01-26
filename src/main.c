@@ -620,6 +620,7 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
     }
 }
 
+
 static void draw_countdown(void) {
     int center_x = display_get_width() / 2;
     int center_y = SCREEN_HEIGHT / 2;
@@ -895,8 +896,10 @@ int main(void) {
                                             0.55f, COLOR_DRONE, DRAW_SHADED, 30.0f);
     entities[ENTITY_TILE] = create_entity("rom:/tile2.t3dm", (T3DVec3){{0, 1000, 0}},
                                            1.0f, COLOR_TILE, DRAW_SHADED, 10.0f);
+    entities[ENTITY_LOADER] = create_entity("rom:/loader.t3dm", (T3DVec3){{0, 1, 0}},
+                                           1.0f,  RGBA32(255, 237, 41, 175), DRAW_SHADED, 50.0f);
 
-    entities[ENTITY_DEFLECT_RING] = create_entity("rom:/tile2.t3dm", (T3DVec3){{0, 1000, 0}},
+    entities[ENTITY_DEFLECT_RING] = create_entity("rom:/sphere.t3dm", (T3DVec3){{0, 1000, 0}},
                                        1.0f, RGBA32(0, 150, 255, 200), DRAW_SHADED, 0.0f);
     entities[ENTITY_GRID] = create_entity("rom:/grid2.t3dm", (T3DVec3){{0, 1, 0}},
                                            1.0f, COLOR_MAP, DRAW_SHADED, 0.0f);
@@ -1010,6 +1013,11 @@ int main(void) {
                 entities[ENTITY_STATION].rotation.v[1] -= TWO_PI;
             }
 
+             entities[ENTITY_LOADER].rotation.v[1] -= delta_time * 0.3f;
+            if (entities[ENTITY_LOADER].rotation.v[1] < 0.0f) {
+                entities[ENTITY_LOADER].rotation.v[1] += TWO_PI;
+            }
+
             // Update matrices
             update_entity_matrices(entities, ENTITY_COUNT);
 
@@ -1054,6 +1062,7 @@ int main(void) {
                 game.collision_timer = 0.0f;
             }
 
+            check_loader_asteroid_collisions_opt(&entities[ENTITY_LOADER], asteroids, ASTEROID_COUNT, delta_time);
 
             // Update deflection timer
             update_deflect_timer(delta_time);
