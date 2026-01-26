@@ -259,6 +259,14 @@ static void update_tile_visibility(Entity *tile) {
         game.tile_following_resource = -1;
     }
 
+    // Hide tile if drone is actively mining
+    if (game.drone_mining_resource >= 0) {
+        tile->position.v[0] = 0.0f;
+        tile->position.v[1] = 1000.0f;
+        tile->position.v[2] = 0.0f;
+        return;
+    }
+
     if (game.drone_heal) {
         // Follow cursor when in drone heal mode
         tile->position.v[0] = game.cursor_position.v[0];
@@ -1132,7 +1140,6 @@ int main(void) {
     }
 
     // Cleanup
-
     cleanup_particles();
     sprite_free(background);
     sprite_free(station_icon);

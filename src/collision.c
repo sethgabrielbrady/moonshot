@@ -353,6 +353,11 @@ void check_drone_resource_collisions(Entity *entity, Entity *resources, int coun
     // Update drone_full based on current resource level
     game.drone_full = (game.drone_resource_val >= DRONE_MAX_RESOURCES);
 
+    // Don't mine if drone was just given a new command
+    // if (game.drone_command_interrupt) {
+    //     return;
+    // }
+
     for (int i = 0; i < count; i++) {
         // Distance-based early rejection
         float dx = entity->position.v[0] - resources[i].position.v[0];

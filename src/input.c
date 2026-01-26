@@ -200,6 +200,17 @@ void process_system_input(T3DViewport *viewport) {
 // Game Input (movement, actions - only when not paused)
 // =============================================================================
 
+// Helper to clear all drone command states
+static void clear_drone_command_state(void) {
+    game.move_drone = false;
+    game.drone_heal = false;
+    game.drone_moving_to_resource = false;
+    game.drone_moving_to_station = false;
+    game.drone_collecting_resource = false;
+    game.tile_following_resource = -1;
+    game.drone_mining_resource = -1;
+}
+
 void process_game_input(float delta_time) {
     check_deflect_input();
 
@@ -212,40 +223,35 @@ void process_game_input(float delta_time) {
 
     // Drone heal mode
     if (input.pressed.c_up) {
+        clear_drone_command_state();
         game.drone_heal = true;
         game.drone_target_position.v[0] = game.cursor_position.v[0];
         game.drone_target_position.v[1] = game.cursor_position.v[1];
         game.drone_target_position.v[2] = game.cursor_position.v[2];
         game.move_drone = true;
-        game.drone_moving_to_resource = false;
-        game.drone_moving_to_station = false;
-        game.tile_following_resource = -1;
         play_sfx(2);
     }
 
     // Send drone to tile position
     if (input.pressed.c_left) {
+        clear_drone_command_state();
         float offset_distance = 30.0f;
         game.drone_target_position.v[0] = game.cursor_position.v[0] - cursor_look_direction.v[0] * offset_distance;
         game.drone_target_position.v[1] = game.cursor_position.v[1];
         game.drone_target_position.v[2] = game.cursor_position.v[2] - cursor_look_direction.v[2] * offset_distance;
         game.move_drone = true;
-        game.drone_heal = false;
         game.drone_moving_to_resource = true;
-        game.drone_moving_to_station = false;
-        game.tile_following_resource = -1;
         play_sfx(2);
     }
 
     // Send drone to station
     if (input.pressed.c_down) {
+        clear_drone_command_state();
         game.drone_target_rotation = 0.0f;
         game.drone_target_position.v[0] = 0.0f;
         game.drone_target_position.v[2] = 0.0f;
         game.move_drone = true;
         game.drone_moving_to_station = true;
-        game.drone_moving_to_resource = false;
-        game.drone_heal = false;
     }
 }
 
