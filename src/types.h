@@ -13,6 +13,7 @@
 typedef enum {
     DRAW_SHADED,
     DRAW_TEXTURED_LIT,
+    DRAW_FLAT,
 } DrawType;
 
 // =============================================================================
@@ -45,6 +46,7 @@ typedef enum {
     ENTITY_LOADER,
     ENTITY_DEFLECT_RING,
     ENTITY_GRID,
+    ENTITY_WALL,
     ENTITY_COUNT
 } EntityID;
 

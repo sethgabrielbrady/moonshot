@@ -25,11 +25,15 @@
 #define CAM_ROTATION_SPEED 120.0f
 
 // =============================================================================
-// Playable Area
+// Playable Area (Circular)
 // =============================================================================
 
-#define PLAY_AREA_HALF_X   832.0f
-#define PLAY_AREA_HALF_Z   832.0f
+#define PLAY_AREA_RADIUS   832.0f   // Radius of circular play area
+#define PLAY_AREA_RADIUS_SQ (PLAY_AREA_RADIUS * PLAY_AREA_RADIUS)
+
+// Legacy defines for compatibility (deprecated - use PLAY_AREA_RADIUS)
+#define PLAY_AREA_HALF_X   PLAY_AREA_RADIUS
+#define PLAY_AREA_HALF_Z   PLAY_AREA_RADIUS
 #define PLAY_AREA_SIZE     840.0f
 
 // =============================================================================

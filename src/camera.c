@@ -190,8 +190,15 @@ void update_camera(T3DViewport *viewport, float cam_yaw, float delta_time,
         camera.target.v[0] += (cursor_position.v[0] - camera.target.v[0]) * follow_speed;
         camera.target.v[2] += (cursor_position.v[2] - camera.target.v[2]) * follow_speed;
 
-        camera.target.v[0] = clampf(camera.target.v[0], -PLAY_AREA_HALF_X, PLAY_AREA_HALF_X);
-        camera.target.v[2] = clampf(camera.target.v[2], -PLAY_AREA_HALF_Z, PLAY_AREA_HALF_Z);
+        // Clamp camera target to circular play area
+        float cam_dist_sq = camera.target.v[0] * camera.target.v[0] +
+                            camera.target.v[2] * camera.target.v[2];
+        if (cam_dist_sq > PLAY_AREA_RADIUS_SQ) {
+            float cam_dist = sqrtf(cam_dist_sq);
+            float scale = PLAY_AREA_RADIUS / cam_dist;
+            camera.target.v[0] *= scale;
+            camera.target.v[2] *= scale;
+        }
 
         camera.position.v[0] = camera.target.v[0] + horizontal_dist * sin_yaw;
         camera.position.v[1] = camera.target.v[1] + vertical_dist;

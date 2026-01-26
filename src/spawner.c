@@ -64,8 +64,6 @@ void scale_resource_based_on_value(Entity *resource) {
 // =============================================================================
 
 void reset_entity(Entity *entity, EntityType type) {
-    int edge = rand() % 4;
-
     if (type == ASTEROID) {
         get_asteroid_velocity_and_scale(entity, &entity->velocity);
     }
@@ -75,35 +73,17 @@ void reset_entity(Entity *entity, EntityType type) {
         scale_resource_based_on_value(entity);
     }
 
-    float bound_x = (type == RESOURCE) ? RESOURCE_BOUND_X : ASTEROID_BOUND_X;
-    float bound_z = (type == RESOURCE) ? RESOURCE_BOUND_Z : ASTEROID_BOUND_Z;
+    float bound_radius = (type == RESOURCE) ? RESOURCE_BOUND_X : ASTEROID_BOUND_X;
 
-    switch (edge) {
-        case 0:
-            entity->position.v[0] = randomize_float(-bound_x, bound_x);
-            entity->position.v[2] = -bound_z;
-            entity->velocity.v[0] = randomize_float(-0.5f, 0.5f);
-            entity->velocity.v[2] = randomize_float(0.3f, 1.0f);
-            break;
-        case 1:
-            entity->position.v[0] = randomize_float(-bound_x, bound_x);
-            entity->position.v[2] = bound_z;
-            entity->velocity.v[0] = randomize_float(-0.5f, 0.5f);
-            entity->velocity.v[2] = randomize_float(-1.0f, -0.3f);
-            break;
-        case 2:
-            entity->position.v[0] = bound_x;
-            entity->position.v[2] = randomize_float(-bound_z, bound_z);
-            entity->velocity.v[0] = randomize_float(-1.0f, -0.3f);
-            entity->velocity.v[2] = randomize_float(-0.5f, 0.5f);
-            break;
-        case 3:
-            entity->position.v[0] = -bound_x;
-            entity->position.v[2] = randomize_float(-bound_z, bound_z);
-            entity->velocity.v[0] = randomize_float(0.3f, 1.0f);
-            entity->velocity.v[2] = randomize_float(-0.5f, 0.5f);
-            break;
-    }
+    // Spawn on circle edge at random angle
+    float angle = randomize_float(0.0f, TWO_PI);
+    entity->position.v[0] = cosf(angle) * bound_radius;
+    entity->position.v[2] = sinf(angle) * bound_radius;
+
+    // Velocity points toward center with some randomness
+    float target_angle = angle + T3D_PI + randomize_float(-0.5f, 0.5f);
+    entity->velocity.v[0] = cosf(target_angle);
+    entity->velocity.v[2] = sinf(target_angle);
 
     // Normalize velocity using fast inverse sqrt
     float len_sq = entity->velocity.v[0] * entity->velocity.v[0] +
@@ -150,12 +130,12 @@ void move_entity(Entity *entity, float delta_time, EntityType type) {
         while (entity->rotation.v[1] < 0.0f) entity->rotation.v[1] += 360.0f;
     }
 
-    // Boundary check
-    float bound_x = ASTEROID_BOUND_X + ASTEROID_PADDING;
-    float bound_z = ASTEROID_BOUND_Z + ASTEROID_PADDING;
+    // Boundary check (circular)
+    float bound_radius = ASTEROID_BOUND_X + ASTEROID_PADDING;
+    float dist_sq = entity->position.v[0] * entity->position.v[0] +
+                    entity->position.v[2] * entity->position.v[2];
 
-    if (entity->position.v[0] < -bound_x || entity->position.v[0] > bound_x ||
-        entity->position.v[2] < -bound_z || entity->position.v[2] > bound_z) {
+    if (dist_sq > bound_radius * bound_radius) {
         reset_entity(entity, type);
     }
 }
@@ -238,8 +218,6 @@ void init_asteroid_system(void) {
 }
 
 void reset_asteroid(Asteroid *asteroid) {
-    int edge = rand() % 4;
-
     // Get difficulty-scaled speed
     float difficulty = get_asteroid_speed_for_difficulty();
     float min_speed = ASTEROID_BASE_MIN_SPEED * difficulty;
@@ -249,35 +227,17 @@ void reset_asteroid(Asteroid *asteroid) {
     asteroid->scale = randomize_float(ASTEROID_MIN_SCALE, ASTEROID_MAX_SCALE);
     asteroid->matrix_index = -1;  // No matrix assigned
 
-    float bound_x = ASTEROID_BOUND_X;
-    float bound_z = ASTEROID_BOUND_Z;
+    float bound_radius = ASTEROID_BOUND_X;
 
-    switch (edge) {
-        case 0:
-            asteroid->position.v[0] = randomize_float(-bound_x, bound_x);
-            asteroid->position.v[2] = -bound_z;
-            asteroid->velocity.v[0] = randomize_float(-0.5f, 0.5f);
-            asteroid->velocity.v[2] = randomize_float(0.3f, 1.0f);
-            break;
-        case 1:
-            asteroid->position.v[0] = randomize_float(-bound_x, bound_x);
-            asteroid->position.v[2] = bound_z;
-            asteroid->velocity.v[0] = randomize_float(-0.5f, 0.5f);
-            asteroid->velocity.v[2] = randomize_float(-1.0f, -0.3f);
-            break;
-        case 2:
-            asteroid->position.v[0] = bound_x;
-            asteroid->position.v[2] = randomize_float(-bound_z, bound_z);
-            asteroid->velocity.v[0] = randomize_float(-1.0f, -0.3f);
-            asteroid->velocity.v[2] = randomize_float(-0.5f, 0.5f);
-            break;
-        case 3:
-            asteroid->position.v[0] = -bound_x;
-            asteroid->position.v[2] = randomize_float(-bound_z, bound_z);
-            asteroid->velocity.v[0] = randomize_float(0.3f, 1.0f);
-            asteroid->velocity.v[2] = randomize_float(-0.5f, 0.5f);
-            break;
-    }
+    // Spawn on circle edge at random angle
+    float angle = randomize_float(0.0f, TWO_PI);
+    asteroid->position.v[0] = cosf(angle) * bound_radius;
+    asteroid->position.v[2] = sinf(angle) * bound_radius;
+
+    // Velocity points toward center with some randomness
+    float target_angle = angle + T3D_PI + randomize_float(-0.5f, 0.5f);
+    asteroid->velocity.v[0] = cosf(target_angle);
+    asteroid->velocity.v[2] = sinf(target_angle);
 
     // Normalize velocity
     float len_sq = asteroid->velocity.v[0] * asteroid->velocity.v[0] +
@@ -302,8 +262,8 @@ void init_asteroids_optimized(Asteroid *asteroids, int count) {
 }
 
 void update_asteroids_optimized(Asteroid *asteroids, int count, float delta_time) {
-    float bound_x = ASTEROID_BOUND_X + ASTEROID_PADDING;
-    float bound_z = ASTEROID_BOUND_Z + ASTEROID_PADDING;
+    float bound_radius = ASTEROID_BOUND_X + ASTEROID_PADDING;
+    float bound_radius_sq = bound_radius * bound_radius;
 
     for (int i = 0; i < count; i++) {
         Asteroid *a = &asteroids[i];
@@ -323,9 +283,10 @@ void update_asteroids_optimized(Asteroid *asteroids, int count, float delta_time
             if (a->rotation_y < 0.0f) a->rotation_y += 360.0f;
         }
 
-        // Boundary check
-        if (a->position.v[0] < -bound_x || a->position.v[0] > bound_x ||
-            a->position.v[2] < -bound_z || a->position.v[2] > bound_z) {
+        // Boundary check (circular)
+        float pos_dist_sq = a->position.v[0] * a->position.v[0] +
+                            a->position.v[2] * a->position.v[2];
+        if (pos_dist_sq > bound_radius_sq) {
             reset_asteroid(a);
         }
     }

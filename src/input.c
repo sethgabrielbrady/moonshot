@@ -337,9 +337,15 @@ void update_cursor_movement(float delta_time, Entity *cursor_entity) {
     game.cursor_position.v[0] = roundf(game.cursor_position.v[0] * 10.0f) / 10.0f;
     game.cursor_position.v[2] = roundf(game.cursor_position.v[2] * 10.0f) / 10.0f;
 
-    // Clamp to play area
-    game.cursor_position.v[0] = clampf(game.cursor_position.v[0], -PLAY_AREA_HALF_X, PLAY_AREA_HALF_X);
-    game.cursor_position.v[2] = clampf(game.cursor_position.v[2], -PLAY_AREA_HALF_Z, PLAY_AREA_HALF_Z);
+    // Clamp to circular play area
+    float dist_sq = game.cursor_position.v[0] * game.cursor_position.v[0] +
+                    game.cursor_position.v[2] * game.cursor_position.v[2];
+    if (dist_sq > PLAY_AREA_RADIUS_SQ) {
+        float dist = sqrtf(dist_sq);
+        float scale = PLAY_AREA_RADIUS / dist;
+        game.cursor_position.v[0] *= scale;
+        game.cursor_position.v[2] *= scale;
+    }
 
     // Update cursor entity position
     if (cursor_entity) {

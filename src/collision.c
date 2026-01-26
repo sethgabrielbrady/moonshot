@@ -574,23 +574,3 @@ void check_cursor_asteroid_deflection_opt(Entity *cursor, Asteroid *asteroids, i
 // =============================================================================
 // Loader Asteroid Collisions (Optimized Asteroid struct)
 // =============================================================================
-
-// void check_loader_asteroid_collisions_opt(Entity *loader, Asteroid *asteroids, int count, float delta_time) {
-//     const float asteroid_collision_radius = 10.0f;
-
-//     for (int i = 0; i < count; i++) {
-//         // Distance-based early rejection
-//         float dx = loader->position.v[0] - asteroids[i].position.v[0];
-//         float dz = loader->position.v[2] - asteroids[i].position.v[2];
-//         float dist_sq = dx * dx + dz * dz;
-//         float max_range = loader->collision_radius + asteroid_collision_radius + 50.0f;
-//         if (dist_sq > max_range * max_range) continue;
-
-//         // Actual collision check
-//         float combined_radius = loader->collision_radius + asteroid_collision_radius;
-//         if (dist_sq < combined_radius * combined_radius) {
-//             spawn_explosion(asteroids[i].position, COLOR_SPARKS);
-//             reset_asteroid(&asteroids[i]);
-//         }
-//     }
-// }

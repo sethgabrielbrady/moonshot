@@ -295,6 +295,51 @@ static void check_tile_following_status(Entity *drone) {
     }
 }
 
+// // =============================================================================
+// // Boundary Wall (Circular)
+// // =============================================================================
+
+// static float wall_orbit_angle = 0.0f;
+// // static void update_wall_light(T3DVec3 wall_pos);  // Forward declaration
+
+// static void update_boundary_wall(Entity *wall, T3DVec3 cursor_pos, float delta_time) {
+//     // Calculate distance from center
+//     float dist_sq = cursor_pos.v[0] * cursor_pos.v[0] + cursor_pos.v[2] * cursor_pos.v[2];
+//     float dist = sqrtf(dist_sq);
+
+//     // Distance from the edge of the play area
+//     float distance_to_edge = PLAY_AREA_RADIUS - dist;
+
+//     // Check if cursor is near edge
+//     bool near_edge = (distance_to_edge < WALL_FADE_START);
+
+//     float target_angle;
+
+//     if (near_edge) {
+//         // Snap to cursor direction
+//         target_angle = atan2f(cursor_pos.v[2], cursor_pos.v[0]);
+//         wall_orbit_angle = target_angle;
+//     } else {
+//         // Orbit around perimeter
+//         wall_orbit_angle += delta_time * 0.5f;  // Orbit speed
+//         if (wall_orbit_angle > TWO_PI) wall_orbit_angle -= TWO_PI;
+//         target_angle = wall_orbit_angle;
+//     }
+
+//     // Position wall at the edge
+//     wall->position.v[0] = cosf(target_angle) * PLAY_AREA_RADIUS;
+//     wall->position.v[1] = WALL_HEIGHT;
+//     wall->position.v[2] = sinf(target_angle) * PLAY_AREA_RADIUS;
+
+//     // Rotate wall to face inward (toward center)
+//     wall->rotation.v[1] = target_angle + T3D_PI / 2.0f;
+
+//     // Update wall point light position
+//     update_wall_light(wall->position);
+
+//     wall->color = RGBA32(255, 0, 0, 255);
+// }
+
 
 // =============================================================================
 // Initialization
@@ -346,7 +391,6 @@ static void init_subsystems(void) {
     set_bgm_volume(0.5f);
 
     srand(get_ticks());
-
     init_game_state();
 }
 
@@ -360,7 +404,6 @@ static void setup_lighting(void) {
     uint8_t color_directional[4] = {0xFF, 0xFF, 0xFF, 0xFF};
     T3DVec3 light_dir = {{100.0f, 200.0f, 0.0f}};
 
-
     t3d_vec3_norm(&light_dir);
     t3d_light_set_ambient(color_ambient);
     t3d_light_set_directional(0, color_directional, &light_dir);
@@ -369,7 +412,61 @@ static void setup_lighting(void) {
     uint8_t station_light_color[4] = {0xFF, 0xCC, 0x88, 0xFF};  // Warm white/orange
     T3DVec3 station_light_pos = {{0.0f, 10.0f, 0.0f}};
     t3d_light_set_point(1, station_light_color, &station_light_pos, 200.0f, false);
+
+    // Point light for wall (initial position, updated each frame)
+    uint8_t wall_light_color[4] = {0xFF, 0xCC, 0x88, 0xFF};  // 255, 237, 41, 175
+    T3DVec3 wall_light_pos = {{ 0.0f, WALL_HEIGHT, PLAY_AREA_RADIUS}};
+    t3d_light_set_point(2, wall_light_color, &wall_light_pos, 150.0f, false);
 }
+
+static void update_wall_light(T3DVec3 wall_pos) {
+    uint8_t wall_light_color[4] = {0xFF, 0xCC, 0x88,0xFF};  // 255, 237, 41, 175
+    T3DVec3 light_pos = {{wall_pos.v[0], wall_pos.v[1], wall_pos.v[2]}};
+    t3d_light_set_point(2, wall_light_color, &light_pos, 150.0f, true);
+}
+
+// =============================================================================
+// Boundary Wall (Circular)
+// =============================================================================
+
+static float wall_orbit_angle = 0.0f;
+
+static void update_boundary_wall(Entity *wall, T3DVec3 cursor_pos, float delta_time) {
+    // Calculate distance from center
+    float dist_sq = cursor_pos.v[0] * cursor_pos.v[0] + cursor_pos.v[2] * cursor_pos.v[2];
+    float dist = sqrtf(dist_sq);
+
+    // Distance from the edge of the play area
+    float distance_to_edge = PLAY_AREA_RADIUS - dist;
+
+    // Check if cursor is near edge
+    bool near_edge = (distance_to_edge < WALL_FADE_START);
+
+    float target_angle;
+
+    if (near_edge) {
+        // Snap to cursor direction
+        target_angle = atan2f(cursor_pos.v[2], cursor_pos.v[0]);
+        wall_orbit_angle = target_angle;
+    } else {
+        // Orbit around perimeter
+        wall_orbit_angle += delta_time * 0.5f;  // Orbit speed
+        if (wall_orbit_angle > TWO_PI) wall_orbit_angle -= TWO_PI;
+        target_angle = wall_orbit_angle;
+    }
+
+    // Position wall at the edge
+    wall->position.v[0] = cosf(target_angle) * PLAY_AREA_RADIUS;
+    wall->position.v[1] = WALL_HEIGHT;
+    wall->position.v[2] = sinf(target_angle) * PLAY_AREA_RADIUS;
+
+    // Rotate wall to face inward (toward center)
+    wall->rotation.v[1] = target_angle + T3D_PI / 2.0f;
+
+    // Update wall point light position
+    wall->color = RGBA32(255, 237, 41, 175);// 255, 237, 41, 175
+}
+
 
 // =============================================================================
 // Background Rendering
@@ -703,8 +800,10 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     t3d_viewport_attach(viewport);
     t3d_screen_clear_depth();
     setup_lighting();
+    update_wall_light(entities[ENTITY_WALL].position);
 
-    int light_count = 2;  // 1 directional + 1 point light
+
+    int light_count = 3;  // 1 directional + 2 point lights (station + wall)
     t3d_light_set_count(light_count);
 
     bool entity_skip_culling[ENTITY_COUNT] = {false};
@@ -799,7 +898,11 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     draw_entity(&entities[ENTITY_STATION]);
     rdpq_mode_zbuf(true, true);   // Restore Z-write
     rdpq_sync_pipe();
+
+    rdpq_mode_zbuf(true, false);  // Z-read on, Z-write off
     draw_entity(&entities[ENTITY_GRID]);
+    rdpq_mode_zbuf(true, true);   // Restore Z-write
+    rdpq_sync_pipe();
 
     // Render particles at ~30Hz
     game.particle_render_timer += delta_time;
@@ -882,8 +985,10 @@ int main(void) {
 
     entities[ENTITY_DEFLECT_RING] = create_entity("rom:/sphere.t3dm", (T3DVec3){{0, 1000, 0}},
                                        1.0f, RGBA32(0, 150, 255, 200), DRAW_SHADED, 0.0f);
-    entities[ENTITY_GRID] = create_entity("rom:/grid2.t3dm", (T3DVec3){{0, 1, 0}},
+    entities[ENTITY_GRID] = create_entity("rom:/ringvert.t3dm", (T3DVec3){{0, 1, 0}},
                                            1.0f, COLOR_MAP, DRAW_SHADED, 0.0f);
+    entities[ENTITY_WALL] = create_entity("rom:/wall.t3dm", (T3DVec3){{0, 1000, 0}},
+                                           1.0f, RGBA32(255, 237, 41, 175), DRAW_SHADED, 0.0f);
 
 
     init_asteroids_optimized(asteroids, ASTEROID_COUNT);
@@ -954,6 +1059,7 @@ int main(void) {
             update_camera(&viewport, game.cam_yaw, delta_time, game.cursor_position, game.fps_mode, cursor_entity);
             update_screen_shake(delta_time);
             update_tile_visibility(&entities[ENTITY_TILE]);
+            update_boundary_wall(&entities[ENTITY_WALL], game.cursor_position, delta_time);
 
             // Tile collision (only if drone not full)
             if (!game.drone_full) {
@@ -998,6 +1104,10 @@ int main(void) {
             entities[ENTITY_STATION].rotation.v[1] += delta_time * 0.1f;
             if (entities[ENTITY_STATION].rotation.v[1] > TWO_PI) {
                 entities[ENTITY_STATION].rotation.v[1] -= TWO_PI;
+            }
+            entities[ENTITY_GRID].rotation.v[0] += delta_time * 0.1f;
+            if (entities[ENTITY_GRID].rotation.v[0] > TWO_PI) {
+                entities[ENTITY_GRID].rotation.v[0] -= TWO_PI;
             }
 
              entities[ENTITY_LOADER].rotation.v[1] -= delta_time * 0.3f;
