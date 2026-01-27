@@ -295,50 +295,8 @@ static void check_tile_following_status(Entity *drone) {
     }
 }
 
-// // =============================================================================
-// // Boundary Wall (Circular)
-// // =============================================================================
 
-// static float wall_orbit_angle = 0.0f;
-// // static void update_wall_light(T3DVec3 wall_pos);  // Forward declaration
 
-// static void update_boundary_wall(Entity *wall, T3DVec3 cursor_pos, float delta_time) {
-//     // Calculate distance from center
-//     float dist_sq = cursor_pos.v[0] * cursor_pos.v[0] + cursor_pos.v[2] * cursor_pos.v[2];
-//     float dist = sqrtf(dist_sq);
-
-//     // Distance from the edge of the play area
-//     float distance_to_edge = PLAY_AREA_RADIUS - dist;
-
-//     // Check if cursor is near edge
-//     bool near_edge = (distance_to_edge < WALL_FADE_START);
-
-//     float target_angle;
-
-//     if (near_edge) {
-//         // Snap to cursor direction
-//         target_angle = atan2f(cursor_pos.v[2], cursor_pos.v[0]);
-//         wall_orbit_angle = target_angle;
-//     } else {
-//         // Orbit around perimeter
-//         wall_orbit_angle += delta_time * 0.5f;  // Orbit speed
-//         if (wall_orbit_angle > TWO_PI) wall_orbit_angle -= TWO_PI;
-//         target_angle = wall_orbit_angle;
-//     }
-
-//     // Position wall at the edge
-//     wall->position.v[0] = cosf(target_angle) * PLAY_AREA_RADIUS;
-//     wall->position.v[1] = WALL_HEIGHT;
-//     wall->position.v[2] = sinf(target_angle) * PLAY_AREA_RADIUS;
-
-//     // Rotate wall to face inward (toward center)
-//     wall->rotation.v[1] = target_angle + T3D_PI / 2.0f;
-
-//     // Update wall point light position
-//     update_wall_light(wall->position);
-
-//     wall->color = RGBA32(255, 0, 0, 255);
-// }
 
 
 // =============================================================================
@@ -394,13 +352,14 @@ static void init_subsystems(void) {
     init_game_state();
 }
 
+
 // =============================================================================
 // Lighting Setup
 // =============================================================================
 
 static void setup_lighting(void) {
     // uint8_t color_ambient[4] = {0x60, 0x60, 0x60, 0xFF};
-    uint8_t color_ambient[4] = {0x40, 0x40, 0x40, 0xFF};
+    uint8_t color_ambient[4] = {0x20, 0x20, 0x20, 0xFF};
     uint8_t color_directional[4] = {0xFF, 0xFF, 0xFF, 0xFF};
     T3DVec3 light_dir = {{100.0f, 200.0f, 0.0f}};
 
@@ -411,18 +370,18 @@ static void setup_lighting(void) {
     // Point light at station
     uint8_t station_light_color[4] = {0xFF, 0xCC, 0x88, 0xFF};  // Warm white/orange
     T3DVec3 station_light_pos = {{0.0f, 10.0f, 0.0f}};
-    t3d_light_set_point(1, station_light_color, &station_light_pos, 200.0f, false);
+    t3d_light_set_point(1, station_light_color, &station_light_pos, 100.0f, false);
 
     // Point light for wall (initial position, updated each frame)
     uint8_t wall_light_color[4] = {0xFF, 0xCC, 0x88, 0xFF};  // 255, 237, 41, 175
     T3DVec3 wall_light_pos = {{ 0.0f, WALL_HEIGHT, PLAY_AREA_RADIUS}};
-    t3d_light_set_point(2, wall_light_color, &wall_light_pos, 150.0f, false);
+    t3d_light_set_point(2, wall_light_color, &wall_light_pos, 100.0f, false);
 }
 
 static void update_wall_light(T3DVec3 wall_pos) {
     uint8_t wall_light_color[4] = {0xFF, 0xCC, 0x88,0xFF};  // 255, 237, 41, 175
     T3DVec3 light_pos = {{wall_pos.v[0], wall_pos.v[1], wall_pos.v[2]}};
-    t3d_light_set_point(2, wall_light_color, &light_pos, 150.0f, true);
+    t3d_light_set_point(2, wall_light_color, &light_pos, 100.0f, true);
 }
 
 // =============================================================================
@@ -450,7 +409,7 @@ static void update_boundary_wall(Entity *wall, T3DVec3 cursor_pos, float delta_t
         wall_orbit_angle = target_angle;
     } else {
         // Orbit around perimeter
-        wall_orbit_angle += delta_time * 0.5f;  // Orbit speed
+        wall_orbit_angle += delta_time * 2.5f;  // Orbit speed
         if (wall_orbit_angle > TWO_PI) wall_orbit_angle -= TWO_PI;
         target_angle = wall_orbit_angle;
     }
@@ -731,8 +690,8 @@ static void draw_game_timer(void) {
     int y = SCREEN_HEIGHT - 10;
 
     // Draw difficulty multiplier above the timer
-    // rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-    //          x, y - 10, "x%.2f", game.difficulty_multiplier);
+    rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
+             x, y - 10, "x%.2f", game.difficulty_multiplier);
 
     // Draw timer
     rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_RESOURCE});
@@ -922,6 +881,7 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     // Draw death timer if active
     if (game.death_timer_active) {
         int center_x = display_get_width() / 2;
+        int center_y = SCREEN_HEIGHT / 2;
         float time_remaining = 10.0f - game.death_timer;
         if (time_remaining < 0.0f) time_remaining = 0.0f;
 
@@ -929,7 +889,7 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
         int tenths = (int)((time_remaining - seconds) * 10);
 
         rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_WARNING}); //
-        rdpq_text_printf(NULL, FONT_ICON, center_x - 20, 15, "%d.%d", seconds, tenths);
+        rdpq_text_printf(NULL, FONT_ICON, center_x - 20, center_y, "%d.%d", seconds, tenths);
     }
 
     if (game.render_debug) {
@@ -981,6 +941,9 @@ int main(void) {
     entities[ENTITY_TILE] = create_entity("rom:/tile2.t3dm", (T3DVec3){{0, 1000, 0}},
                                            1.0f, COLOR_TILE, DRAW_SHADED, 10.0f);
     entities[ENTITY_LOADER] = create_entity("rom:/loader.t3dm", (T3DVec3){{0, 1, 0}},
+                                           1.0f,  RGBA32(255, 237, 41, 175), DRAW_SHADED, 50.0f);
+
+    entities[ENTITY_LOADER_VERT] = create_entity("rom:/loader_vert.t3dm", (T3DVec3){{0, 1, 0}},
                                            1.0f,  RGBA32(255, 237, 41, 175), DRAW_SHADED, 50.0f);
 
     entities[ENTITY_DEFLECT_RING] = create_entity("rom:/sphere.t3dm", (T3DVec3){{0, 1000, 0}},
@@ -1110,9 +1073,13 @@ int main(void) {
                 entities[ENTITY_GRID].rotation.v[0] -= TWO_PI;
             }
 
-             entities[ENTITY_LOADER].rotation.v[1] -= delta_time * 0.3f;
+            entities[ENTITY_LOADER].rotation.v[1] -= delta_time * 0.9f;
             if (entities[ENTITY_LOADER].rotation.v[1] < 0.0f) {
                 entities[ENTITY_LOADER].rotation.v[1] += TWO_PI;
+            }
+            entities[ENTITY_LOADER_VERT].rotation.v[0] += delta_time * 0.9f;
+            if (entities[ENTITY_LOADER_VERT].rotation.v[0] < 0.0f) {
+                entities[ENTITY_LOADER_VERT].rotation.v[0] += TWO_PI;
             }
 
             // Update matrices
@@ -1189,7 +1156,6 @@ int main(void) {
             update_color_flashes(delta_time);
             update_fps_stats(delta_time);
             update_ship_fuel(delta_time, game.ship_acceleration);
-            // update_ship_fuel(delta_time);
             update_difficulty(delta_time);
 
             game.blink_timer++;
