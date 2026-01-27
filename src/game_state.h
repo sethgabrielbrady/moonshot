@@ -37,6 +37,9 @@ typedef struct {
     bool hi_res_mode;
     bool show_fps;
     bool render_background_enabled;
+    bool show_controls;        // Controls menu visible
+    bool show_tutorial;        // Tutorial menu visible
+    bool show_credits;         // Credits menu visible
     int fps_limit;          // 0=30fps, 1=60fps, 2=uncapped
     bool is_pal_system;
 

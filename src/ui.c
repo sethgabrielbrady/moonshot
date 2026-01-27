@@ -29,6 +29,7 @@ void reset_fps_stats(void) {
 void update_fps_stats(float delta_time) {
     // Use delta_time directly - it's the actual time between frames
     float current_fps = (delta_time > 0.0f) ? (1.0f / delta_time) : 0.0f;
+
     // Clamp to reasonable values to avoid spikes
     if (current_fps > 200.0f) current_fps = 200.0f;
     if (current_fps < 1.0f) current_fps = 1.0f;
@@ -74,8 +75,6 @@ void draw_fps_display(float current, float avg, float min, float max, int partic
     y += line_height;
     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, x, y,
                      "Particles: %d", particle_count);
-
-
 }
 
 
@@ -98,18 +97,236 @@ void draw_triangle_indicator(int x, int y) {
 }
 
 void draw_pause_menu(void) {
-
-    if (game.game_over) {
-        // game.game_over = false;
-        game.game_over_pause = true;
-    }
-    int padding_x = display_get_width() * 0.10f;
-    int padding_y = SCREEN_HEIGHT * 0.10f;
-
+    int padding_x = 10;
+    int padding_y = 10;
     int x1 = padding_x;
     int y1 = padding_y;
     int x2 = display_get_width() - padding_x;
     int y2 = SCREEN_HEIGHT - padding_y;
+
+    // Draw tutorial screen if active
+    if (game.show_tutorial) {
+        rdpq_sync_pipe();
+        rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
+
+        // Draw teal box
+        rdpq_set_prim_color(RGBA32(0, 128, 128, 255));
+        rdpq_fill_rectangle(x1, y1, x2, y2);
+
+        // Draw border
+        rdpq_set_prim_color(RGBA32(0, 200, 200, 255));
+        rdpq_fill_rectangle(x1, y1, x2, y1 + 2);
+        rdpq_fill_rectangle(x1, y2 - 2, x2, y2);
+        rdpq_fill_rectangle(x1, y1, x1 + 2, y2);
+        rdpq_fill_rectangle(x2 - 2, y1, x2, y2);
+
+        rdpq_sync_pipe();
+
+        // Title
+        rdpq_text_printf(&(rdpq_textparms_t){
+            .align = ALIGN_CENTER,
+            .width = display_get_width(),
+        }, FONT_CUSTOM, 0, y1 + 15, "How To Play");
+
+        int tut_x = x1 + 15;
+        int tut_y = y1 + 40;
+        int line_height = 15;
+
+        // Tutorial text
+        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y, "Protect your station from asteroids!");
+        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 2, "Mine resources to repair the station.");
+        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 3, "Fly into crystals to collect them.");
+        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 4, "Return to station to deposit.");
+        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 6, "Your drone can help mine and heal you.");
+        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 7, "Press A near asteroids to deflect!");
+        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 9, "Don't let your station health reach 0!");
+
+        // Back hint
+        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, y2 - 20, "B: Back");
+        return;
+    }
+
+    // Draw credits screen if active
+    if (game.show_credits) {
+        rdpq_sync_pipe();
+        rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
+
+        // Draw teal box
+        rdpq_set_prim_color(RGBA32(0, 128, 128, 255));
+        rdpq_fill_rectangle(x1, y1, x2, y2);
+
+        // Draw border
+        rdpq_set_prim_color(RGBA32(0, 200, 200, 255));
+        rdpq_fill_rectangle(x1, y1, x2, y1 + 2);
+        rdpq_fill_rectangle(x1, y2 - 2, x2, y2);
+        rdpq_fill_rectangle(x1, y1, x1 + 2, y2);
+        rdpq_fill_rectangle(x2 - 2, y1, x2, y2);
+
+        rdpq_sync_pipe();
+
+        // Title
+        rdpq_text_printf(&(rdpq_textparms_t){
+            .align = ALIGN_CENTER,
+            .width = display_get_width(),
+        }, FONT_CUSTOM, 0, y1 + 15, "Credits");
+
+        int cred_x = x1 + 15;
+        int cred_y = y1 + 60;
+        int line_height = 18;
+
+        // Credits text
+        rdpq_text_printf(NULL, FONT_CUSTOM, cred_x, cred_y, "All models, images, and programming");
+        rdpq_text_printf(NULL, FONT_CUSTOM, cred_x, cred_y + line_height, "by Brainpann");
+        rdpq_text_printf(NULL, FONT_CUSTOM, cred_x, cred_y + line_height * 3, "Music by DavidKBD");
+        rdpq_text_printf(NULL, FONT_CUSTOM, cred_x, cred_y + line_height * 4, "Visit www.itch.io for more info");
+
+        // Back hint
+        rdpq_text_printf(NULL, FONT_CUSTOM, cred_x, y2 - 20, "B: Back");
+        return;
+    }
+
+    // Draw controls screen if active
+    if (game.show_controls) {
+        rdpq_sync_pipe();
+        rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
+
+        // Draw teal box
+        rdpq_set_prim_color(RGBA32(0, 128, 128, 255));
+        rdpq_fill_rectangle(x1, y1, x2, y2);
+
+        // Draw border
+        rdpq_set_prim_color(RGBA32(0, 200, 200, 255));
+        rdpq_fill_rectangle(x1, y1, x2, y1 + 2);
+        rdpq_fill_rectangle(x1, y2 - 2, x2, y2);
+        rdpq_fill_rectangle(x1, y1, x1 + 2, y2);
+        rdpq_fill_rectangle(x2 - 2, y1, x2, y2);
+
+        rdpq_sync_pipe();
+
+        // Title
+        rdpq_text_printf(&(rdpq_textparms_t){
+            .align = ALIGN_CENTER,
+            .width = display_get_width(),
+        }, FONT_CUSTOM, 0, y1 + 15, "Controls");
+
+        int ctrl_x = x1 + 15;
+        int ctrl_y = y1 + 40;
+        int line_height = 16;
+
+        // Control mappings
+        rdpq_text_printf(NULL, FONT_CUSTOM, ctrl_x, ctrl_y, "Stick: Move Ship");
+        rdpq_text_printf(NULL, FONT_CUSTOM, ctrl_x, ctrl_y + line_height, "A: Deflect");
+        rdpq_text_printf(NULL, FONT_CUSTOM, ctrl_x, ctrl_y + line_height * 2, "R/Z: Rotate Camera");
+        rdpq_text_printf(NULL, FONT_CUSTOM, ctrl_x, ctrl_y + line_height * 3, "C-Up: Drone Heal");
+        rdpq_text_printf(NULL, FONT_CUSTOM, ctrl_x, ctrl_y + line_height * 4, "C-Left: Drone Mine");
+        rdpq_text_printf(NULL, FONT_CUSTOM, ctrl_x, ctrl_y + line_height * 5, "C-Down: Drone Return");
+        rdpq_text_printf(NULL, FONT_CUSTOM, ctrl_x, ctrl_y + line_height * 6, "Start: Pause");
+
+        // Back hint
+        rdpq_text_printf(NULL, FONT_CUSTOM, ctrl_x, y2 - 20, "B: Back");
+        return;
+    }
+
+    // Draw death menu (lost a life but still have lives left)
+    if (game.game_over_pause && game.player_lives > 0) {
+        rdpq_sync_pipe();
+        rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
+
+        // Draw teal box
+        rdpq_set_prim_color(RGBA32(0, 128, 128, 255));
+        rdpq_fill_rectangle(x1, y1, x2, y2);
+
+        // Draw border
+        rdpq_set_prim_color(RGBA32(0, 200, 200, 255));
+        rdpq_fill_rectangle(x1, y1, x2, y1 + 2);
+        rdpq_fill_rectangle(x1, y2 - 2, x2, y2);
+        rdpq_fill_rectangle(x1, y1, x1 + 2, y2);
+        rdpq_fill_rectangle(x2 - 2, y1, x2, y2);
+
+        rdpq_sync_pipe();
+
+        int text_x = x1 + 15;
+        int text_y = y1 + 30;
+        int line_height = 16;
+
+        // Death message
+        rdpq_text_printf(NULL, FONT_CUSTOM, text_x, text_y, "Oh no buddy. You ok?");
+        rdpq_text_printf(NULL, FONT_CUSTOM, text_x, text_y + line_height * 2, "You weren't out there very long.");
+        rdpq_text_printf(NULL, FONT_CUSTOM, text_x, text_y + line_height * 3, "Thats ok - get out there and");
+        rdpq_text_printf(NULL, FONT_CUSTOM, text_x, text_y + line_height * 4, "try again!");
+
+        // Lives remaining
+        rdpq_text_printf(NULL, FONT_CUSTOM, text_x, text_y + line_height * 6, "Lives remaining: %d", game.player_lives);
+
+        // Menu options
+        int menu_y = y2 - 60;
+        int option_height = 18;
+
+        // Draw highlight box
+        rdpq_set_prim_color(RGBA32(0, 180, 180, 255));
+        rdpq_fill_rectangle(text_x - 5, menu_y + (game.menu_selection * option_height) - 10,
+                            x2 - 15, menu_y + (game.menu_selection * option_height) + 5);
+
+        // Draw triangle indicator
+        draw_triangle_indicator(text_x - 20, menu_y + (game.menu_selection * option_height) - 12);
+        rdpq_sync_pipe();
+
+        rdpq_text_printf(NULL, FONT_CUSTOM, text_x, menu_y, "Continue");
+        rdpq_text_printf(NULL, FONT_CUSTOM, text_x, menu_y + option_height, "Quit");
+
+        return;
+    }
+
+    // Draw game over menu (no lives left)
+    if (game.game_over_pause && game.player_lives <= 0) {
+        rdpq_sync_pipe();
+        rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
+
+        // Draw teal box
+        rdpq_set_prim_color(RGBA32(0, 128, 128, 255));
+        rdpq_fill_rectangle(x1, y1, x2, y2);
+
+        // Draw border
+        rdpq_set_prim_color(RGBA32(0, 200, 200, 255));
+        rdpq_fill_rectangle(x1, y1, x2, y1 + 2);
+        rdpq_fill_rectangle(x1, y2 - 2, x2, y2);
+        rdpq_fill_rectangle(x1, y1, x1 + 2, y2);
+        rdpq_fill_rectangle(x2 - 2, y1, x2, y2);
+
+        rdpq_sync_pipe();
+
+        int text_x = x1 + 15;
+        int text_y = y1 + 30;
+        int line_height = 16;
+
+        // Game over message
+        rdpq_text_printf(NULL, FONT_CUSTOM, text_x, text_y, "Well, you certainly tried.");
+        rdpq_text_printf(NULL, FONT_CUSTOM, text_x, text_y + line_height * 2, "Maybe you need to take a break");
+        rdpq_text_printf(NULL, FONT_CUSTOM, text_x, text_y + line_height * 3, "rather than beating up my");
+        rdpq_text_printf(NULL, FONT_CUSTOM, text_x, text_y + line_height * 4, "mining ship.");
+
+        // Menu options
+        int menu_y = y2 - 60;
+        int option_height = 18;
+
+        // Draw highlight box
+        rdpq_set_prim_color(RGBA32(0, 180, 180, 255));
+        rdpq_fill_rectangle(text_x - 5, menu_y + (game.menu_selection * option_height) - 10,
+                            x2 - 15, menu_y + (game.menu_selection * option_height) + 5);
+
+        // Draw triangle indicator
+        draw_triangle_indicator(text_x - 20, menu_y + (game.menu_selection * option_height) - 12);
+        rdpq_sync_pipe();
+
+        rdpq_text_printf(NULL, FONT_CUSTOM, text_x, menu_y, "Restart");
+        rdpq_text_printf(NULL, FONT_CUSTOM, text_x, menu_y + option_height, "Quit");
+
+        return;
+    }
+
+    if (game.game_over) {
+        game.game_over_pause = true;
+    }
 
     rdpq_sync_pipe();
     rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
@@ -125,14 +342,17 @@ void draw_pause_menu(void) {
     rdpq_fill_rectangle(x1, y1, x1 + 2, y2);
     rdpq_fill_rectangle(x2 - 2, y1, x2, y2);
 
-    int menu_x = x1 + 15;
+    int menu_x = x1 + 30;
     int menu_y = y1 + 40;
     int line_height = 18;
 
     // Draw highlight box behind selected option
     rdpq_set_prim_color(RGBA32(0, 180, 180, 255));
-    rdpq_fill_rectangle(menu_x - 5, menu_y + (game.menu_selection * line_height) - 10,
+    rdpq_fill_rectangle(menu_x - 20, menu_y + (game.menu_selection * line_height) - 10,
                         x2 - 15, menu_y + (game.menu_selection * line_height) + 5);
+
+    // Draw triangle indicator
+    draw_triangle_indicator(menu_x - 18, menu_y + (game.menu_selection * line_height) - 12);
 
     rdpq_sync_pipe();
 
@@ -158,10 +378,7 @@ void draw_pause_menu(void) {
     }
     rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y, "%s", first_option);
 
-    // rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height,
-    //                  "Camera: %s", game.fps_mode ? "FPS" : "ISO");
-
-    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height ,
+    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height,
                      "Resolution: %s", game.hi_res_mode ? "Hi-Res" : "Lo-Res");
 
     const char *bgm_text;
@@ -186,7 +403,11 @@ void draw_pause_menu(void) {
     rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 3,
                      "FPS Limit: %s", fps_text);
     rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 4,
-                     "Background: %s", game.render_background_enabled ? "ON" : "OFF");
+                     "Controls");
+    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 5,
+                     "Tutorial");
+    rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 6,
+                     "Credits");
 
     // Controls hint
     rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, y2 - 20,

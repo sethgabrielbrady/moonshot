@@ -21,6 +21,9 @@ GameStateData game = {
     .hi_res_mode = false,
     .show_fps = false,
     .render_background_enabled = true,
+    .show_controls = false,
+    .show_tutorial = false,
+    .show_credits = false,
     .fps_limit = 0,
     .is_pal_system = false,
 

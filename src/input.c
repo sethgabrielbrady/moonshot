@@ -63,6 +63,70 @@ void update_input(void) {
 
 void process_menu_input(void) {
 
+    // Handle controls screen - B button backs out
+    if (game.show_controls) {
+        if (input.pressed.b) {
+            game.show_controls = false;
+        }
+        return;  // Don't process other menu input while in controls
+    }
+
+    // Handle tutorial screen - B button backs out
+    if (game.show_tutorial) {
+        if (input.pressed.b) {
+            game.show_tutorial = false;
+        }
+        return;  // Don't process other menu input while in tutorial
+    }
+
+    // Handle credits screen - B button backs out
+    if (game.show_credits) {
+        if (input.pressed.b) {
+            game.show_credits = false;
+        }
+        return;  // Don't process other menu input while in credits
+    }
+
+    // Handle death/game over menu (special 2-option menu)
+    if (game.game_over_pause) {
+        if (menu_input_delay > 0) menu_input_delay--;
+
+        // Navigate up/down (only 2 options: 0 and 1)
+        if (menu_input_delay == 0 &&
+            (input.pressed.d_up || input.pressed.c_up || input.stick_y > 50)) {
+            game.menu_selection--;
+            if (game.menu_selection < 0) game.menu_selection = 1;
+            menu_input_delay = 10;
+        }
+        if (menu_input_delay == 0 &&
+            (input.pressed.d_down || input.pressed.c_down || input.stick_y < -50)) {
+            game.menu_selection++;
+            if (game.menu_selection > 1) game.menu_selection = 0;
+            menu_input_delay = 10;
+        }
+
+        // Select with A
+        if (input.pressed.a) {
+            if (game.menu_selection == 0) {
+                // Continue or Restart
+                game.state = STATE_PLAYING;
+                game.game_over = false;
+                game.game_over_pause = false;
+                game.reset = true;
+                set_bgm_volume(0.5f);
+            } else {
+                // Quit to title
+                game.state = STATE_TITLE;
+                game.game_over = false;
+                game.game_over_pause = false;
+                game.player_lives = 3;
+                game.reset = true;
+            }
+            game.menu_selection = 0;
+        }
+        return;
+    }
+
     // Decrease delay timer
     if (menu_input_delay > 0) menu_input_delay--;
 
@@ -145,8 +209,16 @@ void process_menu_input(void) {
                 }
                 break;
 
-            case MENU_OPTION_BG:
-                game.render_background_enabled = !game.render_background_enabled;
+            case MENU_OPTION_CONTROLS:
+                game.show_controls = true;
+                break;
+
+            case MENU_OPTION_TUTORIAL:
+                game.show_tutorial = true;
+                break;
+
+            case MENU_OPTION_CREDITS:
+                game.show_credits = true;
                 break;
         }
     }
