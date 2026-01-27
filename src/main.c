@@ -1000,6 +1000,26 @@ int main(void) {
 
         joypad_poll();
         update_input();
+
+        // Handle title screen
+        if (game.state == STATE_TITLE) {
+            if (input.pressed.start) {
+                game.state = STATE_COUNTDOWN;
+                game.countdown_timer = 4.0f;
+            }
+
+            // Render title screen
+            rdpq_attach(display_get(), NULL);
+            rdpq_clear(RGBA32(0, 0, 0, 255));
+
+            rdpq_text_printf(NULL, FONT_CUSTOM, SCREEN_WIDTH / 2 - 45, 30, "ASTERISK");
+            rdpq_text_printf(NULL, FONT_CUSTOM, SCREEN_WIDTH / 2 - 45, SCREEN_HEIGHT / 2, "Press Start");
+
+            rdpq_detach_show();
+            last_time = current_time;
+            continue;
+        }
+
         process_system_input(&viewport);
 
         // Handle countdown state

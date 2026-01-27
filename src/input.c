@@ -157,19 +157,20 @@ void process_menu_input(void) {
 // =============================================================================
 
 void process_system_input(T3DViewport *viewport) {
-    // Toggle pause with START (but not during countdown)
+    // Toggle pause with START (only during PLAYING or PAUSED)
     if (input.pressed.start) {
         if (game.state == STATE_PLAYING) {
             game.state = STATE_PAUSED;
             game.menu_selection = 0;
             menu_input_delay = 0;
             set_bgm_volume(0.25f);
+            return;
         } else if (game.state == STATE_PAUSED) {
             game.state = STATE_PLAYING;
             set_bgm_volume(0.5f);
+            return;
         }
-        // Don't allow pause during STATE_COUNTDOWN
-        return;
+        // Don't do anything for other states (TITLE, COUNTDOWN, etc.)
     }
 
     // Handle paused state

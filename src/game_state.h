@@ -10,6 +10,7 @@
 // =============================================================================
 
 typedef enum {
+    STATE_TITLE,
     STATE_COUNTDOWN,
     STATE_PLAYING,
     STATE_PAUSED,

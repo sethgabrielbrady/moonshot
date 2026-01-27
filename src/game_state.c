@@ -8,7 +8,7 @@
 
 GameStateData game = {
     // Core game state
-    .state = STATE_COUNTDOWN,
+    .state = STATE_TITLE,
     .game_over = false,
     .game_over_pause = false,
 
@@ -130,7 +130,7 @@ sprite_t *health_icon = NULL;
 // =============================================================================
 
 void init_game_state(void) {
-    game.state = STATE_COUNTDOWN;
+    game.state = STATE_TITLE;
     game.countdown_timer = 4.0f;
     game.game_over = false;
     game.game_over_pause = false;
