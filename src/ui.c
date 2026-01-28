@@ -182,6 +182,8 @@ void draw_pause_menu(void) {
         rdpq_text_printf(NULL, FONT_CUSTOM, cred_x, cred_y + line_height, "by Brainpann");
         rdpq_text_printf(NULL, FONT_CUSTOM, cred_x, cred_y + line_height * 3, "Music by DavidKBD");
         rdpq_text_printf(NULL, FONT_CUSTOM, cred_x, cred_y + line_height * 4, "Visit www.itch.io for more info");
+        rdpq_text_printf(NULL, FONT_CUSTOM, cred_x, cred_y + line_height * 5, "Fonts from FontStruct (fontstruct.com)");
+
 
         // Back hint
         rdpq_text_printf(NULL, FONT_CUSTOM, cred_x, y2 - 20, "B: Back");

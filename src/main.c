@@ -473,12 +473,12 @@ static void draw_cursor_fuel_bar() {
     }
 
     if (fill_width < bar_width) {
-        rdpq_set_prim_color(RGBA32(110, 0, 110, 115));
+        rdpq_set_prim_color(RGBA32(40, 0, 40, 255));
         rdpq_fill_rectangle(x + fill_width, y, x + bar_width, y + bar_height);
     }
 }
 
-static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset, const char *label, int cursor, bool station_entity) {
+static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset, int cursor) {
     if (entity->value < 0) entity->value = 0;
 
     int x = 6;
@@ -506,31 +506,16 @@ static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset
     }
 
     rdpq_sync_pipe();
+    rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
 
+    if (fill_width > 0) {
+        rdpq_set_prim_color(bar_color);
+        rdpq_fill_rectangle(x, y, x + fill_width, y + bar_height);
+    }
 
-    if (station_entity) {
-        rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
-        rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-                 x, y, ">");
-        rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-                 x + 5, y, "%d", game.accumulated_credits);
-        rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(255, 255, 255, 255)});
-    } else {
-        rdpq_sync_pipe();
-        rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
-
-        if (fill_width > 0) {
-            rdpq_set_prim_color(bar_color);
-            rdpq_fill_rectangle(x, y, x + fill_width, y + bar_height);
-        }
-
-        if (fill_width < bar_width) {
-            rdpq_set_prim_color(RGBA32(0, 155, 0, 105));
-            rdpq_fill_rectangle(x + fill_width, y, x + bar_width, y + bar_height);
-        }
-
-        rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-                x + bar_width + 5, y + bar_height, "%s", label);
+    if (fill_width < bar_width) {
+        rdpq_set_prim_color(RGBA32(0, 50, 0, 255));
+        rdpq_fill_rectangle(x + fill_width, y, x + bar_width, y + bar_height);
     }
 }
 
@@ -561,9 +546,8 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
             rdpq_set_prim_color(bar_color);
             rdpq_fill_rectangle(x, y, x + fill_width, y + bar_height);
         }
-
         if (fill_width < bar_width) {
-            rdpq_set_prim_color(RGBA32(50, 130, 165, 105));
+            rdpq_set_prim_color(RGBA32(0, 40, 60, 255));
             rdpq_fill_rectangle(x + fill_width, y, x + bar_width, y + bar_height);
         }
     }
@@ -684,28 +668,35 @@ static void draw_game_timer(void) {
     int total_seconds = (int)game.game_time;
     int minutes = total_seconds / 60;
     int seconds = total_seconds % 60;
+    int hundredths = (int)((game.game_time - total_seconds) * 100);
 
     // Position in bottom right corner
     int x = display_get_width() - 38;
     int y = SCREEN_HEIGHT - 10;
 
-    // Draw difficulty multiplier above the timer
-    rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-             x, y - 10, "x%.2f", game.difficulty_multiplier);
+    // // Draw difficulty multiplier above the timer
+    // rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
+    //          x, y - 10, "x%.2f", game.difficulty_multiplier);
 
-    // Draw timer
     rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_RESOURCE});
     rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-             x, y, "%d:%02d", minutes, seconds);
-    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(255, 255, 255, 255)});
+                x - 24, y - 10, "%d", game.accumulated_credits);
 
+    // Draw timer
+    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_FLAME});
+    rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
+             x - 24, y, "%d:%02d.%02d", minutes, seconds, hundredths);
+    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(255, 255, 255, 255)});
 }
 
 
 static void draw_info_bars(void) {
-    draw_entity_health_bar(&entities[ENTITY_STATION], STATION_MAX_HEALTH, 0, "S", 0, true);
+    // Reset render mode to ensure clean state for UI
+    rdpq_set_mode_standard();
+
+    // draw_entity_health_bar(&entities[ENTITY_STATION], STATION_MAX_HEALTH, 0, "S", 0, true);
     draw_cursor_fuel_bar();
-    draw_entity_health_bar(cursor_entity, CURSOR_MAX_HEALTH, 20, "", 1, false);
+    draw_entity_health_bar(cursor_entity, CURSOR_MAX_HEALTH, 20, 1);
     draw_entity_resource_bar(game.cursor_resource_val, CURSOR_RESOURCE_CAPACITY, 25, "Procyon", false);
     draw_entity_resource_bar(game.drone_resource_val, DRONE_MAX_RESOURCES, 225, "PUP", true);
     draw_game_timer();
@@ -878,6 +869,30 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     draw_info_bars();
 
 
+    // Track was_dying state and GO display using integer frame counter
+    static bool was_dying = false;
+    static int go_display_frames = 0;
+
+    // Update GO display frame counter
+    if (go_display_frames > 0) {
+        go_display_frames--;
+        if (go_display_frames == 0) {
+            was_dying = false;
+        }
+    }
+
+    // While death_timer is active, set was_dying = true
+    if (game.death_timer_active) {
+        was_dying = true;
+        go_display_frames = 0;
+    }
+
+    // If was_dying and death_timer no longer active, show GO
+    if (was_dying && !game.death_timer_active && go_display_frames == 0) {
+        go_display_frames = 30;  // About 1 second at 30fps
+        was_dying = false;
+    }
+
     // Draw death timer if active
     if (game.death_timer_active) {
         int center_x = display_get_width() / 2;
@@ -888,8 +903,16 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
         int seconds = (int)time_remaining;
         int tenths = (int)((time_remaining - seconds) * 10);
 
-        rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_WARNING}); //
-        rdpq_text_printf(NULL, FONT_ICON, center_x - 20, center_y, "%d.%d", seconds, tenths);
+        rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_WARNING});
+        rdpq_text_printf(NULL, FONT_ICON, center_x, center_y, "%d.%d", seconds, tenths);
+    }
+
+    // Draw GO if frames remaining (not during death timer)
+    if (go_display_frames > 0 && !game.death_timer_active) {
+        int center_x = display_get_width() / 2;
+        int center_y = SCREEN_HEIGHT / 2;
+        rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
+        rdpq_text_printf(NULL, FONT_ICON, center_x, center_y, "GO");
     }
 
     if (game.render_debug) {

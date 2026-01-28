@@ -115,6 +115,8 @@ typedef struct {
     float death_timer;          // Counts up to 10 seconds
     bool death_timer_active;    // Is timer running
 
+    float go_display_timer;     // Timer for "GO" text after successful heal
+
     int accumulated_credits;    // Credits accumulated during play session
     float ship_fuel;            // Current ship fuel level
     bool ship_acceleration;     // Is ship currently accelerating

@@ -98,6 +98,7 @@ GameStateData game = {
     // Death timer
     .death_timer = 0.0f,
     .death_timer_active = false,
+    .go_display_timer = 0.0f,
     .accumulated_credits = 0,
     .ship_fuel = CURSOR_MAX_FUEL,
     .ship_acceleration = false,

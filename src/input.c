@@ -357,9 +357,29 @@ void update_cursor_movement(float delta_time, Entity *cursor_entity) {
         }
 
     } else {
-        // Isometric mode: rotate cursor to face stick direction
+        // Isometric mode: smoothly rotate cursor to face stick direction
         if (input.stick_magnitude_sq > deadzone_sq && cursor_entity) {
-            cursor_entity->rotation.v[1] = atan2f(-rotated_x, -rotated_z);
+            float target_rotation = atan2f(-rotated_x, -rotated_z);
+            float current_rotation = cursor_entity->rotation.v[1];
+
+            // Calculate angle difference (handle wraparound)
+            float angle_diff = target_rotation - current_rotation;
+
+            // Normalize to -PI to PI range
+            while (angle_diff > T3D_PI) angle_diff -= 2.0f * T3D_PI;
+            while (angle_diff < -T3D_PI) angle_diff += 2.0f * T3D_PI;
+
+            // Rotate quickly toward target (adjust multiplier for speed)
+            float rotation_speed = 20.0f * delta_time;
+            if (fabsf(angle_diff) < rotation_speed) {
+                cursor_entity->rotation.v[1] = target_rotation;
+            } else {
+                cursor_entity->rotation.v[1] += (angle_diff > 0 ? rotation_speed : -rotation_speed);
+            }
+
+            // Keep rotation in valid range
+            while (cursor_entity->rotation.v[1] > T3D_PI) cursor_entity->rotation.v[1] -= 2.0f * T3D_PI;
+            while (cursor_entity->rotation.v[1] < -T3D_PI) cursor_entity->rotation.v[1] += 2.0f * T3D_PI;
 
             cursor_look_direction.v[0] = -rotated_x / input.stick_magnitude;
             cursor_look_direction.v[2] = rotated_z / input.stick_magnitude;
