@@ -524,7 +524,7 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
     int bar_height = 3;
 
     int x = display_get_width() - bar_width - 2;
-    int y = SCREEN_HEIGHT - y_offset;
+    int y = SCREEN_HEIGHT - 40;
 
     if (!show_triangle) {
         y = SCREEN_HEIGHT - 20;
@@ -556,9 +556,9 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
     int icon_y = y - 6;
 
     if (show_triangle) {
-        icon_x = display_get_width() - 30;
-        int action_x = icon_x - 8;
-        int action_y = icon_y + 10;
+        icon_x = 10;
+        int action_x = icon_x + 8;
+        int action_y = icon_y - 10;
 
         rdpq_sync_pipe();
         rdpq_set_mode_standard();
@@ -646,7 +646,6 @@ static void draw_countdown(void) {
     int center_x = display_get_width() / 2;
     int center_y = SCREEN_HEIGHT / 2;
 
-    // Get the current countdown number (3, 2, 1, or "GO!")
     int count = (int)game.countdown_timer + 1;
 
     if (count > 1 && count <= 4) {
@@ -672,18 +671,26 @@ static void draw_game_timer(void) {
 
     // Position in bottom right corner
     int x = display_get_width() - 38;
-    int y = SCREEN_HEIGHT - 10;
+    int y = 20;
 
     // // Draw difficulty multiplier above the timer
     // rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
     //          x, y - 10, "x%.2f", game.difficulty_multiplier);
 
-    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_RESOURCE});
+    // draw 50% opacity background box behind timer
+    // rdpq_sync_pipe();
+    // rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
+    // rdpq_set_prim_color(RGBA32(50, 50, 50, 50));
+    // rdpq_fill_rectangle(x - 30, y - 15, x + 30, y + 10);
+
+
+    // Draw accumulated credits above the timer
+    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
     rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
                 x - 24, y - 10, "%d", game.accumulated_credits);
 
     // Draw timer
-    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_FLAME});
+    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_FUEL_BAR});
     rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
              x - 24, y, "%d:%02d.%02d", minutes, seconds, hundredths);
     rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(255, 255, 255, 255)});
@@ -693,8 +700,6 @@ static void draw_game_timer(void) {
 static void draw_info_bars(void) {
     // Reset render mode to ensure clean state for UI
     rdpq_set_mode_standard();
-
-    // draw_entity_health_bar(&entities[ENTITY_STATION], STATION_MAX_HEALTH, 0, "S", 0, true);
     draw_cursor_fuel_bar();
     draw_entity_health_bar(cursor_entity, CURSOR_MAX_HEALTH, 20, 1);
     draw_entity_resource_bar(game.cursor_resource_val, CURSOR_RESOURCE_CAPACITY, 25, "Procyon", false);
