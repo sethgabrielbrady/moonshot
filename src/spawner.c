@@ -155,7 +155,7 @@ void init_asteroids(Entity *asteroids, int count) {
 
     // Load asteroid model once and share it
     if (shared_asteroid_model == NULL) {
-        shared_asteroid_model = t3d_model_load("rom:/asteroid1.t3dm");
+        shared_asteroid_model = t3d_model_load("rom:/asteroid7.t3dm");
     }
 
     for (int i = 0; i < count; i++) {
@@ -195,7 +195,6 @@ void init_resources(Entity *resources, int count) {
 // =============================================================================
 // Optimized Asteroid System (matrix pool + tight struct)
 // =============================================================================
-
 // Matrix pool - only allocate matrices for visible asteroids
 static T3DMat4FP *asteroid_matrix_pool = NULL;
 static bool matrix_pool_used[ASTEROID_MATRIX_POOL_SIZE];

@@ -162,10 +162,6 @@ void process_menu_input(void) {
                 set_bgm_volume(0.5f);
                 break;
 
-            // case MENU_OPTION_CAMERA:
-            //     game.fps_mode = !game.fps_mode;
-            //     break;
-
             case MENU_OPTION_HIRES:
                 game.hi_res_mode = !game.hi_res_mode;
                 display_close();

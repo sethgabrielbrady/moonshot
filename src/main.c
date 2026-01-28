@@ -668,12 +668,12 @@ static void draw_countdown(void) {
     if (count > 1 && count <= 4) {
         rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_RESOURCE});
         rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_ICON,
-                 center_x - 5, center_y, "%d", count - 1);
+                 center_x, center_y, "%d", count - 1);
     } else if (game.countdown_timer < 2) {
         // Show "GO!" briefly after countdown hits 0
         rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
         rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_ICON,
-                 center_x - 12, center_y, "GO");
+                 center_x, center_y, "GO");
     } else {
          rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(255,255,255, 255)});
     }

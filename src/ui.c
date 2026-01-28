@@ -133,13 +133,16 @@ void draw_pause_menu(void) {
         int line_height = 15;
 
         // Tutorial text
-        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y, "Protect your station from asteroids!");
-        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 2, "Mine resources to repair the station.");
-        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 3, "Fly into crystals to collect them.");
-        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 4, "Return to station to deposit.");
-        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 6, "Your drone can help mine and heal you.");
-        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 7, "Press A near asteroids to deflect!");
-        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 9, "Don't let your station health reach 0!");
+        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y, "Mine as many blue asteroids as you can!");
+        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 2, "Bring resources back to the loading");
+        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 3, "zone and earn big bucks!");
+        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 4, "Keep an eye on your ships fuel level ");
+        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 5, "and try not to get too banged up!");
+        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 6, "Use your Personal Utility Prospector");
+        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 7, "(PUP) drone to mine asteroids and ");
+        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 8, "repair your ship.");
+        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 9, "NEXT ->");
+
 
         // Back hint
         rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, y2 - 20, "B: Back");
