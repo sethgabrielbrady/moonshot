@@ -41,6 +41,6 @@ void process_menu_input(void);
 void process_system_input(T3DViewport *viewport);
 
 // Update cursor movement based on input
-void update_cursor_movement(float delta_time, Entity *cursor_entity);
+void update_cursor_movement(float delta_time, Entity *cursor_entity, Entity *jets_entity);
 
 #endif // INPUT_H

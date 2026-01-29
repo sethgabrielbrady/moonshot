@@ -6,6 +6,7 @@
 #include "audio.h"
 #include "ui.h"
 #include "utils.h"
+#include "types.h"
 #include <math.h>
 
 // =============================================================================
@@ -328,7 +329,7 @@ void process_game_input(float delta_time) {
 // Cursor Movement Update
 // =============================================================================
 
-void update_cursor_movement(float delta_time, Entity *cursor_entity) {
+void update_cursor_movement(float delta_time, Entity *cursor_entity, Entity *jets_entity) {
     float yaw_rad = T3D_DEG_TO_RAD(game.cam_yaw);
     float cos_yaw = cosf(yaw_rad);
     float sin_yaw = sinf(yaw_rad);
@@ -439,6 +440,18 @@ void update_cursor_movement(float delta_time, Entity *cursor_entity) {
     // Update cursor entity position
     if (cursor_entity) {
         cursor_entity->position = game.cursor_position;
+
+    }
+    // Update jets entity position and rotation
+    if (jets_entity) {
+        jets_entity->position = game.cursor_position;
+        jets_entity->rotation.v[1] = cursor_entity->rotation.v[1];
+        // Slightly offset jets on x-axis as velocity increases
+        float speed = sqrtf(speed_sq);
+        jets_entity->position.v[0] += sinf(cursor_entity->rotation.v[1]) * (speed / CURSOR_MAX_SPEED) * 8.0f;
+        jets_entity->position.v[2] -= cosf(cursor_entity->rotation.v[1]) * (speed / CURSOR_MAX_SPEED) * 8.0f;
+
+
     }
 
 }

@@ -36,6 +36,7 @@ static Entity entities[ENTITY_COUNT];
 static Asteroid asteroids[ASTEROID_COUNT];  // Optimized asteroid struct
 static Entity resources[RESOURCE_COUNT];
 static Entity *cursor_entity = NULL;
+static Entity *jets_entity = NULL;
 
 // Visibility arrays for culling
 static bool asteroid_visible[ASTEROID_COUNT];
@@ -685,12 +686,12 @@ static void draw_game_timer(void) {
 
 
     // Draw accumulated credits above the timer
-    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
+    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_RESOURCE});
     rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-                x - 24, y - 10, "%d", game.accumulated_credits);
+                x - 24, y + 10, "%d", game.accumulated_credits);
 
     // Draw timer
-    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_FUEL_BAR});
+    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_FLAME});
     rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
              x - 24, y, "%d:%02d.%02d", minutes, seconds, hundredths);
     rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(255, 255, 255, 255)});
@@ -960,9 +961,12 @@ int main(void) {
                                               1.0f, COLOR_STATION, DRAW_SHADED, 30.0f);
     entities[ENTITY_STATION].value = STATION_MAX_HEALTH;
 
-    entities[ENTITY_CURSOR] = create_entity("rom:/cursor2.t3dm", game.cursor_position,
+    entities[ENTITY_CURSOR] = create_entity("rom:/cursor3.t3dm", game.cursor_position,
                                              0.562605f, COLOR_CURSOR, DRAW_SHADED, 10.0f);
     entities[ENTITY_CURSOR].value = CURSOR_MAX_HEALTH;
+
+    entities[ENTITY_JETS] = create_entity("rom:/jets.t3dm", game.cursor_position,
+                                             0.562605f, COLOR_FUEL_BAR, DRAW_SHADED, 10.0f);
 
     entities[ENTITY_DRONE] = create_entity("rom:/dronenew.t3dm", (T3DVec3){{20.0f, DEFAULT_HEIGHT, 29.0f}},
                                             0.55f, COLOR_DRONE, DRAW_SHADED, 30.0f);
@@ -986,6 +990,7 @@ int main(void) {
     init_resources(resources, RESOURCE_COUNT);
 
     cursor_entity = &entities[ENTITY_CURSOR];
+    jets_entity = &entities[ENTITY_JETS];
 
 
     //maybe items
@@ -1065,7 +1070,7 @@ int main(void) {
         }
 
         if (game.state == STATE_PLAYING && !game.game_over) {
-            update_cursor_movement(delta_time, cursor_entity);
+            update_cursor_movement(delta_time, cursor_entity, jets_entity);
             process_game_input(delta_time);
             update_camera(&viewport, game.cam_yaw, delta_time, game.cursor_position, game.fps_mode, cursor_entity);
             update_screen_shake(delta_time);

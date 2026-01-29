@@ -41,6 +41,7 @@ typedef struct {
 typedef enum {
     ENTITY_STATION,
     ENTITY_CURSOR,
+    ENTITY_JETS,
     ENTITY_DRONE,
     ENTITY_TILE,
     ENTITY_LOADER,

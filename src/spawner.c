@@ -155,7 +155,7 @@ void init_asteroids(Entity *asteroids, int count) {
 
     // Load asteroid model once and share it
     if (shared_asteroid_model == NULL) {
-        shared_asteroid_model = t3d_model_load("rom:/asteroid7.t3dm");
+        shared_asteroid_model = t3d_model_load("rom:/asteroid8.t3dm");
     }
 
     for (int i = 0; i < count; i++) {
@@ -180,7 +180,7 @@ void init_resources(Entity *resources, int count) {
 
     // Use same shared model as asteroids (load if not already loaded)
     if (shared_asteroid_model == NULL) {
-        shared_asteroid_model = t3d_model_load("rom:/asteroid7.t3dm");
+        shared_asteroid_model = t3d_model_load("rom:/asteroid8.t3dm");
     }
 
     for (int i = 0; i < count; i++) {
@@ -202,7 +202,7 @@ static bool matrix_pool_used[ASTEROID_MATRIX_POOL_SIZE];
 void init_asteroid_system(void) {
     // Load shared model
     if (shared_asteroid_model == NULL) {
-        shared_asteroid_model = t3d_model_load("rom:/asteroid7.t3dm");
+        shared_asteroid_model = t3d_model_load("rom:/asteroid8.t3dm");
     }
 
     // Allocate matrix pool (uncached memory for RCP)
