@@ -108,7 +108,9 @@ GameStateData game = {
     .difficulty_multiplier = 1.0f,
 
     // Countdown
-    .countdown_timer = 3.0f
+    .countdown_timer = 3.0f,
+    .hauled_resources = false,
+    .hauled_resources_timer = 0.0f
 };
 
 // =============================================================================

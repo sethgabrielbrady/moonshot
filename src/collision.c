@@ -146,13 +146,16 @@ void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, int cou
 
 
 int stored_cursor_resource_val = 0;
-float value_multiplier = 0.2f;
+float value_multiplier = 0.3f;
 
 void check_cursor_station_collision(Entity *cursor, Entity *station) {
     if (!check_entity_intersection(cursor, station)) return;
 
     // Only process if we have resources to deposit
-    if (game.cursor_resource_val <= 0) return;
+    if (game.cursor_resource_val > 0) {
+        game.hauled_resources = true;
+    }
+
 
     stored_cursor_resource_val = game.cursor_resource_val;
 
@@ -173,7 +176,7 @@ void check_cursor_station_collision(Entity *cursor, Entity *station) {
         if (stored_cursor_resource_val >= 70) {
             game.ship_fuel = CURSOR_MAX_FUEL;
         } else {
-            game.ship_fuel += stored_cursor_resource_val * 0.7f;
+            game.ship_fuel += stored_cursor_resource_val * 0.85f;
         }
         if (game.ship_fuel > CURSOR_MAX_FUEL) {
             game.ship_fuel = CURSOR_MAX_FUEL;

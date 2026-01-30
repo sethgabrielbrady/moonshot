@@ -448,10 +448,16 @@ void update_cursor_movement(float delta_time, Entity *cursor_entity, Entity *jet
         jets_entity->rotation.v[1] = cursor_entity->rotation.v[1];
         // Slightly offset jets on x-axis as velocity increases
         float speed = sqrtf(speed_sq);
-        jets_entity->position.v[0] += sinf(cursor_entity->rotation.v[1]) * (speed / CURSOR_MAX_SPEED) * 8.0f;
-        jets_entity->position.v[2] -= cosf(cursor_entity->rotation.v[1]) * (speed / CURSOR_MAX_SPEED) * 8.0f;
 
-
+        // if stick is being pushed
+        if (input.stick_magnitude_sq > deadzone_sq) {
+            jets_entity->position.v[0] += sinf(cursor_entity->rotation.v[1]) * (speed / CURSOR_MAX_SPEED) * 8.0f;
+            jets_entity->position.v[2] -= cosf(cursor_entity->rotation.v[1]) * (speed / CURSOR_MAX_SPEED) * 8.0f;
+            // increase alpha based on speed
+            jets_entity->color = RGBA32(138, 0, 196, (int)(200.0f * (speed / CURSOR_MAX_SPEED)));
+        } else {
+            jets_entity->color = RGBA32(138, 0, 196, 0);
+        }
     }
 
 }

@@ -83,17 +83,15 @@ void draw_fps_display(float current, float avg, float min, float max, int partic
 // =============================================================================
 
 
+
 void draw_triangle_indicator(int x, int y) {
     rdpq_set_prim_color(RGBA32(255, 165, 0, 255));  // Orange
-
-    // Large triangle pointing right (14 pixels tall)
-    rdpq_fill_rectangle(x, y + 6, x + 2, y + 8);
-    rdpq_fill_rectangle(x + 2, y + 5, x + 4, y + 9);
-    rdpq_fill_rectangle(x + 4, y + 4, x + 6, y + 10);
-    rdpq_fill_rectangle(x + 6, y + 3, x + 8, y + 11);
-    rdpq_fill_rectangle(x + 8, y + 2, x + 10, y + 12);
-    rdpq_fill_rectangle(x + 10, y + 1, x + 12, y + 13);
-    rdpq_fill_rectangle(x + 12, y, x + 14, y + 14);
+    // Triangle pointing right (10 pixels tall)
+    rdpq_fill_rectangle(x, y, x + 2, y + 10);
+    rdpq_fill_rectangle(x + 2, y + 1, x + 4, y + 9);
+    rdpq_fill_rectangle(x + 4, y + 2, x + 6, y + 8);
+    rdpq_fill_rectangle(x + 6, y + 3, x + 8, y + 7);
+    rdpq_fill_rectangle(x + 8, y + 4, x + 10, y + 6);
 }
 
 void draw_pause_menu(void) {
@@ -110,7 +108,7 @@ void draw_pause_menu(void) {
         rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
 
         // Draw teal box
-        rdpq_set_prim_color(RGBA32(0, 128, 128, 255));
+        rdpq_set_prim_color(RGBA32(0, 128, 128, 155));
         rdpq_fill_rectangle(x1, y1, x2, y2);
 
         // Draw border
@@ -155,7 +153,7 @@ void draw_pause_menu(void) {
         rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
 
         // Draw teal box
-        rdpq_set_prim_color(RGBA32(0, 128, 128, 255));
+        rdpq_set_prim_color(RGBA32(0, 128, 128, 155));
         rdpq_fill_rectangle(x1, y1, x2, y2);
 
         // Draw border
@@ -196,7 +194,7 @@ void draw_pause_menu(void) {
         rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
 
         // Draw teal box
-        rdpq_set_prim_color(RGBA32(0, 128, 128, 255));
+        rdpq_set_prim_color(RGBA32(0, 128, 128, 155));
         rdpq_fill_rectangle(x1, y1, x2, y2);
 
         // Draw border
@@ -238,7 +236,7 @@ void draw_pause_menu(void) {
         rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
 
         // Draw teal box
-        rdpq_set_prim_color(RGBA32(0, 128, 128, 255));
+        rdpq_set_prim_color(RGBA32(0, 128, 128, 155));
         rdpq_fill_rectangle(x1, y1, x2, y2);
 
         // Draw border
@@ -255,13 +253,13 @@ void draw_pause_menu(void) {
         int line_height = 16;
 
         // Death message
-        rdpq_text_printf(NULL, FONT_CUSTOM, text_x, text_y, "Oh no buddy. You ok?");
+        rdpq_text_printf(NULL, FONT_CUSTOM, text_x, text_y, "Oh no buddy! You ok?");
         rdpq_text_printf(NULL, FONT_CUSTOM, text_x, text_y + line_height * 2, "You weren't out there very long.");
         rdpq_text_printf(NULL, FONT_CUSTOM, text_x, text_y + line_height * 3, "Thats ok - get out there and");
         rdpq_text_printf(NULL, FONT_CUSTOM, text_x, text_y + line_height * 4, "try again!");
 
         // Lives remaining
-        rdpq_text_printf(NULL, FONT_CUSTOM, text_x, text_y + line_height * 6, "Lives remaining: %d", game.player_lives);
+        rdpq_text_printf(NULL, FONT_CUSTOM, text_x, text_y + line_height * 6, "Lives remaining: %d", game.player_lives - 1);
 
         // Menu options
         int menu_y = y2 - 60;
@@ -273,7 +271,7 @@ void draw_pause_menu(void) {
                             x2 - 15, menu_y + (game.menu_selection * option_height) + 5);
 
         // Draw triangle indicator
-        draw_triangle_indicator(text_x - 20, menu_y + (game.menu_selection * option_height) - 12);
+        draw_triangle_indicator(text_x - 20, menu_y + (game.menu_selection * option_height) - 8);
         rdpq_sync_pipe();
 
         rdpq_text_printf(NULL, FONT_CUSTOM, text_x, menu_y, "Continue");
@@ -288,7 +286,7 @@ void draw_pause_menu(void) {
         rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
 
         // Draw teal box
-        rdpq_set_prim_color(RGBA32(0, 128, 128, 255));
+        rdpq_set_prim_color(RGBA32(0, 128, 128, 155));
         rdpq_fill_rectangle(x1, y1, x2, y2);
 
         // Draw border
@@ -320,7 +318,7 @@ void draw_pause_menu(void) {
                             x2 - 15, menu_y + (game.menu_selection * option_height) + 5);
 
         // Draw triangle indicator
-        draw_triangle_indicator(text_x - 20, menu_y + (game.menu_selection * option_height) - 12);
+        draw_triangle_indicator(text_x - 20, menu_y + (game.menu_selection * option_height) - 8);
         rdpq_sync_pipe();
 
         rdpq_text_printf(NULL, FONT_CUSTOM, text_x, menu_y, "Restart");
@@ -337,7 +335,7 @@ void draw_pause_menu(void) {
     rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
 
     // Draw teal box
-    rdpq_set_prim_color(RGBA32(0, 128, 128, 255));
+    rdpq_set_prim_color(RGBA32(0, 128, 128, 155));
     rdpq_fill_rectangle(x1, y1, x2, y2);
 
     // Draw border
@@ -357,7 +355,7 @@ void draw_pause_menu(void) {
                         x2 - 15, menu_y + (game.menu_selection * line_height) + 5);
 
     // Draw triangle indicator
-    draw_triangle_indicator(menu_x - 18, menu_y + (game.menu_selection * line_height) - 12);
+    draw_triangle_indicator(menu_x - 18, menu_y + (game.menu_selection * line_height) - 8);
 
     rdpq_sync_pipe();
 

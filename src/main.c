@@ -443,9 +443,14 @@ static void render_background(sprite_t *background, float cam_yaw) {
     rdpq_set_mode_copy(false);
     rdpq_sprite_blit(background, -offset_x, 0, NULL);
 
-    if (needs_wrap) {
-        rdpq_sprite_blit(background, BG_WIDTH - offset_x, 0, NULL);
+    if (!cam_yaw) {
+        rdpq_sprite_blit(background, BG_WIDTH, 0, NULL);
+    } else if (needs_wrap) {
+        rdpq_sprite_blit(background, -offset_x + BG_WIDTH, 0, NULL);
     }
+    // if (needs_wrap) {
+    //     rdpq_sprite_blit(background, BG_WIDTH - offset_x, 0, NULL);
+    // }
 }
 
 // =============================================================================
@@ -966,7 +971,7 @@ int main(void) {
     entities[ENTITY_CURSOR].value = CURSOR_MAX_HEALTH;
 
     entities[ENTITY_JETS] = create_entity("rom:/jets.t3dm", game.cursor_position,
-                                             0.562605f, COLOR_FUEL_BAR, DRAW_SHADED, 10.0f);
+                                             0.562605f, RGBA32(138, 0, 196, 0), DRAW_SHADED, 10.0f);
 
     entities[ENTITY_DRONE] = create_entity("rom:/dronenew.t3dm", (T3DVec3){{20.0f, DEFAULT_HEIGHT, 29.0f}},
                                             0.55f, COLOR_DRONE, DRAW_SHADED, 30.0f);
@@ -1043,8 +1048,10 @@ int main(void) {
 
             // Render title screen
             rdpq_attach(display_get(), NULL);
-            rdpq_clear(RGBA32(0, 0, 0, 255));
+            // rdpq_clear(RGBA32(0, 0, 0, 255));
+            //draw background
 
+            render_background(background, false);
             rdpq_text_printf(NULL, FONT_CUSTOM, SCREEN_WIDTH / 2 - 45, 30, "ASTERISK");
             rdpq_text_printf(NULL, FONT_CUSTOM, SCREEN_WIDTH / 2 - 45, SCREEN_HEIGHT / 2, "Press Start");
 
@@ -1126,11 +1133,30 @@ int main(void) {
                 entities[ENTITY_GRID].rotation.v[0] -= TWO_PI;
             }
 
-            entities[ENTITY_LOADER].rotation.v[1] -= delta_time * 0.9f;
+
+
+
+
+
+            float roation_speed = 0.9f;
+            // game.hauled_resources, rotate the loader faster for 2 secons
+            if (game.hauled_resources) {
+                if (game.hauled_resources_timer < 1.0f) {
+                    roation_speed = 0.9f + (2.7f * (game.hauled_resources_timer / 1.0f));
+                } else {
+                    roation_speed = 3.6f;
+                }
+                game.hauled_resources_timer += delta_time;
+                if (game.hauled_resources_timer >= 4.0f) {
+                    game.hauled_resources = false;
+                    game.hauled_resources_timer = 0.0f;
+                }
+            }
+            entities[ENTITY_LOADER].rotation.v[1] -= delta_time * roation_speed;
             if (entities[ENTITY_LOADER].rotation.v[1] < 0.0f) {
                 entities[ENTITY_LOADER].rotation.v[1] += TWO_PI;
             }
-            entities[ENTITY_LOADER_VERT].rotation.v[0] += delta_time * 0.9f;
+            entities[ENTITY_LOADER_VERT].rotation.v[0] += delta_time * roation_speed;
             if (entities[ENTITY_LOADER_VERT].rotation.v[0] < 0.0f) {
                 entities[ENTITY_LOADER_VERT].rotation.v[0] += TWO_PI;
             }

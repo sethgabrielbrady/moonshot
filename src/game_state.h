@@ -127,6 +127,8 @@ typedef struct {
 
     // Countdown
     float countdown_timer;      // Counts down from 3.0 to 0
+    bool hauled_resources;
+    float hauled_resources_timer;
 
 } GameStateData;
 

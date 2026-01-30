@@ -185,7 +185,7 @@ void init_resources(Entity *resources, int count) {
 
     for (int i = 0; i < count; i++) {
         resources[i] = create_entity_shared(shared_asteroid_model, (T3DVec3){{0, 10, 0}},
-                                      1.0f, COLOR_RESOURCE, DRAW_SHADED, 10.0f);
+                                      1.0f, COLOR_RESOURCE, DRAW_SHADED, 20.0f);
         reset_entity(&resources[i], RESOURCE);
         resources[i].position.v[0] = randomize_float(-RESOURCE_BOUND_X, RESOURCE_BOUND_X);
         resources[i].position.v[2] = randomize_float(-RESOURCE_BOUND_Z, RESOURCE_BOUND_Z);
@@ -373,7 +373,7 @@ void draw_asteroids_optimized(Asteroid *asteroids, bool *visibility, float *dist
 
         t3d_mat4fp_from_srt_euler(matrix,
             (float[3]){a->scale, a->scale, a->scale},
-            (float[3]){0.0f, a->rotation_y, 0.0f},
+            (float[3]){a->rotation_y, 0.0f, 0.0f},
             a->position.v);
 
         // Draw
