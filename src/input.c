@@ -269,6 +269,7 @@ void process_system_input(T3DViewport *viewport) {
             game.menu_selection = 0;
             menu_input_delay = 0;
             set_bgm_volume(0.25f);
+            stop_rumble();
             return;
         } else if (game.state == STATE_PAUSED) {
             game.state = STATE_PLAYING;

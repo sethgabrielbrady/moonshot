@@ -7,6 +7,47 @@
 #include "camera.h"
 #include "spawner.h"
 #include <math.h>
+#include <joypad.h>
+
+// =============================================================================
+// Rumble Pak Support
+// =============================================================================
+
+static float rumble_timer = 0.0f;
+static bool rumble_available = false;
+static bool rumble_checked = false;
+
+void init_rumble(void) {
+    rumble_checked = true;
+    rumble_available = (joypad_get_accessory_type(JOYPAD_PORT_1) == JOYPAD_ACCESSORY_TYPE_RUMBLE_PAK);
+}
+
+void trigger_rumble(float duration) {
+    if (!rumble_checked) init_rumble();
+    if (!rumble_available) return;
+
+    // Only extend rumble if new duration is longer
+    if (duration > rumble_timer) {
+        rumble_timer = duration;
+        joypad_set_rumble_active(JOYPAD_PORT_1, true);
+    }
+}
+
+void update_rumble(float delta_time) {
+    if (!rumble_available || rumble_timer <= 0.0f) return;
+
+    rumble_timer -= delta_time;
+    if (rumble_timer <= 0.0f) {
+        rumble_timer = 0.0f;
+        joypad_set_rumble_active(JOYPAD_PORT_1, false);
+    }
+}
+
+void stop_rumble(void) {
+    if (!rumble_available) return;
+    rumble_timer = 0.0f;
+    joypad_set_rumble_active(JOYPAD_PORT_1, false);
+}
 
 // =============================================================================
 // External References (from main.c - will be moved to game_state later)
@@ -288,6 +329,7 @@ void check_cursor_resource_collisions(Entity *cursor, Entity *resources, int cou
         if (check_entity_intersection(cursor, &resources[i]) &&
             (game.cursor_resource_val < CURSOR_RESOURCE_CAPACITY)) {
             game.cursor_is_mining = true;
+            // trigger_rumble(0.01f);
 
             // Flicker both resource and cursor color - welder effect
             int flicker = rand() % 100;
@@ -372,6 +414,8 @@ void check_drone_resource_collisions(Entity *entity, Entity *resources, int coun
         if (check_entity_intersection(entity, &resources[i]) &&
             game.drone_resource_val < DRONE_MAX_RESOURCES) {
             game.drone_collecting_resource = true;
+            trigger_rumble(0.01f);
+
             game.drone_is_mining = true;
             entity->position.v[1] = resources[i].position.v[1] + 5.0f;
             entity->position.v[0] = resources[i].position.v[0];
@@ -548,6 +592,12 @@ void check_cursor_asteroid_collisions_opt(Entity *cursor, Asteroid *asteroids, i
                 if (other_shake_enabled) {
                     trigger_screen_shake(3.0f, 0.25f);
                 }
+
+                // Rumble based on damage (0.1s to 0.4s based on hit strength)
+                float rumble_duration = 0.1f + (damage / (MAX_DAMAGE * ship_damage_multiplier * 2.0f)) * 0.3f;
+                if (rumble_duration > 0.4f) rumble_duration = 0.4f;
+                trigger_rumble(rumble_duration);
+
                 game.cursor_iframe_timer = CURSOR_IFRAME_DURATION;
             }
             reset_asteroid(&asteroids[i]);

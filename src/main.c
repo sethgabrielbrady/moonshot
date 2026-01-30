@@ -680,21 +680,18 @@ static void draw_game_timer(void) {
     int x = display_get_width() - 38;
     int y = 20;
 
-    // // Draw difficulty multiplier above the timer
-    // rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-    //          x, y - 10, "x%.2f", game.difficulty_multiplier);
-
-    // draw 50% opacity background box behind timer
-    // rdpq_sync_pipe();
-    // rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
-    // rdpq_set_prim_color(RGBA32(50, 50, 50, 50));
-    // rdpq_fill_rectangle(x - 30, y - 15, x + 30, y + 10);
-
-
     // Draw accumulated credits above the timer
+    int credits_x = 18;
+    // decrease credits_x by 4 for each digit added to credits
+    int credits = game.accumulated_credits;
+    if (credits >= 10 && credits < 100) credits_x = 10;
+    if (credits >= 100 && credits < 1000) credits_x = 4;
+    // if (credits >= 1000) credits_x = 14;
+
+    // update
     rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_RESOURCE});
     rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-                x - 24, y + 10, "%d", game.accumulated_credits);
+                x + credits_x, y + 10, "%d", game.accumulated_credits);
 
     // Draw timer
     rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_FLAME});
@@ -1211,6 +1208,9 @@ int main(void) {
             // Update deflection timer
             update_deflect_timer(delta_time);
 
+            // Update rumble timer
+            update_rumble(delta_time);
+
             // Update death timer (when cursor health = 0)
             if (entities[ENTITY_CURSOR].value <= 0 || game.ship_fuel <= 0) {
                 if (!game.death_timer_active) {
@@ -1224,6 +1224,7 @@ int main(void) {
                     game.game_over = true;
                     game.game_over_pause = true;
                     game.death_timer = 10.0f;
+                    stop_rumble();
                     // Don't set reset here - let the menu handle it
                 }
             } else {
