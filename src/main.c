@@ -563,8 +563,8 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
 
     if (show_triangle) {
         icon_x = 10;
-        int action_x = icon_x + 8;
-        int action_y = icon_y - 10;
+        int action_x = icon_x;
+        int action_y = icon_y + 6;
 
         rdpq_sync_pipe();
         rdpq_set_mode_standard();
@@ -577,18 +577,19 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
             rdpq_set_prim_color(RGBA32(0, 255, 191, 255));
         }
 
-        rdpq_mode_alphacompare(1);
-        rdpq_sprite_blit(drone_icon, icon_x, icon_y, &(rdpq_blitparms_t){
-            .scale_x = 1.0f,
-            .scale_y = 1.0f
-        });
+        // rdpq_mode_alphacompare(1);
+        // rdpq_sprite_blit(drone_icon, icon_x, icon_y, &(rdpq_blitparms_t){
+        //     .scale_x = 1.0f,
+        //     .scale_y = 1.0f
+        // });
 
         if (game.blink_timer < 10) {
+            rdpq_set_prim_color(COLOR_FLAME);
+
             if (game.drone_collecting_resource) {
                 rdpq_sync_pipe();
                 rdpq_set_mode_standard();
                 rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
-                rdpq_set_prim_color(COLOR_RESOURCE);
                 rdpq_mode_alphacompare(1);
                 rdpq_sprite_blit(drill_icon, action_x, action_y, &(rdpq_blitparms_t){
                     .scale_x = 1.0f, .scale_y = 1.0f
@@ -599,7 +600,7 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
                 rdpq_sync_pipe();
                 rdpq_set_mode_standard();
                 rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
-                rdpq_set_prim_color(COLOR_RESOURCE);
+                // rdpq_set_prim_color(COLOR_RESOURCE);
                 rdpq_mode_alphacompare(1);
                 rdpq_sprite_blit(tile_icon, action_x, action_y, &(rdpq_blitparms_t){
                     .scale_x = 1.0f, .scale_y = 1.0f
@@ -610,7 +611,7 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
                 rdpq_sync_pipe();
                 rdpq_set_mode_standard();
                 rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
-                rdpq_set_prim_color(COLOR_FUEL_BAR);
+                // rdpq_set_prim_color(COLOR_FUEL_BAR);
                 rdpq_mode_alphacompare(1);
                 rdpq_sprite_blit(station_icon, action_x, action_y, &(rdpq_blitparms_t){
                     .scale_x = 1.0f, .scale_y = 1.0f
@@ -957,7 +958,7 @@ int main(void) {
     station_icon = sprite_load("rom:/station2.sprite");
     drill_icon = sprite_load("rom:/drill2.sprite");
     tile_icon = sprite_load("rom:/tile3.sprite");
-    drone_icon = sprite_load("rom:/drone.sprite");
+    // drone_icon = sprite_load("rom:/drone.sprite");
     drone_full_icon = sprite_load("rom:/drone_full.sprite");
     health_icon = sprite_load("rom:/health.sprite");
 
@@ -1300,7 +1301,7 @@ int main(void) {
     sprite_free(station_icon);
     sprite_free(drill_icon);
     sprite_free(tile_icon);
-    sprite_free(drone_icon);
+    // sprite_free(drone_icon);
     sprite_free(drone_full_icon);
 
     wav64_close(&sfx_mining);

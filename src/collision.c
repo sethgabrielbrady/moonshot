@@ -77,7 +77,7 @@ void check_loader_asteroid_collisions_opt(Entity *loader, Asteroid *asteroids, i
         float combined_radius = loader->collision_radius + asteroid_collision_radius;
         if (dist_sq < combined_radius * combined_radius) {
             spawn_explosion(asteroids[i].position, COLOR_SPARKS);
-            play_sfx(4);
+            // play_sfx(4);
             reset_asteroid(&asteroids[i]);
         }
     }
