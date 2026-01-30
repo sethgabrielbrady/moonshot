@@ -72,12 +72,48 @@ void process_menu_input(void) {
         return;  // Don't process other menu input while in controls
     }
 
-    // Handle tutorial screen - B button backs out
+    // Handle tutorial screen with submenu
     if (game.show_tutorial) {
-        if (input.pressed.b) {
-            game.show_tutorial = false;
+        if (menu_input_delay > 0) menu_input_delay--;
+
+        int tut_page = get_tutorial_page();
+        int tut_sel = get_tutorial_selection();
+
+        if (tut_page == 0) {
+            // Main tutorial menu - navigate up/down (5 options: 0-4)
+            if (menu_input_delay == 0 &&
+                (input.pressed.d_up || input.pressed.c_up || input.stick_y > 50)) {
+                tut_sel--;
+                if (tut_sel < 0) tut_sel = 4;
+                set_tutorial_selection(tut_sel);
+                menu_input_delay = 10;
+            }
+            if (menu_input_delay == 0 &&
+                (input.pressed.d_down || input.pressed.c_down || input.stick_y < -50)) {
+                tut_sel++;
+                if (tut_sel > 4) tut_sel = 0;
+                set_tutorial_selection(tut_sel);
+                menu_input_delay = 10;
+            }
+
+            // A button selects the topic
+            if (input.pressed.a) {
+                set_tutorial_page(tut_sel + 1);  // 1=Basics, 2=Ship, 3=Drone, 4=Resources, 5=Tips
+            }
+
+            // B button backs out to pause menu
+            if (input.pressed.b) {
+                game.show_tutorial = false;
+                set_tutorial_selection(0);
+                set_tutorial_page(0);
+            }
+        } else {
+            // Detail page - B backs out to tutorial menu
+            if (input.pressed.b) {
+                set_tutorial_page(0);
+            }
         }
-        return;  // Don't process other menu input while in tutorial
+        return;
     }
 
     // Handle credits screen - B button backs out

@@ -4,6 +4,18 @@
 #include <rdpq.h>
 
 // =============================================================================
+// Tutorial Submenu State (static to avoid game_state changes)
+// =============================================================================
+
+static int tutorial_selection = 0;  // 0=Ship, 1=Drone, 2=Resources
+static int tutorial_page = 0;       // 0=menu, 1=Ship, 2=Drone, 3=Resources
+
+int get_tutorial_selection(void) { return tutorial_selection; }
+int get_tutorial_page(void) { return tutorial_page; }
+void set_tutorial_selection(int val) { tutorial_selection = val; }
+void set_tutorial_page(int val) { tutorial_page = val; }
+
+// =============================================================================
 // FPS Stats
 // =============================================================================
 
@@ -118,32 +130,103 @@ void draw_pause_menu(void) {
         rdpq_fill_rectangle(x1, y1, x1 + 2, y2);
         rdpq_fill_rectangle(x2 - 2, y1, x2, y2);
 
+        int tut_x = x1 + 30;
+        int tut_y = y1 + 40;
+        int line_height = 14;
+
+        // Calculate highlight position based on page/selection
+        int highlight_y;
+        if (tutorial_page == 0) {
+            highlight_y = tut_y + (tutorial_selection * 20) - 10;
+        } else {
+            highlight_y = y1 + 5;  // Title position for detail pages
+        }
+
+        // Draw highlight box (shared)
+        rdpq_set_prim_color(RGBA32(0, 180, 180, 255));
+        rdpq_fill_rectangle(tut_x - 20, highlight_y, x2 - 15, highlight_y + 18);
+
+        // Draw triangle indicator (shared)
+        draw_triangle_indicator(tut_x - 18, highlight_y + 2);
         rdpq_sync_pipe();
 
-        // Title
+        // Draw title
+        const char *title;
+        if (tutorial_page == 0) title = "How To Play";
+        else if (tutorial_page == 1) title = "Basics";
+        else if (tutorial_page == 2) title = "Ship";
+        else if (tutorial_page == 3) title = "Drone";
+        else if (tutorial_page == 4) title = "Resources";
+        else title = "Tips";
+
         rdpq_text_printf(&(rdpq_textparms_t){
             .align = ALIGN_CENTER,
             .width = display_get_width(),
-        }, FONT_CUSTOM, 0, y1 + 15, "How To Play");
+        }, FONT_CUSTOM, 0, y1 + 15, title);
 
-        int tut_x = x1 + 15;
-        int tut_y = y1 + 40;
-        int line_height = 15;
+        // Draw content based on page
+        tut_x = x1 + 15;
 
-        // Tutorial text
-        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y, "Mine as many blue asteroids as you can!");
-        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 2, "Bring resources back to the loading");
-        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 3, "zone and earn big bucks!");
-        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 4, "Keep an eye on your ships fuel level ");
-        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 5, "and try not to get too banged up!");
-        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 6, "Use your Personal Utility Prospector");
-        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 7, "(PUP) drone to mine asteroids and ");
-        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 8, "repair your ship.");
-        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 9, "NEXT ->");
+        if (tutorial_page == 0) {
+            // Menu options
+            tut_x = x1 + 30;
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y, "Basics");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + 20, "Ship");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + 40, "Drone");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + 60, "Resources");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + 80, "Tips");
+        } else if (tutorial_page == 1) {
+            // Basics content
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y, "Mine resources to earn credits.");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 2, "Dodge and deflect asteroids.");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 4, "Command your drone to earn credits");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 5, "and repair your ship.");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 7, "If you run out of fuel or need critical");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 8, "repairs, you have 10 secs before you");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 9, "lose a credit.");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 11, "Survive as long as you can, earning");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 12, "as much as you can.");
+        } else if (tutorial_page == 2) {
+            // Ship content
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y, "Move the ship with the analog stick.");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 2, "Try to conserve fuel by sliding into");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 3, "areas using your momentum.");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 5, "Deflect asteroids with the A button.");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 6, "Be careful, it also uses fuel!");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 8, "Change the camera with R/Z.");
+        } else if (tutorial_page == 3) {
+            // Drone content
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y, "Command the drone with C-Buttons.");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 2, "C-Left sends it to a resource asteroid.");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 4, "C-Up sends the drone to you for repair");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 5, "but only if it has collected resources!");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 7, "C-Down sends the drone to the loading");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 8, "area to drop off its haul and earn");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 9, "your credits!");
+        } else if (tutorial_page == 4) {
+            // Resources content
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y, "Mine blue resource asteroids to earn");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height, "credits. Move your ship to a resource");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 2, "asteroid to initiate mining.");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 4, "Be mindful to dodge and deflect");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 5, "asteroids coming at you!");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 7, "Bring what you've mined to the loading");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 8, "area for a payout, repair, and fuel.");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 10, "A full resource haul earns bonuses!");
+        } else if (tutorial_page == 5) {
+            // Tips content
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y, "Conserve your fuel by taking advantage");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height, "of momentum.");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 3, "Watch the icons above your gauges");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 4, "for the drone status.");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 6, "Keep your drone mining - it can save");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 7, "you in a pinch!");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 9, "Look out for fuel, resources, or repair");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 10, "items floating around.");
+        }
 
-
-        // Back hint
-        rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, y2 - 20, "B: Back");
+        // Back hint (shared)
+        rdpq_text_printf(NULL, FONT_CUSTOM, x1 + 15, y2 - 20, "B: Back");
         return;
     }
 

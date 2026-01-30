@@ -34,6 +34,15 @@ void draw_pause_menu(void);
 void draw_game_over_screen(void);
 
 // =============================================================================
+// Tutorial Submenu Accessors
+// =============================================================================
+
+int get_tutorial_selection(void);
+int get_tutorial_page(void);
+void set_tutorial_selection(int val);
+void set_tutorial_page(int val);
+
+// =============================================================================
 // FPS Stats Tracking
 // =============================================================================
 
