@@ -209,4 +209,6 @@
 #define TRAIL_PARTICLE_COUNT    2         // Particles per call (1-3 recommended)
 #define TRAIL_HEIGHT            5.0f      // Fixed height for trail particles
 
+#define ASTEROID_COUNT 30
+
 #endif // CONSTANTS_H
