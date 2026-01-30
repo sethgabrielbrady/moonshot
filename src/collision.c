@@ -128,7 +128,7 @@ void check_loader_asteroid_collisions_opt(Entity *loader, Asteroid *asteroids, i
 // Cursor/Ship Collisions
 // =============================================================================
 
-static float ship_damage_multiplier = 3.0f;
+static float ship_damage_multiplier = 1.75f;
 
 void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, int count, bool *visibility, float delta_time) {
     if (game.deflect_active) return;
@@ -226,7 +226,9 @@ void check_cursor_station_collision(Entity *cursor, Entity *station) {
 
     // Credits - bonus for full load
     if (stored_cursor_resource_val >= 100) {
-        game.accumulated_credits += stored_cursor_resource_val + 25;
+        game.accumulated_credits += 200;
+        snprintf(game.status_message, sizeof(game.status_message), "Full load bonus: +200 credits!");
+        game.status_message_timer = 2.0f;
     } else {
         game.accumulated_credits += stored_cursor_resource_val;
     }
@@ -326,8 +328,12 @@ void check_cursor_resource_collisions(Entity *cursor, Entity *resources, int cou
             continue;
         }
 
-        if (check_entity_intersection(cursor, &resources[i]) &&
-            (game.cursor_resource_val < CURSOR_RESOURCE_CAPACITY)) {
+        if (check_entity_intersection(cursor, &resources[i]) && (game.cursor_resource_val >= CURSOR_RESOURCE_CAPACITY)) {
+            snprintf(game.status_message, sizeof(game.status_message), "Ship full!");
+            game.status_message_timer = 2.0f;
+        }
+
+        if (check_entity_intersection(cursor, &resources[i]) && (game.cursor_resource_val < CURSOR_RESOURCE_CAPACITY)) {
             game.cursor_is_mining = true;
             // trigger_rumble(0.01f);
 
@@ -371,6 +377,10 @@ static void drone_mine_resource(Entity *entity, Entity *resource, float delta_ti
     game.drone_mining_accumulated += amount;
 
     // Only transfer whole units
+    if (game.drone_mining_accumulated >= 1.0f && game.drone_resource_val >= DRONE_MAX_RESOURCES) {
+        snprintf(game.status_message, sizeof(game.status_message), "Drone Full!");
+        game.status_message_timer = 2.0f;
+    }
     if (game.drone_mining_accumulated >= 1.0f && game.drone_resource_val < DRONE_MAX_RESOURCES) {
         int transfer = (int)game.drone_mining_accumulated;
         resource->value -= transfer;
@@ -568,6 +578,8 @@ void check_cursor_asteroid_collisions_opt(Entity *cursor, Asteroid *asteroids, i
         float combined_radius = cursor->collision_radius + asteroid_collision_radius;
         if (dist_sq < combined_radius * combined_radius) {
             if (game.cursor_iframe_timer <= 0.0f) {
+                snprintf(game.status_message, sizeof(game.status_message), "Ouch!");
+                game.status_message_timer = 2.0f;
                 play_sfx(4);
                 float damage = calculate_asteroid_damage_opt(&asteroids[i]);
                 if (damage <= MAX_DAMAGE * ship_damage_multiplier) {
@@ -617,6 +629,8 @@ void check_cursor_asteroid_deflection_opt(Entity *cursor, Asteroid *asteroids, i
 
         if (dist_sq < deflect_radius_sq) {
             spawn_explosion(asteroids[i].position, COLOR_ASTEROID);
+            snprintf(game.status_message, sizeof(game.status_message), "Nice deflection!");
+            game.status_message_timer = 2.0f;
             play_sfx(SFX_SHIP_HIT);
             reset_asteroid(&asteroids[i]);
             game.deflect_count++;

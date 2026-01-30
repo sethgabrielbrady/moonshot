@@ -130,6 +130,9 @@ typedef struct {
     bool hauled_resources;
     float hauled_resources_timer;
 
+    char status_message[64];
+    float status_message_timer;
+
 } GameStateData;
 
 // =============================================================================

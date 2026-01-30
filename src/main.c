@@ -479,7 +479,16 @@ static void draw_cursor_fuel_bar() {
     }
 
     if (fill_width < bar_width) {
-        rdpq_set_prim_color(RGBA32(40, 0, 40, 255));
+        if (fuel_percent <= 0.3f) {
+            if ((int)(game.blink_timer / 5) % 2 == 0) {
+                rdpq_set_prim_color(RGBA32(40, 0, 40, 255));
+            } else {
+                rdpq_set_prim_color(RGBA32(80, 0, 80, 255));
+            }
+        } else {
+            rdpq_set_prim_color(RGBA32(40, 0, 40, 255));
+        }
+        // rdpq_set_prim_color(RGBA32(40, 0, 40, 255));
         rdpq_fill_rectangle(x + fill_width, y, x + bar_width, y + bar_height);
     }
 }
@@ -520,7 +529,16 @@ static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset
     }
 
     if (fill_width < bar_width) {
-        rdpq_set_prim_color(RGBA32(0, 50, 0, 255));
+        // flashing low health bar
+        if (health_percent <= 0.3f && cursor) {
+            if ((int)(game.blink_timer / 5) % 2 == 0) {
+                rdpq_set_prim_color(RGBA32(0, 50, 0, 255));
+            } else {
+                rdpq_set_prim_color(RGBA32(0, 100, 0, 255));
+            }
+        } else {
+            rdpq_set_prim_color(RGBA32(0, 50, 0, 255));
+        }
         rdpq_fill_rectangle(x + fill_width, y, x + bar_width, y + bar_height);
     }
 }
@@ -677,9 +695,8 @@ static void draw_game_timer(void) {
     int hundredths = (int)((game.game_time - total_seconds) * 100);
 
     // Position in bottom right corner
-    int x = display_get_width() - 38;
+    int x = 38;
     int y = 20;
-
     // Draw accumulated credits above the timer
     int credits_x = 18;
     // decrease credits_x by 4 for each digit added to credits
@@ -688,17 +705,61 @@ static void draw_game_timer(void) {
     if (credits >= 100 && credits < 1000) credits_x = 4;
     // if (credits >= 1000) credits_x = 14;
 
-    // update
-    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_RESOURCE});
-    rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-                x + credits_x, y + 10, "%d", game.accumulated_credits);
 
     // Draw timer
     rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_FLAME});
     rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
              x - 24, y, "%d:%02d.%02d", minutes, seconds, hundredths);
     rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(255, 255, 255, 255)});
-}
+
+
+    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_RESOURCE});
+    rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
+                x + credits_x, y + 10, "%d", game.accumulated_credits);
+
+
+    float fuel_percent = game.ship_fuel / CURSOR_MAX_FUEL;
+    float health_percent = cursor_entity->value / CURSOR_MAX_HEALTH;
+
+    if (fuel_percent > 0.3f && health_percent > 0.3f) {
+        if (game.status_message_timer > 0.0f) {
+            rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_FUEL_BAR});
+        //     rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1, .align = ALIGN_CENTER, .valign = VALIGN_TOP}, FONT_CUSTOM,
+        //                     display_get_width() / 2, y + 10, "%s", game.status_message);
+
+            rdpq_text_printf(
+                &(rdpq_textparms_t){
+                    .width = 280,                // Box width for alignment
+                    .height = 40,                // Box height for alignment
+                    .align = ALIGN_CENTER,       // Horizontal alignment
+                    .valign = VALIGN_TOP,        // Vertical alignment
+                    .char_spacing = 1
+                },
+                FONT_CUSTOM,
+                display_get_width() / 2 - 140,  // X: left edge of box
+                y + 10,                         // Y: top edge of box
+                "%s", game.status_message
+            );
+        }
+    }
+    if (fuel_percent < 0.3f)  {
+        if ((int)(game.blink_timer / 10) % 2 == 0) {
+            rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_FUEL_BAR});
+            rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
+                    x - 24, y + 20, "%s", "Low Fuel" );
+        }
+    }
+
+    // if health low, draw warning text
+    if (health_percent < 0.3f)  {
+        if ((int)(game.blink_timer / 10) % 2 != 0) { // Opposite phase
+            rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
+            rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
+                    x - 24, y + 20, "%s", "Low Health" );
+        }
+    }
+        rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(255, 255, 255, 255)});
+    }
 
 
 static void draw_info_bars(void) {
@@ -1059,6 +1120,12 @@ int main(void) {
         }
 
         process_system_input(&viewport);
+
+        if (game.status_message_timer > 0.0f) {
+            game.status_message_timer -= delta_time;
+            if (game.status_message_timer < 0.0f)
+                game.status_message_timer = 0.0f;
+        }
 
         // Handle countdown state
         if (game.state == STATE_COUNTDOWN) {

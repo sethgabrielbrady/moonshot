@@ -110,7 +110,9 @@ GameStateData game = {
     // Countdown
     .countdown_timer = 3.0f,
     .hauled_resources = false,
-    .hauled_resources_timer = 0.0f
+    .hauled_resources_timer = 0.0f,
+    .status_message = "",
+    .status_message_timer = 0.0f
 };
 
 // =============================================================================
