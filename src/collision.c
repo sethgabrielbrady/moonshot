@@ -335,7 +335,9 @@ void check_cursor_resource_collisions(Entity *cursor, Entity *resources, int cou
 
         if (check_entity_intersection(cursor, &resources[i]) && (game.cursor_resource_val < CURSOR_RESOURCE_CAPACITY)) {
             game.cursor_is_mining = true;
-            // trigger_rumble(0.01f);
+
+
+
 
             // Flicker both resource and cursor color - welder effect
             int flicker = rand() % 100;
@@ -556,7 +558,7 @@ float calculate_asteroid_damage_opt(Asteroid *asteroid) {
 }
 
 void check_cursor_asteroid_collisions_opt(Entity *cursor, Asteroid *asteroids, int count, bool *visibility, float delta_time) {
-    if (game.deflect_active) return;
+    if (game.deflect_active || game.cursor_is_mining) return;
     if (game.cursor_iframe_timer > 0.0f) {
         game.cursor_iframe_timer -= delta_time;
     }

@@ -408,6 +408,7 @@ static void update_boundary_wall(Entity *wall, T3DVec3 cursor_pos, float delta_t
         // Snap to cursor direction
         target_angle = atan2f(cursor_pos.v[2], cursor_pos.v[0]);
         wall_orbit_angle = target_angle;
+
     } else {
         // Orbit around perimeter
         wall_orbit_angle += delta_time * 2.5f;  // Orbit speed
@@ -722,8 +723,18 @@ static void draw_game_timer(void) {
     if (fuel_percent < 0.3f)  {
         if ((int)(game.blink_timer / 10) % 2 == 0) {
             rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_FUEL_BAR});
-            rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-                    x - 24, y + 20, "%s", "Low Fuel" );
+            rdpq_text_printf(
+                &(rdpq_textparms_t){
+                    .width = 280,                // Box width for alignment
+                    .height = 40,                // Box height for alignment
+                    .align = ALIGN_CENTER,       // Horizontal alignment
+                    .valign = VALIGN_TOP,        // Vertical alignment
+                    .char_spacing = 1
+                },
+                FONT_CUSTOM,
+                display_get_width() / 2 - 140,  // X: left edge of box
+                display_get_height() - 20,
+                 "%s", "Low Fuel" );
         }
     }
 
@@ -732,8 +743,18 @@ static void draw_game_timer(void) {
     if (health_percent < 0.3f)  {
         if ((int)(game.blink_timer / 10) % 2 != 0) { // Opposite phase
             rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
-            rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-                    x - 24, y + 20, "%s", "Low Health" );
+            rdpq_text_printf(
+                &(rdpq_textparms_t){
+                    .width = 280,                // Box width for alignment
+                    .height = 40,                // Box height for alignment
+                    .align = ALIGN_CENTER,       // Horizontal alignment
+                    .valign = VALIGN_TOP,        // Vertical alignment
+                    .char_spacing = 1
+                },
+                FONT_CUSTOM,
+                display_get_width() / 2 - 140,  // X: left edge of box
+                display_get_height() - 20,
+                 "%s", "Low Health" );
         }
     }
     if (fuel_percent > 0.3f && health_percent > 0.3f) {
@@ -749,7 +770,7 @@ static void draw_game_timer(void) {
                 },
                 FONT_CUSTOM,
                 display_get_width() / 2 - 140,  // X: left edge of box
-                y + 10,                         // Y: top edge of box
+                display_get_height() - 20,                         // Y: top edge of box
                 "%s", game.status_message
             );
         }
