@@ -335,8 +335,8 @@ static void init_subsystems(void) {
 
     rdpq_text_register_font(FONT_BUILTIN_DEBUG_MONO, rdpq_font_load_builtin(FONT_BUILTIN_DEBUG_MONO));
 
-    custom_font = rdpq_font_load("rom:/nasasm.font64");
-    icon_font = rdpq_font_load("rom:/nasa.font64");
+    custom_font = rdpq_font_load("rom:/Nebula.font64");
+    icon_font = rdpq_font_load("rom:/spacerangertitleital.font64");
 
     rdpq_text_register_font(FONT_CUSTOM, custom_font);
     rdpq_text_register_font(FONT_ICON, icon_font);
@@ -672,14 +672,36 @@ static void draw_countdown(void) {
     int count = (int)game.countdown_timer + 1;
 
     if (count > 1 && count <= 4) {
-        rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_RESOURCE});
-        rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_ICON,
-                 center_x, center_y, "%d", count - 1);
+        rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_FUEL_BAR});
+        rdpq_text_printf(
+            &(rdpq_textparms_t){
+                .width = 280,                // Box width for alignment
+                .height = 40,                // Box height for alignment
+                .align = ALIGN_CENTER,       // Horizontal alignment
+                .valign = VALIGN_CENTER,        // Vertical alignment
+                .char_spacing = 1
+            },
+            FONT_ICON,
+            display_get_width() / 2 - 140,  // X: left edge of box
+            display_get_height() / 2 - 20,
+                "%d", count - 1 );
+
     } else if (game.countdown_timer < 2) {
         // Show "GO!" briefly after countdown hits 0
         rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
-        rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_ICON,
-                 center_x, center_y, "GO");
+        rdpq_text_printf(
+            &(rdpq_textparms_t){
+                .width = 280,                // Box width for alignment
+                .height = 40,                // Box height for alignment
+                .align = ALIGN_CENTER,       // Horizontal alignment
+                .valign = VALIGN_CENTER,        // Vertical alignment
+                .char_spacing = 1
+            },
+            FONT_ICON,
+            display_get_width() / 2 - 140,  // X: left edge of box
+            display_get_height() / 2 - 20,
+                "GO!" );
+
     } else {
          rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(255,255,255, 255)});
     }
@@ -720,8 +742,24 @@ static void draw_game_timer(void) {
     float health_percent = cursor_entity->value / CURSOR_MAX_HEALTH;
 
 
+
     if (fuel_percent < 0.3f)  {
         if ((int)(game.blink_timer / 10) % 2 == 0) {
+            // lighter versioon of fuel bar color for blinking effect
+            rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(207, 85, 255, 255)});
+            rdpq_text_printf(
+                &(rdpq_textparms_t){
+                    .width = 280,                // Box width for alignment
+                    .height = 40,                // Box height for alignment
+                    .align = ALIGN_CENTER,       // Horizontal alignment
+                    .valign = VALIGN_TOP,        // Vertical alignment
+                    .char_spacing = 1
+                },
+                FONT_CUSTOM,
+                display_get_width() / 2 - 141,  // X: left edge of box
+                display_get_height() - 29,
+                 "%s", "!!! LOW FUEL !!!" );
+
             rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_FUEL_BAR});
             rdpq_text_printf(
                 &(rdpq_textparms_t){
@@ -733,8 +771,8 @@ static void draw_game_timer(void) {
                 },
                 FONT_CUSTOM,
                 display_get_width() / 2 - 140,  // X: left edge of box
-                display_get_height() - 20,
-                 "%s", "Low Fuel" );
+                display_get_height() - 30,
+                 "%s", "!!! LOW FUEL !!!" );
         }
     }
 
@@ -742,6 +780,21 @@ static void draw_game_timer(void) {
     // if health low, draw warning text
     if (health_percent < 0.3f)  {
         if ((int)(game.blink_timer / 10) % 2 != 0) { // Opposite phase
+
+            rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(80, 255, 80, 255)});
+            rdpq_text_printf(
+                &(rdpq_textparms_t){
+                    .width = 280,                // Box width for alignment
+                    .height = 40,                // Box height for alignment
+                    .align = ALIGN_CENTER,       // Horizontal alignment
+                    .valign = VALIGN_TOP,        // Vertical alignment
+                    .char_spacing = 1
+                },
+                FONT_CUSTOM,
+                display_get_width() / 2 - 141,  // X: left edge of box
+                display_get_height() - 29,
+                 "%s", "!!! LOW HEALTH !!!" );
+
             rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
             rdpq_text_printf(
                 &(rdpq_textparms_t){
@@ -753,12 +806,26 @@ static void draw_game_timer(void) {
                 },
                 FONT_CUSTOM,
                 display_get_width() / 2 - 140,  // X: left edge of box
-                display_get_height() - 20,
-                 "%s", "Low Health" );
+                display_get_height() - 30,
+                 "%s", "!!! LOW HEALTH !!!" );
         }
     }
     if (fuel_percent > 0.3f && health_percent > 0.3f) {
         if (game.status_message_timer > 0.0f) {
+
+            rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(255, 100, 100, 255)});
+            rdpq_text_printf(
+                &(rdpq_textparms_t){
+                    .width = 280,                // Box width for alignment
+                    .height = 40,                // Box height for alignment
+                    .align = ALIGN_CENTER,       // Horizontal alignment
+                    .valign = VALIGN_TOP,        // Vertical alignment
+                    .char_spacing = 1
+                },
+                FONT_CUSTOM,
+                display_get_width() / 2 - 141,  // X: left edge of box
+                display_get_height() - 29,
+                 "%s", game.status_message );
             rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_FUEL_BAR});
             rdpq_text_printf(
                 &(rdpq_textparms_t){
@@ -770,7 +837,7 @@ static void draw_game_timer(void) {
                 },
                 FONT_CUSTOM,
                 display_get_width() / 2 - 140,  // X: left edge of box
-                display_get_height() - 20,                         // Y: top edge of box
+                display_get_height() - 30,                         // Y: top edge of box
                 "%s", game.status_message
             );
         }
@@ -986,8 +1053,6 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
 
     // Draw death timer if active
     if (game.death_timer_active) {
-        int center_x = display_get_width() / 2;
-        int center_y = SCREEN_HEIGHT / 2;
         float time_remaining = 10.0f - game.death_timer;
         if (time_remaining < 0.0f) time_remaining = 0.0f;
 
@@ -995,7 +1060,18 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
         int tenths = (int)((time_remaining - seconds) * 10);
 
         rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_WARNING});
-        rdpq_text_printf(NULL, FONT_ICON, center_x, center_y, "%d.%d", seconds, tenths);
+        rdpq_text_printf(
+            &(rdpq_textparms_t){
+                .width = 280,                // Box width for alignment
+                .height = 40,                // Box height for alignment
+                .align = ALIGN_RIGHT,       // Horizontal alignment
+                .valign = VALIGN_TOP,        // Vertical alignment
+                .char_spacing = 1
+            },
+            FONT_ICON,
+             28,  // X: right edge of box
+             5,
+               "%d", seconds );
     }
 
     // Draw GO if frames remaining (not during death timer)
@@ -1003,7 +1079,18 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
         int center_x = display_get_width() / 2;
         int center_y = SCREEN_HEIGHT / 2;
         rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
-        rdpq_text_printf(NULL, FONT_ICON, center_x, center_y, "GO");
+        rdpq_text_printf(
+            &(rdpq_textparms_t){
+                .width = 280,                // Box width for alignment
+                .height = 40,                // Box height for alignment
+                .align = ALIGN_CENTER,       // Horizontal alignment
+                .valign = VALIGN_CENTER,        // Vertical alignment
+                .char_spacing = 1
+            },
+            FONT_ICON,
+            display_get_width() / 2 - 140,  // X: left edge of box
+            display_get_height() / 2 - 20,
+               "GO!");
     }
 
     if (game.render_debug) {
@@ -1119,6 +1206,9 @@ int main(void) {
         joypad_poll();
         update_input();
 
+        //defaul to white font color
+        rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(255, 255, 255, 255)});
+
         // Handle title screen
         if (game.state == STATE_TITLE) {
             if (input.pressed.start) {
@@ -1132,8 +1222,51 @@ int main(void) {
             //draw background
 
             render_background(background, false);
-            rdpq_text_printf(NULL, FONT_CUSTOM, SCREEN_WIDTH / 2 - 45, 30, "ASTERISK");
-            rdpq_text_printf(NULL, FONT_CUSTOM, SCREEN_WIDTH / 2 - 45, SCREEN_HEIGHT / 2, "Press Start");
+
+            rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(255, 255, 255, 255)});
+            rdpq_text_printf(
+                &(rdpq_textparms_t){
+                    .width = 280,
+                    .height = 40,
+                    .align = ALIGN_CENTER,
+                    .valign = VALIGN_TOP,
+                    .char_spacing = 1
+                },
+                FONT_ICON,
+                display_get_width() / 2 - 138,  // X: left edge of box
+                    39,
+                 "%s", "AsteRisk" );
+
+            rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_ASTEROID});
+             rdpq_text_printf(
+                &(rdpq_textparms_t){
+                    .width = 280,
+                    .height = 40,
+                    .align = ALIGN_CENTER,
+                    .valign = VALIGN_TOP,
+                    .char_spacing = 1
+                },
+                FONT_ICON,
+                display_get_width() / 2 - 140,  // X: left edge of box
+                    40,
+                 "%s", "AsteRisk" );
+
+
+
+            // rdpq_text_printf(NULL, FONT_ICON, SCREEN_WIDTH / 2 - 45, SCREEN_HEIGHT / 2, "Press Start");
+            rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
+            rdpq_text_printf(
+                &(rdpq_textparms_t){
+                    .width = 280,
+                    .height = 40,
+                    .align = ALIGN_CENTER,
+                    .valign = VALIGN_BOTTOM,
+                    .char_spacing = 1
+                },
+                FONT_CUSTOM,
+                display_get_width() / 2 - 140,  // X: left edge of box
+                SCREEN_HEIGHT / 2,
+                 "%s", "Press Start" );
 
             rdpq_detach_show();
             last_time = current_time;

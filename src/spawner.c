@@ -160,7 +160,7 @@ void init_asteroids(Entity *asteroids, int count) {
 
     for (int i = 0; i < count; i++) {
         asteroids[i] = create_entity_shared(shared_asteroid_model, (T3DVec3){{0, 10, 0}},
-                                      randomize_float(0.1f, 1.3f), COLOR_ASTEROID, DRAW_SHADED, 10.0f);
+                                      randomize_float(0.1f, 1.3f), COLOR_FLAME, DRAW_SHADED, 10.0f);
         reset_entity(&asteroids[i], ASTEROID);
     }
 }
@@ -356,7 +356,7 @@ void draw_asteroids_optimized(Asteroid *asteroids, bool *visibility, float *dist
     }
 
     // Set up shared rendering state
-    rdpq_set_prim_color(COLOR_ASTEROID);
+    rdpq_set_prim_color(COLOR_FLAME);
     rdpq_mode_combiner(RDPQ_COMBINER1((PRIM, 0, SHADE, 0), (PRIM, 0, SHADE, 0)));
 
     // Draw sorted asteroids (closest first)
