@@ -271,16 +271,10 @@ void draw_particles(T3DViewport *viewport) {
         tpx->posA[2] = tpx->posB[2] = pz;
         tpx->sizeA = tpx->sizeB = size_fp;
 
-        tpx->colorA[0] = tpx->colorB[0] = 81;
-        tpx->colorA[1] = tpx->colorB[1] = 229;
-        tpx->colorA[2] = tpx->colorB[2] = 255;
+        tpx->colorA[0] = tpx->colorB[0] = 200;
+        tpx->colorA[1] = tpx->colorB[1] = 74;
+        tpx->colorA[2] = tpx->colorB[2] = 28;
         tpx->colorA[3] = tpx->colorB[3] = 255;
-
-
-
-    //  RGBA32(81, 229, 255, 255)
-    //  RGBA32(255, 25, 25, 255)
-
 
 
         tpx++;

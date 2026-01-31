@@ -141,6 +141,7 @@
 #define COLOR_FLAME        RGBA32(200, 74, 28, 255)
 #define COLOR_FUEL_BAR     RGBA32(138, 0, 196, 255)
 #define COLOR_HEALTH       RGBA32(0, 180, 20, 255)
+#define COLOR_LOADER       RGBA32(255, 237, 41, 175)
 
 
 
