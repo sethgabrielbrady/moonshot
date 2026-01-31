@@ -336,7 +336,9 @@ static void init_subsystems(void) {
     rdpq_text_register_font(FONT_BUILTIN_DEBUG_MONO, rdpq_font_load_builtin(FONT_BUILTIN_DEBUG_MONO));
 
     // custom_font = rdpq_font_load("rom:/Nebula.font64");
-    custom_font = rdpq_font_load("rom:/Bebas.font64");
+    // custom_font = rdpq_font_load("rom:/Bebas.font64");
+    custom_font = rdpq_font_load("rom:/striker.font64");
+
 
     icon_font = rdpq_font_load("rom:/spacerangertitleital.font64");
 
@@ -457,90 +459,102 @@ static void render_background(sprite_t *background, float cam_yaw) {
 // UI Drawing
 // =============================================================================
 
-static void draw_cursor_fuel_bar() {
-    int x = 7;
-    int y = SCREEN_HEIGHT - 23;
-    int bar_width = 40;
-    int bar_height = 3;
+// =============================================================================
+// Gauge Drawing Helpers
+// =============================================================================
 
+// Build a string of slash marks based on percentage (2 slashes per 10%)
+static void build_gauge_slashes(char *buffer, float percent) {
+    // Clamp percent
+    if (percent > 1.0f) percent = 1.0f;
+    if (percent < 0.0f) percent = 0.0f;
+
+    // Calculate slash count: 2 slashes per 10%, round up for partial
+    // 1-5% = 1, 6-10% = 2, 11-15% = 3, etc.
+    int slash_count = 0;
+    if (percent > 0.0f) {
+        slash_count = (int)((percent * 100.0f + 4.99f) / 5.0f);  // Round up to nearest 5%, then 1 slash per 5%
+        if (slash_count > 20) slash_count = 20;
+        if (slash_count < 1 && percent > 0.0f) slash_count = 1;
+    }
+
+    // Fill buffer with slashes
+    for (int i = 0; i < slash_count; i++) {
+        buffer[i] = '/';
+    }
+    buffer[slash_count] = '\0';
+}
+
+static void draw_cursor_fuel_bar(void) {
     float fuel_percent = game.ship_fuel / CURSOR_MAX_FUEL;
     if (fuel_percent > 1.0f) fuel_percent = 1.0f;
     if (fuel_percent < 0.0f) fuel_percent = 0.0f;
 
-    int fill_width = (int)(bar_width * fuel_percent);
-    color_t bar_color = COLOR_FUEL_BAR;
+    if (fuel_percent <= 0.0f) return;
+
+    // Build slash string based on fuel level
+    char slashes[32];
+    build_gauge_slashes(slashes, fuel_percent);
+
+    int x = 38;  // Offset from health bar on X axis
+    int y = SCREEN_HEIGHT - 49;
 
     rdpq_sync_pipe();
     rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
+    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_FUEL_BAR});
 
-    if (fill_width > 0) {
-        rdpq_set_prim_color(bar_color);
-        rdpq_fill_rectangle(x, y, x + fill_width, y + bar_height);
-    }
-
-    if (fill_width < bar_width) {
-        if (fuel_percent <= 0.3f) {
-            if ((int)(game.blink_timer / 5) % 2 == 0) {
-                rdpq_set_prim_color(RGBA32(40, 0, 40, 255));
-            } else {
-                rdpq_set_prim_color(RGBA32(80, 0, 80, 255));
-            }
-        } else {
-            rdpq_set_prim_color(RGBA32(40, 0, 40, 255));
-        }
-        // rdpq_set_prim_color(RGBA32(40, 0, 40, 255));
-        rdpq_fill_rectangle(x + fill_width, y, x + bar_width, y + bar_height);
-    }
+    // Draw slashes twice offset by 1 pixel for thickness
+    rdpq_text_printf(
+        &(rdpq_textparms_t){
+            .width = 280, .height = 40,
+            .align = ALIGN_LEFT, .valign = VALIGN_BOTTOM,
+            .char_spacing = 0
+        },
+        FONT_CUSTOM, x, y, "%s", slashes);
+    rdpq_text_printf(
+        &(rdpq_textparms_t){
+            .width = 280, .height = 40,
+            .align = ALIGN_LEFT, .valign = VALIGN_BOTTOM,
+            .char_spacing = 0
+        },
+        FONT_CUSTOM, x + 1, y, "%s", slashes);
 }
 
-static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset, int cursor) {
+static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset, int is_cursor) {
     if (entity->value < 0) entity->value = 0;
-
-    int x = 6;
-    int y = 10 + y_offset;
-    int bar_width = 40;
-    int bar_height = 3;
-
-    if (cursor) {
-        y = SCREEN_HEIGHT - 26;
-    }
 
     float health_percent = entity->value / max_value;
     if (health_percent > 1.0f) health_percent = 1.0f;
     if (health_percent < 0.0f) health_percent = 0.0f;
 
-    int fill_width = (int)(bar_width * health_percent);
+    if (health_percent <= 0.0f) return;
 
-    color_t bar_color;
-    if (health_percent > 0.6f) {
-        bar_color = RGBA32(0, 255, 0, 255);
-    } else if (health_percent > 0.3f) {
-        bar_color = RGBA32(255, 255, 0, 255);
-    } else {
-        bar_color = RGBA32(255, 0, 0, 255);
-    }
+    // Build slash string based on health level
+    char slashes[32];
+    build_gauge_slashes(slashes, health_percent);
+
+    int x = 35;
+    int y = is_cursor ? (SCREEN_HEIGHT - 51) : (10 + y_offset - 25);
 
     rdpq_sync_pipe();
     rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
+    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
 
-    if (fill_width > 0) {
-        rdpq_set_prim_color(bar_color);
-        rdpq_fill_rectangle(x, y, x + fill_width, y + bar_height);
-    }
-
-    if (fill_width < bar_width) {
-        // flashing low health bar
-        if (health_percent <= 0.3f && cursor) {
-            if ((int)(game.blink_timer / 5) % 2 == 0) {
-                rdpq_set_prim_color(RGBA32(0, 50, 0, 255));
-            } else {
-                rdpq_set_prim_color(RGBA32(0, 100, 0, 255));
-            }
-        } else {
-            rdpq_set_prim_color(RGBA32(0, 50, 0, 255));
-        }
-        rdpq_fill_rectangle(x + fill_width, y, x + bar_width, y + bar_height);
-    }
+    // Draw slashes twice offset by 1 pixel for thickness
+    rdpq_text_printf(
+        &(rdpq_textparms_t){
+            .width = 280, .height = 40,
+            .align = ALIGN_LEFT, .valign = VALIGN_BOTTOM,
+            .char_spacing = 0
+        },
+        FONT_CUSTOM, x, y, "%s", slashes);
+    rdpq_text_printf(
+        &(rdpq_textparms_t){
+            .width = 280, .height = 40,
+            .align = ALIGN_LEFT, .valign = VALIGN_BOTTOM,
+            .char_spacing = 0
+        },
+        FONT_CUSTOM, x + 1, y, "%s", slashes);
 }
 
 static void draw_entity_resource_bar(int resource_val, float max_value, int y_offset, const char *label, bool show_triangle) {
@@ -549,11 +563,6 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
 
     int x = display_get_width() - bar_width - 2;
     int y = SCREEN_HEIGHT - 40;
-
-    if (!show_triangle) {
-        y = SCREEN_HEIGHT - 20;
-        x = 8;
-    }
 
     float resource_percent = resource_val / max_value;
     if (resource_percent > 1.0f) resource_percent = 1.0f;
@@ -566,14 +575,19 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
     rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
 
     if (!show_triangle) {
-        if (fill_width > 0) {
-            rdpq_set_prim_color(bar_color);
-            rdpq_fill_rectangle(x, y, x + fill_width, y + bar_height);
-        }
-        if (fill_width < bar_width) {
-            rdpq_set_prim_color(RGBA32(0, 40, 60, 255));
-            rdpq_fill_rectangle(x + fill_width, y, x + bar_width, y + bar_height);
-        }
+        rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_RESOURCE});
+            rdpq_text_printf(
+                &(rdpq_textparms_t){
+                    .width = 280,
+                    .height = 40,
+                    .align = ALIGN_LEFT,
+                    .valign = VALIGN_BOTTOM,
+                    .char_spacing = 1
+                },
+                FONT_CUSTOM,
+                14 ,  // X: left edge of box
+                y - 10,
+                 "%d%s", fill_width,"%" );
     }
 
     int icon_x = x - 20;
@@ -624,7 +638,6 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
                 rdpq_sync_pipe();
                 rdpq_set_mode_standard();
                 rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, PRIM, 0), (TEX0, 0, PRIM, 0)));
-                // rdpq_set_prim_color(COLOR_FUEL_BAR);
                 rdpq_mode_alphacompare(1);
                 rdpq_sprite_blit(station_icon, action_x, action_y, &(rdpq_blitparms_t){
                     .scale_x = 1.0f, .scale_y = 1.0f
@@ -714,9 +727,14 @@ static void draw_game_timer(void) {
 
     // Draw timer
     rdpq_sync_pipe();
-    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_FLAME});
-    rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-             x - 24, y, "%d:%02d.%02d", minutes, seconds, hundredths);
+    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_ASTEROID});
+
+    rdpq_text_printf(
+        &(rdpq_textparms_t){.char_spacing = 1},
+        FONT_CUSTOM,
+        display_get_width() - 55,
+        display_get_height() - 15,
+        "%d:%02d.%02d", minutes, seconds, hundredths);
 
     rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_RESOURCE});
     rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
@@ -728,7 +746,7 @@ static void draw_game_timer(void) {
     rdpq_sync_pipe();
     if (fuel_percent < 0.3f)  {
         if ((int)(game.blink_timer / 10) % 2 == 0) {
-            rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_LOADER });
+            rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_ASTEROID });
             rdpq_text_printf(
                 &(rdpq_textparms_t){
                     .width = 280,
@@ -739,13 +757,13 @@ static void draw_game_timer(void) {
                 },
                 FONT_CUSTOM,
                 display_get_width() / 2 - 140,  // X: left edge of box
-                display_get_height() - 30,
-                 "%s", "!!! LOW FUEL !!!" );
+                10,
+                 "%s", "--LOW FUEL--" );
         }
     }
     if (health_percent < 0.3f)  {
         if ((int)(game.blink_timer / 10) % 2 != 0) { // Opposite phase
-            rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_LOADER });
+            rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_ASTEROID });
             rdpq_text_printf(
                 &(rdpq_textparms_t){
                     .width = 280,
@@ -756,14 +774,14 @@ static void draw_game_timer(void) {
                 },
                 FONT_CUSTOM,
                 display_get_width() / 2 - 140,
-                display_get_height() - 30,
-                 "%s", "!!! LOW HEALTH !!!" );
+                10,
+                 "%s", "--LOW HEALTH--" );
         }
     }
 
     if (fuel_percent > 0.3f && health_percent > 0.3f) {
         if (game.status_message_timer > 0.0f) {
-            rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_LOADER });
+            rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_ASTEROID });
             rdpq_text_printf(
                 &(rdpq_textparms_t){
                     .width = 280,
@@ -774,7 +792,7 @@ static void draw_game_timer(void) {
                 },
                 FONT_CUSTOM,
                 display_get_width() / 2 - 140,
-                display_get_height() - 30,
+                10,
                 "%s", game.status_message
             );
         }
