@@ -277,10 +277,10 @@ void draw_particles(T3DViewport *viewport) {
         tpx->colorA[3] = tpx->colorB[3] = 255;
 
 
-// Asteroid ambient color  RGBA32(108, 136, 64, 255)
-// #define COLOR_RESOURCE     RGBA32(81, 229, 255, 255)
-// #define COLOR_WARNING      RGBA32(255, 25, 25, 255)
-// #define COLOR_FLAME        RGBA32(255, 74, 28, 200)
+
+    //  RGBA32(81, 229, 255, 255)
+    //  RGBA32(255, 25, 25, 255)
+
 
 
         tpx++;

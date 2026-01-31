@@ -1062,7 +1062,7 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
         rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_WARNING});
         rdpq_text_printf(
             &(rdpq_textparms_t){
-                .width = 280,                // Box width for alignment
+                .width = display_get_width() - 60,                // Box width for alignment
                 .height = 40,                // Box height for alignment
                 .align = ALIGN_RIGHT,       // Horizontal alignment
                 .valign = VALIGN_TOP,        // Vertical alignment
