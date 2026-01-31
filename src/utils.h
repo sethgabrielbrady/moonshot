@@ -29,4 +29,14 @@ float fast_inv_sqrt(float x);
 
 const char* get_compass_direction(float angle);
 
+// =============================================================================
+// Rumble Pak Support
+// =============================================================================
+
+void init_rumble(void);
+void trigger_rumble(float duration);
+void update_rumble(float delta_time);
+void stop_rumble(void);
+
+
 #endif // UTILS_H

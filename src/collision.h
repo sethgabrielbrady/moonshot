@@ -57,14 +57,6 @@ void reset_resource_colors(Entity *resources, int count);
 void update_deflect_timer(float delta_time);
 void check_deflect_input(void);
 
-// =============================================================================
-// Rumble Pak Support
-// =============================================================================
-
-void init_rumble(void);
-void trigger_rumble(float duration);
-void update_rumble(float delta_time);
-void stop_rumble(void);
 
 // Deflection radius for visualization
 #define DEFLECT_RADIUS 15.0f

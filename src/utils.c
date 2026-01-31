@@ -4,6 +4,51 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+
+
+
+
+// =============================================================================
+// Rumble Pak Support
+// =============================================================================
+
+static float rumble_timer = 0.0f;
+static bool rumble_available = false;
+static bool rumble_checked = false;
+
+void init_rumble(void) {
+    rumble_checked = true;
+    rumble_available = (joypad_get_accessory_type(JOYPAD_PORT_1) == JOYPAD_ACCESSORY_TYPE_RUMBLE_PAK);
+}
+
+void trigger_rumble(float duration) {
+    if (!rumble_checked) init_rumble();
+    if (!rumble_available) return;
+
+    // Only extend rumble if new duration is longer
+    if (duration > rumble_timer) {
+        rumble_timer = duration;
+        joypad_set_rumble_active(JOYPAD_PORT_1, true);
+    }
+}
+
+void update_rumble(float delta_time) {
+    if (!rumble_available || rumble_timer <= 0.0f) return;
+
+    rumble_timer -= delta_time;
+    if (rumble_timer <= 0.0f) {
+        rumble_timer = 0.0f;
+        joypad_set_rumble_active(JOYPAD_PORT_1, false);
+    }
+}
+
+void stop_rumble(void) {
+    if (!rumble_available) return;
+    rumble_timer = 0.0f;
+    joypad_set_rumble_active(JOYPAD_PORT_1, false);
+}
+
+
 // =============================================================================
 // Time Functions
 // =============================================================================

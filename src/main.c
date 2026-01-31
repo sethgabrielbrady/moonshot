@@ -713,6 +713,7 @@ static void draw_game_timer(void) {
 
 
     // Draw timer
+    rdpq_sync_pipe();
     rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_FLAME});
     rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
              x - 24, y, "%d:%02d.%02d", minutes, seconds, hundredths);
@@ -724,7 +725,7 @@ static void draw_game_timer(void) {
 
     float fuel_percent = game.ship_fuel / CURSOR_MAX_FUEL;
     float health_percent = cursor_entity->value / CURSOR_MAX_HEALTH;
-
+    rdpq_sync_pipe();
     if (fuel_percent < 0.3f)  {
         if ((int)(game.blink_timer / 10) % 2 == 0) {
             rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_LOADER });
@@ -848,13 +849,13 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     t3d_light_set_count(light_count);
 
     bool entity_skip_culling[ENTITY_COUNT] = {false};
-    entity_skip_culling[ENTITY_GRID] = true;
+    entity_skip_culling[ENTITY_STATION_V] = true;
     entity_skip_culling[ENTITY_CURSOR] = true;
     entity_skip_culling[ENTITY_STATION] = true;
 
     // Draw main entities
     for (int i = 0; i < ENTITY_COUNT; i++) {
-        if (i == ENTITY_STATION || i == ENTITY_GRID) continue;
+        if (i == ENTITY_STATION || i == ENTITY_STATION_V) continue;
 
         // Cursor with distance-based scale
         if (i == ENTITY_CURSOR && game.cursor_scale_multiplier != 1.0f) {
@@ -930,8 +931,10 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
         }
     }
 
-    // Draw asteroids (optimized with matrix pool) and resources
-    draw_asteroids_optimized(asteroids, asteroid_visible, asteroid_distance_sq, ASTEROID_COUNT);
+    // Draw asteroids (optimized with matrix pool) and resources - skip during countdown
+    if (game.state != STATE_COUNTDOWN) {
+        draw_asteroids_optimized(asteroids, asteroid_visible, asteroid_distance_sq, ASTEROID_COUNT);
+    }
     draw_entities_sorted(resources, RESOURCE_COUNT, NULL, resource_visible);
 
     // Draw station - disable Z-write to prevent self Z-fighting
@@ -941,7 +944,7 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     rdpq_sync_pipe();
 
     rdpq_mode_zbuf(true, false);  // Z-read on, Z-write off
-    draw_entity(&entities[ENTITY_GRID]);
+    draw_entity(&entities[ENTITY_STATION_V]);
     rdpq_mode_zbuf(true, true);   // Restore Z-write
     rdpq_sync_pipe();
 
@@ -1051,14 +1054,14 @@ int main(void) {
     station_icon = sprite_load("rom:/station2.sprite");
     drill_icon = sprite_load("rom:/drill2.sprite");
     tile_icon = sprite_load("rom:/tile3.sprite");
-    // drone_icon = sprite_load("rom:/drone.sprite");
     drone_full_icon = sprite_load("rom:/drone_full.sprite");
     health_icon = sprite_load("rom:/health.sprite");
 
     // Create entities
     entities[ENTITY_STATION] = create_entity("rom:/stationring.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}},
                                               1.0f, COLOR_STATION, DRAW_SHADED, 30.0f);
-    entities[ENTITY_STATION].value = STATION_MAX_HEALTH;
+    entities[ENTITY_STATION_V] = create_entity("rom:/ringvert.t3dm", (T3DVec3){{0, 1, 0}},
+                                           1.0f, COLOR_MAP, DRAW_SHADED, 0.0f);
 
     entities[ENTITY_CURSOR] = create_entity("rom:/cursor3.t3dm", game.cursor_position,
                                              0.562605f, COLOR_CURSOR, DRAW_SHADED, 10.0f);
@@ -1079,8 +1082,7 @@ int main(void) {
 
     entities[ENTITY_DEFLECT_RING] = create_entity("rom:/sphere.t3dm", (T3DVec3){{0, 1000, 0}},
                                        1.0f, RGBA32(0, 150, 255, 200), DRAW_SHADED, 0.0f);
-    entities[ENTITY_GRID] = create_entity("rom:/ringvert.t3dm", (T3DVec3){{0, 1, 0}},
-                                           1.0f, COLOR_MAP, DRAW_SHADED, 0.0f);
+
     entities[ENTITY_WALL] = create_entity("rom:/wall.t3dm", (T3DVec3){{0, 1000, 0}},
                                            1.0f, RGBA32(255, 237, 41, 175), DRAW_SHADED, 0.0f);
 
@@ -1138,18 +1140,78 @@ int main(void) {
 
         // Handle title screen
         if (game.state == STATE_TITLE) {
+            static float title_cam_yaw = 0.0f;
+
             if (input.pressed.start) {
                 game.state = STATE_COUNTDOWN;
                 game.countdown_timer = 4.0f;
+                // Reset asteroids off-screen when starting game
+                for (int i = 0; i < ASTEROID_COUNT; i++) {
+                    reset_asteroid(&asteroids[i]);
+                    // Move asteroids far away so they're not visible during countdown
+                    asteroids[i].position.v[0] = 2000.0f + (i * 10.0f);
+                    asteroids[i].position.v[2] = 2000.0f + (i * 10.0f);
+                }
+                // Reset camera yaw
+                game.cam_yaw = CAM_ANGLE_YAW;
+                title_cam_yaw = 0.0f;
             }
 
-            // Render title screen
-            rdpq_attach(display_get(), NULL);
-            // rdpq_clear(RGBA32(0, 0, 0, 255));
-            //draw background
+            // Slowly pan the camera
+            title_cam_yaw += delta_time * 5.0f;  // Slow rotation speed
+            if (title_cam_yaw >= 360.0f) title_cam_yaw -= 360.0f;
 
-            render_background(background, false);
+            // Update asteroids
+            update_asteroids_optimized(asteroids, ASTEROID_COUNT, delta_time);
 
+            // Rotate station for visual effect
+            entities[ENTITY_STATION_V].rotation.v[0] += delta_time * 0.1f;
+            if (entities[ENTITY_STATION_V].rotation.v[0] > TWO_PI) {
+                entities[ENTITY_STATION_V].rotation.v[0] -= TWO_PI;
+            }
+
+            // Update camera for title screen (use title_cam_yaw for slow pan)
+            update_camera(&viewport, title_cam_yaw, delta_time, (T3DVec3){{0, 0, 0}}, false, cursor_entity);
+
+            // Perform visibility/culling for asteroids
+            for (int i = 0; i < ASTEROID_COUNT; i++) {
+                float dx = asteroids[i].position.v[0] - camera.position.v[0];
+                float dz = asteroids[i].position.v[2] - camera.position.v[2];
+                asteroid_distance_sq[i] = dx * dx + dz * dz;
+                asteroid_visible[i] = (asteroid_distance_sq[i] < ASTEROID_DRAW_DISTANCE_SQ);
+            }
+
+            // Render 3D scene
+            rdpq_attach(display_get(), display_get_zbuf());
+            render_background(background, title_cam_yaw);
+
+            t3d_frame_start();
+            t3d_viewport_attach(&viewport);
+            t3d_screen_clear_depth();
+            setup_lighting();
+
+            int light_count = 1;
+            t3d_light_set_count(light_count);
+
+            // Draw asteroids
+            draw_asteroids_optimized(asteroids, asteroid_visible, asteroid_distance_sq, ASTEROID_COUNT);
+
+            // Sync before drawing station
+            rdpq_sync_pipe();
+
+            // Draw station entities
+            update_entity_matrix(&entities[ENTITY_STATION]);
+            update_entity_matrix(&entities[ENTITY_STATION_V]);
+            rdpq_mode_zbuf(true, false);  // Z-read on, Z-write off
+            draw_entity(&entities[ENTITY_STATION]);
+            rdpq_sync_pipe();
+            draw_entity(&entities[ENTITY_STATION_V]);
+            rdpq_mode_zbuf(true, true);   // Restore Z-write
+
+            // Sync before switching to 2D text rendering
+            rdpq_sync_pipe();
+
+            // Draw title text on top
             rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(255, 255, 255, 255)});
             rdpq_text_printf(
                 &(rdpq_textparms_t){
@@ -1160,8 +1222,8 @@ int main(void) {
                     .char_spacing = 1
                 },
                 FONT_ICON,
-                display_get_width() / 2 - 138,  // X: left edge of box
-                    39,
+                display_get_width() / 2 - 138,
+                    59,
                  "%s", "AsteRisk" );
 
             rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_ASTEROID});
@@ -1174,13 +1236,10 @@ int main(void) {
                     .char_spacing = 1
                 },
                 FONT_ICON,
-                display_get_width() / 2 - 140,  // X: left edge of box
-                    40,
+                display_get_width() / 2 - 140,
+                    60,
                  "%s", "AsteRisk" );
 
-
-
-            // rdpq_text_printf(NULL, FONT_ICON, SCREEN_WIDTH / 2 - 45, SCREEN_HEIGHT / 2, "Press Start");
             rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
             rdpq_text_printf(
                 &(rdpq_textparms_t){
@@ -1191,8 +1250,8 @@ int main(void) {
                     .char_spacing = 1
                 },
                 FONT_CUSTOM,
-                display_get_width() / 2 - 140,  // X: left edge of box
-                SCREEN_HEIGHT / 2,
+                display_get_width() / 2 - 140,
+                SCREEN_HEIGHT / 2 + 10,
                  "%s", "Press Start" );
 
             rdpq_detach_show();
@@ -1274,9 +1333,9 @@ int main(void) {
             if (entities[ENTITY_STATION].rotation.v[1] > TWO_PI) {
                 entities[ENTITY_STATION].rotation.v[1] -= TWO_PI;
             }
-            entities[ENTITY_GRID].rotation.v[0] += delta_time * 0.1f;
-            if (entities[ENTITY_GRID].rotation.v[0] > TWO_PI) {
-                entities[ENTITY_GRID].rotation.v[0] -= TWO_PI;
+            entities[ENTITY_STATION_V].rotation.v[0] += delta_time * 0.1f;
+            if (entities[ENTITY_STATION_V].rotation.v[0] > TWO_PI) {
+                entities[ENTITY_STATION_V].rotation.v[0] -= TWO_PI;
             }
 
 
@@ -1297,6 +1356,9 @@ int main(void) {
                     game.hauled_resources = false;
                     game.hauled_resources_timer = 0.0f;
                 }
+
+                // Spawn celebration particles around the loader
+                spawn_loader_sparks(entities[ENTITY_LOADER].position);
             }
             entities[ENTITY_LOADER].rotation.v[1] -= delta_time * roation_speed;
             if (entities[ENTITY_LOADER].rotation.v[1] < 0.0f) {

@@ -18,6 +18,7 @@ void clear_all_particles(void);
 
 void spawn_explosion(T3DVec3 position, color_t color);
 void spawn_mining_sparks(T3DVec3 position);
+void spawn_loader_sparks(T3DVec3 position);
 void spawn_ship_trail(T3DVec3 position, T3DVec3 velocity, color_t color);
 
 // =============================================================================

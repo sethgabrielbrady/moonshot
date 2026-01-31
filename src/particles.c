@@ -6,13 +6,14 @@
 #include "types.h"
 #include "constants.h"
 #include "camera.h"
+#include "utils.h"
 
 // =============================================================================
 // Configuration
 // =============================================================================
 
-#define MAX_PARTICLES 512
-#define MAX_AMBIENT_PARTICLES 400
+#define MAX_PARTICLES 768
+#define MAX_AMBIENT_PARTICLES 512
 
 // =============================================================================
 // Debug
@@ -128,6 +129,18 @@ void spawn_mining_sparks(T3DVec3 position) {
             (rand() % 200 - 100) * 0.75f
         }};
         spawn_particle(position, velocity, COLOR_RESOURCE, 0.03f, 0.6f);
+    }
+}
+
+void spawn_loader_sparks(T3DVec3 position) {
+    trigger_rumble(0.01f);
+    for (int i = 0; i < 8; i++) {
+        T3DVec3 velocity = {{
+            (rand() % 300 - 150) * 0.5f,
+            (rand() % 60 + 10) * 1.50f,
+            (rand() % 300 - 150) * 0.5f
+        }};
+        spawn_particle(position, velocity, COLOR_RESOURCE, 0.035f, 0.8f);
     }
 }
 
