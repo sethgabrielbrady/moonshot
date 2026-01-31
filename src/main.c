@@ -1058,8 +1058,8 @@ int main(void) {
     health_icon = sprite_load("rom:/health.sprite");
 
     // Create entities
-    entities[ENTITY_STATION] = create_entity("rom:/stationring.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}},
-                                              1.0f, COLOR_STATION, DRAW_SHADED, 30.0f);
+    entities[ENTITY_STATION] = create_entity("rom:/stationring2.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}},
+                                              1.0f, COLOR_STATION, DRAW_TEXTURED_LIT, 30.0f);
     entities[ENTITY_STATION_V] = create_entity("rom:/ringvert.t3dm", (T3DVec3){{0, 1, 0}},
                                            1.0f, COLOR_MAP, DRAW_SHADED, 0.0f);
 
@@ -1074,10 +1074,10 @@ int main(void) {
                                             0.55f, COLOR_DRONE, DRAW_SHADED, 30.0f);
     entities[ENTITY_TILE] = create_entity("rom:/tile2.t3dm", (T3DVec3){{0, 1000, 0}},
                                            1.0f, COLOR_TILE, DRAW_SHADED, 10.0f);
-    entities[ENTITY_LOADER] = create_entity("rom:/loader.t3dm", (T3DVec3){{0, 1, 0}},
+    entities[ENTITY_LOADER] = create_entity("rom:/loader2.t3dm", (T3DVec3){{0, 1, 0}},
                                            1.0f,  RGBA32(255, 237, 41, 175), DRAW_SHADED, 50.0f);
 
-    entities[ENTITY_LOADER_VERT] = create_entity("rom:/loader_vert.t3dm", (T3DVec3){{0, 1, 0}},
+    entities[ENTITY_LOADER_VERT] = create_entity("rom:/loader_vert2.t3dm", (T3DVec3){{0, 1, 0}},
                                            1.0f,  RGBA32(255, 237, 41, 175), DRAW_SHADED, 50.0f);
 
     entities[ENTITY_DEFLECT_RING] = create_entity("rom:/sphere.t3dm", (T3DVec3){{0, 1000, 0}},
@@ -1364,10 +1364,12 @@ int main(void) {
             if (entities[ENTITY_LOADER].rotation.v[1] < 0.0f) {
                 entities[ENTITY_LOADER].rotation.v[1] += TWO_PI;
             }
+
             entities[ENTITY_LOADER_VERT].rotation.v[0] += delta_time * roation_speed;
             if (entities[ENTITY_LOADER_VERT].rotation.v[0] < 0.0f) {
                 entities[ENTITY_LOADER_VERT].rotation.v[0] += TWO_PI;
             }
+
 
             // Update matrices
             update_entity_matrices(entities, ENTITY_COUNT);
