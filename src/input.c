@@ -210,7 +210,7 @@ void process_menu_input(void) {
                 break;
 
             case MENU_OPTION_AUDIO:
-                game.bgm_track = (game.bgm_track + 1) % 5;  // 0=OFF, 1-3=tracks, 4=Random
+                game.bgm_track = (game.bgm_track + 1) % 6;  // 0=OFF, 1-4=tracks, 5=Random
                 stop_bgm();
                 if (game.bgm_track == 1) {
                     play_bgm("rom:/nebrun.wav64");
@@ -219,14 +219,18 @@ void process_menu_input(void) {
                 } else if (game.bgm_track == 3) {
                     play_bgm("rom:/lunram.wav64");
                 } else if (game.bgm_track == 4) {
-                    // Random - pick 1, 2, or 3
-                    int random_track = (rand() % 3) + 1;
+                    play_bgm("rom:/cosjou.wav64");
+                } else if (game.bgm_track == 5) {
+                    // Random - pick 1, 2, 3, or 4
+                    int random_track = (rand() % 4) + 1;
                     if (random_track == 1) {
                         play_bgm("rom:/nebrun.wav64");
                     } else if (random_track == 2) {
                         play_bgm("rom:/orbodd.wav64");
-                    } else {
+                    } else if (random_track == 3) {
                         play_bgm("rom:/lunram.wav64");
+                    } else {
+                        play_bgm("rom:/cosjou.wav64");
                     }
                 }
                 break;

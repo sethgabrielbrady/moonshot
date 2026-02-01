@@ -28,7 +28,7 @@ GameStateData game = {
     .is_pal_system = false,
 
     // Audio
-    .bgm_track = 4,  // 4 = Random
+    .bgm_track = 5,  // 5 = Random
 
     // Blink timer
     .blink_timer = 0,

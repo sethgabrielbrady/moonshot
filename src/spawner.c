@@ -51,7 +51,7 @@ static void get_asteroid_velocity_and_scale(Entity *asteroid, T3DVec3 *out_veloc
 }
 
 static void get_resource_velocity_and_scale(Entity *resource, T3DVec3 *out_velocity) {
-    resource->speed = randomize_float(5.0f, 20.0f);
+    resource->speed = randomize_float(10.0f, 30.0f); //resource speed range
     resource->scale = randomize_float(0.6f, 1.4f);
 }
 

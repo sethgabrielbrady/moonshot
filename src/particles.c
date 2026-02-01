@@ -12,8 +12,8 @@
 // Configuration
 // =============================================================================
 
-#define MAX_PARTICLES 768
-#define MAX_AMBIENT_PARTICLES 512
+#define MAX_PARTICLES 728
+#define MAX_AMBIENT_PARTICLES 456
 
 // =============================================================================
 // Debug
@@ -134,7 +134,7 @@ void spawn_mining_sparks(T3DVec3 position) {
 
 void spawn_loader_sparks(T3DVec3 position) {
     trigger_rumble(0.01f);
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 6; i++) {
         T3DVec3 velocity = {{
             (rand() % 300 - 150) * 0.5f,
             (rand() % 60 + 10) * 1.50f,

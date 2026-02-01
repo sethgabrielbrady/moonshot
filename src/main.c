@@ -585,9 +585,9 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
                     .char_spacing = 1
                 },
                 FONT_CUSTOM,
-                14 ,  // X: left edge of box
+                16 ,  // X: left edge of box
                 y - 10,
-                 "%d%s", fill_width,"%" );
+                 "%d%s", (int)(resource_percent * 100), "%" );
     }
 
     int icon_x = x - 20;
@@ -732,13 +732,13 @@ static void draw_game_timer(void) {
     rdpq_text_printf(
         &(rdpq_textparms_t){.char_spacing = 1},
         FONT_CUSTOM,
-        display_get_width() - 55,
+        display_get_width() - 64,
         display_get_height() - 15,
         "%d:%02d.%02d", minutes, seconds, hundredths);
 
     rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_RESOURCE});
     rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-            x - 24, y + 12, "%d", game.accumulated_credits);
+            x - 30, y, "%d", game.accumulated_credits);
 
 
     float fuel_percent = game.ship_fuel / CURSOR_MAX_FUEL;
@@ -1111,9 +1111,9 @@ int main(void) {
     cursor_entity = &entities[ENTITY_CURSOR];
     jets_entity = &entities[ENTITY_JETS];
 
-
     //maybe items
     init_ambient_particles();
+
 
     // Load audio
     wav64_open(&sfx_mining, "rom:/ploop.wav64");
@@ -1128,15 +1128,21 @@ int main(void) {
     } else if (game.bgm_track == 3) {
         play_bgm("rom:/lunram.wav64");
     } else if (game.bgm_track == 4) {
-        // Random - pick 1, 2, or 3
-        int random_track = (rand() % 3) + 1;
+        play_bgm("rom:/cosjou.wav64");
+    } else if (game.bgm_track == 5) {
+        // Random - pick 1, 2, 3, or 4
+        int random_track = (rand() % 4) + 1;
         if (random_track == 1) {
             play_bgm("rom:/nebrun.wav64");
         } else if (random_track == 2) {
             play_bgm("rom:/orbodd.wav64");
-        } else {
+        } else if (random_track == 3) {
             play_bgm("rom:/lunram.wav64");
+        } else {
+            play_bgm("rom:/cosjou.wav64");
         }
+
+
     }
 
     float last_time = get_time_s() - (1.0f / 60.0f);

@@ -472,6 +472,7 @@ void draw_pause_menu(void) {
     else if (game.bgm_track == 1) bgm_text = "Nebula Run";
     else if (game.bgm_track == 2) bgm_text = "Orbit Oddyssey";
     else if (game.bgm_track == 3) bgm_text = "Lunar Rampage";
+    else if (game.bgm_track == 4) bgm_text = "Cosmic Journey";
     else bgm_text = "Random";
     rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 2,
                      "Music: %s", bgm_text);

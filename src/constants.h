@@ -23,6 +23,7 @@
 #define CAM_ASPECT_RATIO   ((float)SCREEN_WIDTH / (float)SCREEN_HEIGHT)
 #define CAM_FOLLOW_SPEED   10.0f
 #define CAM_ROTATION_SPEED 120.0f
+#define CAM_MULTIPLIER  1.2f   // Increase camera height by 20%
 
 // =============================================================================
 // Playable Area (Circular)
