@@ -132,6 +132,7 @@ sprite_t *drill_icon = NULL;
 sprite_t *drone_icon = NULL;
 sprite_t *drone_full_icon = NULL;
 sprite_t *health_icon = NULL;
+sprite_t *rumble_icon = NULL;
 
 // =============================================================================
 // Functions

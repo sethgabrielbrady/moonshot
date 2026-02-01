@@ -314,12 +314,10 @@ static void init_subsystems(void) {
     tv_type_t tv = get_tv_type();
     game.is_pal_system = (tv == TV_PAL);
 
-     // Reinitialize display with correct settings for PAL if needed
+    // Set FPS limit based on TV type (no need to change resolution - VI handles scaling)
     if (game.is_pal_system) {
-        display_close();
-        display_init(RESOLUTION_256x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
         display_set_fps_limit(25);
-        debugf("PAL system detected - 256x240 @ 25fps\n");
+        debugf("PAL system detected - 320x240 @ 25fps\n");
     } else {
         display_set_fps_limit(30);
         debugf("NTSC system detected - 320x240 @ 30fps\n");
@@ -334,12 +332,7 @@ static void init_subsystems(void) {
     init_particles();
 
     rdpq_text_register_font(FONT_BUILTIN_DEBUG_MONO, rdpq_font_load_builtin(FONT_BUILTIN_DEBUG_MONO));
-
-    // custom_font = rdpq_font_load("rom:/Nebula.font64");
-    // custom_font = rdpq_font_load("rom:/Bebas.font64");
     custom_font = rdpq_font_load("rom:/striker.font64");
-
-
     icon_font = rdpq_font_load("rom:/spacerangertitleital.font64");
 
     rdpq_text_register_font(FONT_CUSTOM, custom_font);
@@ -676,6 +669,11 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
 
 
 static void draw_countdown(void) {
+    // Safety check for invalid timer values
+    if (!isfinite(game.countdown_timer) || game.countdown_timer < -10.0f || game.countdown_timer > 100.0f) {
+        return;
+    }
+
     int count = (int)game.countdown_timer + 1;
 
     if (count > 1 && count <= 4) {
@@ -743,44 +741,19 @@ static void draw_game_timer(void) {
 
     float fuel_percent = game.ship_fuel / CURSOR_MAX_FUEL;
     float health_percent = cursor_entity->value / CURSOR_MAX_HEALTH;
-    rdpq_sync_pipe();
+    // rdpq_sync_pipe();
     if (fuel_percent < 0.3f)  {
-        if ((int)(game.blink_timer / 10) % 2 == 0) {
-            rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_ASTEROID });
-            rdpq_text_printf(
-                &(rdpq_textparms_t){
-                    .width = 280,
-                    .height = 40,
-                    .align = ALIGN_CENTER,
-                    .valign = VALIGN_TOP,
-                    .char_spacing = 1
-                },
-                FONT_CUSTOM,
-                display_get_width() / 2 - 140,  // X: left edge of box
-                10,
-                 "%s", "--LOW FUEL--" );
-        }
+        snprintf(game.status_message, sizeof(game.status_message), "--LOW FUEL--");
+         game.status_message_timer = 2.0f;
     }
     if (health_percent < 0.3f)  {
-        if ((int)(game.blink_timer / 10) % 2 != 0) { // Opposite phase
-            rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_ASTEROID });
-            rdpq_text_printf(
-                &(rdpq_textparms_t){
-                    .width = 280,
-                    .height = 40,
-                    .align = ALIGN_CENTER,
-                    .valign = VALIGN_TOP,
-                    .char_spacing = 1
-                },
-                FONT_CUSTOM,
-                display_get_width() / 2 - 140,
-                10,
-                 "%s", "--LOW HEALTH--" );
-        }
+        snprintf(game.status_message, sizeof(game.status_message), "--LOW HEALTH--");
+        game.status_message_timer = 2.0f;
     }
 
-    if (fuel_percent > 0.3f && health_percent > 0.3f) {
+    // if (fuel_percent > 0.3f && health_percent > 0.3f) {
         if (game.status_message_timer > 0.0f) {
+            rdpq_sync_pipe();
             rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_ASTEROID });
             rdpq_text_printf(
                 &(rdpq_textparms_t){
@@ -796,7 +769,7 @@ static void draw_game_timer(void) {
                 "%s", game.status_message
             );
         }
-    }
+    //
 
     rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(255, 255, 255, 255)});
 }
@@ -816,12 +789,12 @@ static void draw_info_bars(void) {
 // update station value to drop resources over time
 static float fuel_drain_accumulated = 0.0f;
 static void update_ship_fuel(float delta_time, bool accelerating) {
-    const float FUEL_DRAIN_RATE = 1.50f; // resources per second
+    const float FUEL_DRAIN_RATE = 1.25f; // resources per second
     if (accelerating) {
         fuel_drain_accumulated += FUEL_DRAIN_RATE * 2.0f * delta_time;
         spawn_ship_trail(entities[ENTITY_CURSOR].position, game.cursor_velocity, COLOR_FUEL_BAR);
     } else {
-        fuel_drain_accumulated += FUEL_DRAIN_RATE * 0.5f * delta_time;
+        fuel_drain_accumulated += FUEL_DRAIN_RATE * delta_time;
     }
 
     // Only drain whole units
@@ -1074,6 +1047,8 @@ int main(void) {
     tile_icon = sprite_load("rom:/tile3.sprite");
     drone_full_icon = sprite_load("rom:/drone_full.sprite");
     health_icon = sprite_load("rom:/health.sprite");
+    rumble_icon = sprite_load("rom:/rpak.sprite");
+
 
     // Create entities
     entities[ENTITY_STATION] = create_entity("rom:/stationring2.t3dm", (T3DVec3){{0, DEFAULT_HEIGHT, 0}},
@@ -1088,7 +1063,7 @@ int main(void) {
     entities[ENTITY_JETS] = create_entity("rom:/jets.t3dm", game.cursor_position,
                                              0.562605f, RGBA32(138, 0, 196, 0), DRAW_SHADED, 10.0f);
 
-    entities[ENTITY_DRONE] = create_entity("rom:/dronenew.t3dm", (T3DVec3){{20.0f, DEFAULT_HEIGHT, 29.0f}},
+    entities[ENTITY_DRONE] = create_entity("rom:/dronenew.t3dm", (T3DVec3){{60.0f, DEFAULT_HEIGHT, 69.0f}},
                                             0.55f, COLOR_DRONE, DRAW_SHADED, 30.0f);
     entities[ENTITY_TILE] = create_entity("rom:/tile2.t3dm", (T3DVec3){{0, 1000, 0}},
                                            1.0f, COLOR_TILE, DRAW_SHADED, 10.0f);
@@ -1121,40 +1096,19 @@ int main(void) {
     wav64_open(&sfx_dfull, "rom:/dronecommand.wav64");
     wav64_open(&sfx_shiphit, "rom:/shiphit.wav64");
 
-    if (game.bgm_track == 1) {
-        play_bgm("rom:/nebrun.wav64");
-    } else if (game.bgm_track == 2) {
-        play_bgm("rom:/orbodd.wav64");
-    } else if (game.bgm_track == 3) {
-        play_bgm("rom:/lunram.wav64");
-    } else if (game.bgm_track == 4) {
-        play_bgm("rom:/cosjou.wav64");
-    } else if (game.bgm_track == 5) {
-        // Random - pick 1, 2, 3, or 4
-        int random_track = (rand() % 4) + 1;
-        if (random_track == 1) {
-            play_bgm("rom:/nebrun.wav64");
-        } else if (random_track == 2) {
-            play_bgm("rom:/orbodd.wav64");
-        } else if (random_track == 3) {
-            play_bgm("rom:/lunram.wav64");
-        } else {
-            play_bgm("rom:/cosjou.wav64");
-        }
-
-
-    }
-
-    float last_time = get_time_s() - (1.0f / 60.0f);
+    // Play title screen music
+    play_bgm("rom:/lunramtit.wav64");
 
     // =============================================================================
     // Main Game Loop
     // =============================================================================
 
     for (;;) {
-        float current_time = get_time_s();
-        float delta_time = current_time - last_time;
-        // last_time = current_time;
+        float delta_time = display_get_delta_time();
+
+        // Clamp delta_time to prevent issues
+        if (delta_time < 0.001f) delta_time = 0.001f;
+        if (delta_time > 0.1f) delta_time = 0.1f;
 
         joypad_poll();
         update_input();
@@ -1164,11 +1118,40 @@ int main(void) {
 
         // Handle title screen
         if (game.state == STATE_TITLE) {
+            update_audio();
             static float title_cam_yaw = 0.0f;
 
+
             if (input.pressed.start) {
+                stop_bgm();
+                update_audio();
+
                 game.state = STATE_COUNTDOWN;
                 game.countdown_timer = 4.0f;
+
+                // Start game music
+                if (game.bgm_track == 1) {
+                    play_bgm("rom:/nebrunv3.wav64");
+                } else if (game.bgm_track == 2) {
+                    play_bgm("rom:/orboddv2.wav64");
+                } else if (game.bgm_track == 3) {
+                    play_bgm("rom:/lunramv2.wav64");
+                } else if (game.bgm_track == 4) {
+                    play_bgm("rom:/coshouv2.wav64");
+                } else if (game.bgm_track == 5) {
+                    // Random - pick 1, 2, 3, or 4
+                    int random_track = (rand() % 4) + 1;
+                    if (random_track == 1) {
+                        play_bgm("rom:/nebrunv3.wav64");
+                    } else if (random_track == 2) {
+                        play_bgm("rom:/orboddv2.wav64");
+                    } else if (random_track == 3) {
+                        play_bgm("rom:/lunramv2.wav64");
+                    } else {
+                        play_bgm("rom:/coshouv2.wav64");
+                    }
+                }
+
                 // Reset asteroids off-screen when starting game
                 for (int i = 0; i < ASTEROID_COUNT; i++) {
                     reset_asteroid(&asteroids[i]);
@@ -1183,7 +1166,11 @@ int main(void) {
 
             // Slowly pan the camera
             title_cam_yaw += delta_time * 5.0f;  // Slow rotation speed
-            if (title_cam_yaw >= 360.0f) title_cam_yaw -= 360.0f;
+            // Robust bounds check (handles NaN/overflow)
+            if (title_cam_yaw >= 360.0f || title_cam_yaw < 0.0f || !isfinite(title_cam_yaw)) {
+                title_cam_yaw = fmodf(title_cam_yaw, 360.0f);
+                if (title_cam_yaw < 0.0f || !isfinite(title_cam_yaw)) title_cam_yaw = 0.0f;
+            }
 
             // Update asteroids
             update_asteroids_optimized(asteroids, ASTEROID_COUNT, delta_time);
@@ -1239,47 +1226,64 @@ int main(void) {
             rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(255, 255, 255, 255)});
             rdpq_text_printf(
                 &(rdpq_textparms_t){
-                    .width = 280,
+                    .width = display_get_width(),
                     .height = 40,
                     .align = ALIGN_CENTER,
                     .valign = VALIGN_TOP,
                     .char_spacing = 1
                 },
                 FONT_ICON,
-                display_get_width() / 2 - 138,
+                    2,
                     59,
                  "%s", "AsteRisk" );
 
             rdpq_font_style(icon_font, 0, &(rdpq_fontstyle_t){.color = COLOR_ASTEROID});
              rdpq_text_printf(
                 &(rdpq_textparms_t){
-                    .width = 280,
+                    .width = display_get_width(),
                     .height = 40,
                     .align = ALIGN_CENTER,
                     .valign = VALIGN_TOP,
                     .char_spacing = 1
                 },
                 FONT_ICON,
-                display_get_width() / 2 - 140,
+                    0,
                     60,
                  "%s", "AsteRisk" );
 
             rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
             rdpq_text_printf(
                 &(rdpq_textparms_t){
-                    .width = 280,
+                    .width = display_get_width(),
                     .height = 40,
                     .align = ALIGN_CENTER,
                     .valign = VALIGN_BOTTOM,
                     .char_spacing = 1
                 },
                 FONT_CUSTOM,
-                display_get_width() / 2 - 140,
+                display_get_width() / 2 - 160,
                 SCREEN_HEIGHT / 2 + 10,
                  "%s", "Press Start" );
 
+
+            //draw the rumble icon image 20px from the bottom, middle of the screen
+            if (rumble_icon) {
+                rdpq_set_prim_color(RGBA32(155, 44, 18, 155));
+                rdpq_sprite_blit(rumble_icon, display_get_width() - 20 - (rumble_icon->width / 2),
+                                 display_get_height() - rumble_icon->height - 10,
+                                 &(rdpq_blitparms_t){
+                                     .scale_x = 1.0f, .scale_y = 1.0f
+                                 });
+                rdpq_set_prim_color(RGBA32(255, 74, 28, 255));
+                rdpq_sprite_blit(rumble_icon, display_get_width() - 21 - (rumble_icon->width / 2),
+                                 display_get_height() - rumble_icon->height - 10,
+                                 &(rdpq_blitparms_t){
+                                     .scale_x = 1.0f, .scale_y = 1.0f
+                                 });
+            }
+
+
             rdpq_detach_show();
-            last_time = current_time;
             continue;
         }
 
@@ -1526,10 +1530,6 @@ int main(void) {
         render_frame(&viewport, background, game.cam_yaw, delta_time);
         update_audio();
         rspq_wait();
-
-        // Update last_time AFTER vsync/wait
-        last_time = current_time;
-
     }
 
     // Cleanup

@@ -178,8 +178,9 @@ void update_camera(T3DViewport *viewport, float cam_yaw, float delta_time,
         float pitch_rad = T3D_DEG_TO_RAD(CAM_ANGLE_PITCH);
         float yaw_rad = T3D_DEG_TO_RAD(cam_yaw);
 
-        float horizontal_dist = CAM_DISTANCE * cosf(pitch_rad) + 20.0f;  // Pull camera back
-        float vertical_dist = CAM_DISTANCE * sinf(pitch_rad) + 20.0f;     // Raise camera height
+        float cam_mod = 0.0f;
+        float horizontal_dist = CAM_DISTANCE * cosf(pitch_rad) + cam_mod;  // Pull camera back
+        float vertical_dist = CAM_DISTANCE * sinf(pitch_rad) + cam_mod;     // Raise camera height
 
         float sin_yaw = sinf(yaw_rad);
         float cos_yaw = cosf(yaw_rad);

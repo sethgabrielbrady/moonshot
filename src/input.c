@@ -213,24 +213,24 @@ void process_menu_input(void) {
                 game.bgm_track = (game.bgm_track + 1) % 6;  // 0=OFF, 1-4=tracks, 5=Random
                 stop_bgm();
                 if (game.bgm_track == 1) {
-                    play_bgm("rom:/nebrun.wav64");
+                    play_bgm("rom:/nebrunv3.wav64");
                 } else if (game.bgm_track == 2) {
-                    play_bgm("rom:/orbodd.wav64");
+                    play_bgm("rom:/orboddv2.wav64");
                 } else if (game.bgm_track == 3) {
-                    play_bgm("rom:/lunram.wav64");
+                    play_bgm("rom:/lunramv2.wav64");
                 } else if (game.bgm_track == 4) {
-                    play_bgm("rom:/cosjou.wav64");
+                    play_bgm("rom:/coshouv2.wav64");
                 } else if (game.bgm_track == 5) {
                     // Random - pick 1, 2, 3, or 4
                     int random_track = (rand() % 4) + 1;
                     if (random_track == 1) {
-                        play_bgm("rom:/nebrun.wav64");
+                        play_bgm("rom:/nebrunv3.wav64");
                     } else if (random_track == 2) {
-                        play_bgm("rom:/orbodd.wav64");
+                        play_bgm("rom:/orboddv2.wav64");
                     } else if (random_track == 3) {
-                        play_bgm("rom:/lunram.wav64");
+                        play_bgm("rom:/lunramv2.wav64");
                     } else {
-                        play_bgm("rom:/cosjou.wav64");
+                        play_bgm("rom:/coshouv2.wav64");
                     }
                 }
                 break;
@@ -380,7 +380,6 @@ void update_cursor_movement(float delta_time, Entity *cursor_entity, Entity *jet
 
     float deadzone_sq = CURSOR_DEADZONE * CURSOR_DEADZONE;
 
-    //if stick magnitude greated than deadzone, decrease game.ship_fuel
     if (input.stick_magnitude_sq > deadzone_sq) {
         game.ship_acceleration = true;
     } else {

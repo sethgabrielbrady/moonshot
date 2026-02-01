@@ -93,7 +93,6 @@ void check_loader_asteroid_collisions_opt(Entity *loader, Asteroid *asteroids, i
 // =============================================================================
 
 static float ship_damage_multiplier = 1.75f;
-
 void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, int count, bool *visibility, float delta_time) {
     if (game.deflect_active) return;
     if (game.cursor_iframe_timer > 0.0f) {
@@ -119,9 +118,7 @@ void check_cursor_asteroid_collisions(Entity *cursor, Entity *asteroids, int cou
                 if (damage <= MAX_DAMAGE * ship_damage_multiplier) {
                     damage = MAX_DAMAGE * ship_damage_multiplier;
                 }
-                // if (damage >= MAX_DAMAGE * ship_damage_multiplier) {
-                //     damage = MAX_DAMAGE * ship_damage_multiplier;
-                // }
+
                 spawn_explosion(asteroids[i].position, COLOR_SPARKS);
                 cursor->value -= damage;
                 game.cursor_last_damage = (int)damage;
@@ -168,8 +165,12 @@ void check_cursor_station_collision(Entity *cursor, Entity *station) {
     if (cursor->value < CURSOR_MAX_HEALTH) {
         if (stored_cursor_resource_val >= 100) {
             cursor->value += 50;
+            snprintf(game.status_message, sizeof(game.status_message), "Ship Repaired!");
+            game.status_message_timer = 2.0f;
         } else {
             cursor->value += stored_cursor_resource_val * value_multiplier;
+            snprintf(game.status_message, sizeof(game.status_message), "Repair +%.0f", stored_cursor_resource_val * value_multiplier);
+            game.status_message_timer = 2.0f;
         }
         if (cursor->value > CURSOR_MAX_HEALTH) {
             cursor->value = CURSOR_MAX_HEALTH;
@@ -180,8 +181,12 @@ void check_cursor_station_collision(Entity *cursor, Entity *station) {
     if (game.ship_fuel < CURSOR_MAX_FUEL) {
         if (stored_cursor_resource_val >= 70) {
             game.ship_fuel = CURSOR_MAX_FUEL;
+            snprintf(game.status_message, sizeof(game.status_message), "Max Fuel!");
+            game.status_message_timer = 2.0f;
         } else {
             game.ship_fuel += stored_cursor_resource_val * 0.85f;
+            snprintf(game.status_message, sizeof(game.status_message), "Fuel +%.0f", stored_cursor_resource_val * 0.85f);
+            game.status_message_timer = 2.0f;
         }
         if (game.ship_fuel > CURSOR_MAX_FUEL) {
             game.ship_fuel = CURSOR_MAX_FUEL;
@@ -194,7 +199,11 @@ void check_cursor_station_collision(Entity *cursor, Entity *station) {
         snprintf(game.status_message, sizeof(game.status_message), "Full load bonus: +200 credits!");
         game.status_message_timer = 2.0f;
     } else {
-        game.accumulated_credits += stored_cursor_resource_val;
+        if (stored_cursor_resource_val > 0){
+            game.accumulated_credits += stored_cursor_resource_val;
+            snprintf(game.status_message, sizeof(game.status_message), "Credits +%d", game.accumulated_credits += stored_cursor_resource_val);
+            game.status_message_timer = 2.0f;
+        }
     }
     // Clear resources
     game.cursor_resource_val = 0;
@@ -272,6 +281,8 @@ static void mine_resource(Entity *entity, Entity *resource, float delta_time) {
         resource->value = 0;
         resource->color = COLOR_ASTEROID;
         entity->value += 5; // replenish some energy on resource depletion
+        snprintf(game.status_message, sizeof(game.status_message), "Repair +5!");
+        game.status_message_timer = 2.0f;
         reset_entity(resource, RESOURCE);
     }
 }
@@ -299,8 +310,6 @@ void check_cursor_resource_collisions(Entity *cursor, Entity *resources, int cou
 
         if (check_entity_intersection(cursor, &resources[i]) && (game.cursor_resource_val < CURSOR_RESOURCE_CAPACITY)) {
             game.cursor_is_mining = true;
-
-
 
 
             // Flicker both resource and cursor color - welder effect
@@ -374,11 +383,6 @@ void check_drone_resource_collisions(Entity *entity, Entity *resources, int coun
     // Update drone_full based on current resource level
     game.drone_full = (game.drone_resource_val >= DRONE_MAX_RESOURCES);
 
-    // Don't mine if drone was just given a new command
-    // if (game.drone_command_interrupt) {
-    //     return;
-    // }
-
     for (int i = 0; i < count; i++) {
         // Distance-based early rejection
         float dx = entity->position.v[0] - resources[i].position.v[0];
@@ -391,6 +395,8 @@ void check_drone_resource_collisions(Entity *entity, Entity *resources, int coun
             game.drone_resource_val < DRONE_MAX_RESOURCES) {
             game.drone_collecting_resource = true;
             trigger_rumble(0.01f);
+            snprintf(game.status_message, sizeof(game.status_message), "Drone Mining");
+
 
             game.drone_is_mining = true;
             entity->position.v[1] = resources[i].position.v[1] + 5.0f;
@@ -417,18 +423,22 @@ void check_drone_resource_collisions(Entity *entity, Entity *resources, int coun
 
 void check_drone_station_collisions(Entity *drone, Entity *station, int count) {
     if (check_entity_intersection(drone, station)) {
-        // station->value += game.drone_resource_val;
-        game.accumulated_credits += game.drone_resource_val;
-        game.drone_resource_val = 0;
-        drone->value = game.drone_resource_val;
+        if (game.drone_resource_val > 0) {
+            snprintf(game.status_message, sizeof(game.status_message), "Credits +%d", game.drone_resource_val);
+            game.status_message_timer = 2.0f;
+            game.accumulated_credits += game.drone_resource_val;
+            game.drone_resource_val = 0;
+            drone->value = game.drone_resource_val;
+        }
     }
 }
 
 void check_drone_cursor_collisions(Entity *drone, Entity *cursor, int count) {
     if (check_entity_intersection(drone, cursor)) {
         cursor->value += game.drone_resource_val;
-
         game.ship_fuel += game.drone_resource_val * 0.3f;
+        snprintf(game.status_message, sizeof(game.status_message), "Repair/Fuel +%d+%.0f", game.drone_resource_val, game.drone_resource_val * 0.3f);
+        game.status_message_timer = 2.0f;
 
         if (game.ship_fuel < 10) {
             game.ship_fuel = 10;
@@ -506,9 +516,10 @@ void check_deflect_input(void) {
             game.deflect_active = true;
             game.deflect_timer = DEFLECT_DURATION;
             game.ship_fuel -= DEFLECT_FUEL_COST;
+            snprintf(game.status_message, sizeof(game.status_message), "Fuel -%0f", DEFLECT_FUEL_COST);
+            game.status_message_timer = 2.0f;
         }
     }
-
 }
 
 // =============================================================================
@@ -595,7 +606,7 @@ void check_cursor_asteroid_deflection_opt(Entity *cursor, Asteroid *asteroids, i
 
         if (dist_sq < deflect_radius_sq) {
             spawn_explosion(asteroids[i].position, COLOR_ASTEROID);
-            snprintf(game.status_message, sizeof(game.status_message), "Nice deflection!");
+            snprintf(game.status_message, sizeof(game.status_message), "Nice deflection! Fuel +5");
             game.status_message_timer = 2.0f;
             play_sfx(SFX_SHIP_HIT);
             reset_asteroid(&asteroids[i]);

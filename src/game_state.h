@@ -158,6 +158,7 @@ extern sprite_t *drill_icon;
 extern sprite_t *drone_icon;
 extern sprite_t *drone_full_icon;
 extern sprite_t *health_icon;
+extern sprite_t *rumble_icon;
 
 // =============================================================================
 // Functions
