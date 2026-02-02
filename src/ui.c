@@ -2,13 +2,15 @@
 #include "constants.h"
 #include "game_state.h"
 #include <rdpq.h>
+#include <malloc.h>
+
 
 // =============================================================================
 // Tutorial Submenu State (static to avoid game_state changes)
 // =============================================================================
 
-static int tutorial_selection = 0;  // 0=Ship, 1=Drone, 2=Resources
-static int tutorial_page = 0;       // 0=menu, 1=Ship, 2=Drone, 3=Resources
+static int tutorial_selection = 0;
+static int tutorial_page = 0;
 
 int get_tutorial_selection(void) { return tutorial_selection; }
 int get_tutorial_page(void) { return tutorial_page; }
@@ -72,21 +74,26 @@ void update_fps_stats(float delta_time) {
 // FPS Display
 // =============================================================================
 
-void draw_fps_display(float current, float avg, float min, float max, int particle_count) {
+void draw_fps_display(float current, float avg, float min, float max) {
     int x = display_get_width() - 120;
     int y = 10;
     int line_height = 10;
 
     rdpq_sync_pipe();
-
     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, x, y,
                      "fps: %.0f avg: %.0f", current, avg);
+    struct mallinfo mem_info = mallinfo();
+    int total_ram_kb = get_memory_size() / 1024;
+    int heap_used_kb = mem_info.uordblks / 1024;
+
     y += line_height;
     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, x, y,
-                     "min: %.0f max: %.0f", min, max);
-    y += line_height;
-    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, x, y,
-                     "Particles: %d", particle_count);
+                     "RAM: %dKB / %dKB", heap_used_kb, total_ram_kb);
+
+    // y += line_height;
+    // rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, x, y,
+    //                  "min: %.0f max: %.0f", min, max);
+
 }
 
 
@@ -166,6 +173,7 @@ void draw_pause_menu(void) {
 
         // Draw content based on page
         tut_x = x1 + 15;
+        rdpq_sync_pipe();
 
         if (tutorial_page == 0) {
             // Menu options
@@ -177,15 +185,16 @@ void draw_pause_menu(void) {
             rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + 80, "Tips");
         } else if (tutorial_page == 1) {
             // Basics content
+
             rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y, "Mine resources to earn credits.");
-            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 2, "Dodge and deflect asteroids.");
-            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 4, "Command your drone to earn credits");
-            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 5, "and repair your ship.");
-            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 7, "If you run out of fuel or need critical");
-            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 8, "repairs, you have 10 secs before you");
-            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 9, "lose a credit.");
-            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 11, "Survive as long as you can, earning");
-            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 12, "as much as you can.");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 1, "Dodge and deflect asteroids.");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 2, "Command your drone to earn credits");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 4, "and repair your ship.");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 5, "If you run out of fuel or need critical");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 6, "repairs, you have 10 secs before you");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 7, "lose a credit.");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 9, "Survive as long as you can, earning");
+            rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y + line_height * 10, "as much as you can.");
         } else if (tutorial_page == 2) {
             // Ship content
             rdpq_text_printf(NULL, FONT_CUSTOM, tut_x, tut_y, "Move the ship with the analog stick.");
@@ -230,46 +239,6 @@ void draw_pause_menu(void) {
         return;
     }
 
-    // Draw credits screen if active
-    if (game.show_credits) {
-        rdpq_sync_pipe();
-        rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
-
-        // Draw teal box
-        rdpq_set_prim_color(RGBA32(0, 128, 128, 155));
-        rdpq_fill_rectangle(x1, y1, x2, y2);
-
-        // Draw border
-        rdpq_set_prim_color(RGBA32(0, 200, 200, 255));
-        rdpq_fill_rectangle(x1, y1, x2, y1 + 2);
-        rdpq_fill_rectangle(x1, y2 - 2, x2, y2);
-        rdpq_fill_rectangle(x1, y1, x1 + 2, y2);
-        rdpq_fill_rectangle(x2 - 2, y1, x2, y2);
-
-        rdpq_sync_pipe();
-
-        // Title
-        rdpq_text_printf(&(rdpq_textparms_t){
-            .align = ALIGN_CENTER,
-            .width = display_get_width(),
-        }, FONT_CUSTOM, 0, y1 + 15, "Credits");
-
-        int cred_x = x1 + 15;
-        int cred_y = y1 + 60;
-        int line_height = 18;
-
-        // Credits text
-        rdpq_text_printf(NULL, FONT_CUSTOM, cred_x, cred_y, "All models, images, and programming");
-        rdpq_text_printf(NULL, FONT_CUSTOM, cred_x, cred_y + line_height, "by Brainpann");
-        rdpq_text_printf(NULL, FONT_CUSTOM, cred_x, cred_y + line_height * 3, "Music by DavidKBD");
-        rdpq_text_printf(NULL, FONT_CUSTOM, cred_x, cred_y + line_height * 4, "Visit www.itch.io for more info");
-        rdpq_text_printf(NULL, FONT_CUSTOM, cred_x, cred_y + line_height * 5, "Fonts from FontStruct (fontstruct.com)");
-
-
-        // Back hint
-        rdpq_text_printf(NULL, FONT_CUSTOM, cred_x, y2 - 20, "B: Back");
-        return;
-    }
 
     // Draw controls screen if active
     if (game.show_controls) {
@@ -412,6 +381,7 @@ void draw_pause_menu(void) {
 
     if (game.game_over) {
         game.game_over_pause = true;
+        game.menu_selection = 0;  // Reset to first option (Continue/Restart)
     }
 
     rdpq_sync_pipe();
@@ -470,9 +440,9 @@ void draw_pause_menu(void) {
     const char *bgm_text;
     if (game.bgm_track == 0) bgm_text = "OFF";
     else if (game.bgm_track == 1) bgm_text = "Nebula Run";
-    else if (game.bgm_track == 2) bgm_text = "Orbit Oddyssey";
+    else if (game.bgm_track == 2) bgm_text = "Cosmic Journey";
     else if (game.bgm_track == 3) bgm_text = "Lunar Rampage";
-    else if (game.bgm_track == 4) bgm_text = "Cosmic Journey";
+
     else bgm_text = "Random";
     rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 2,
                      "Music: %s", bgm_text);
@@ -495,10 +465,10 @@ void draw_pause_menu(void) {
                      "Tutorial");
     rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, menu_y + line_height * 6,
                      "Credits");
-
     // Controls hint
     rdpq_text_printf(NULL, FONT_CUSTOM, menu_x, y2 - 20,
                      "Up/Down: Select  A: Toggle");
+
 }
 
 void draw_game_over_screen(void) {

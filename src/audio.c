@@ -48,15 +48,6 @@ void play_sfx(int sfx_type) {
             mixer_ch_set_vol(8, 0.5, 0.5);
             mixer_ch_set_freq(8, 840.0f);
             break;
-
-        case SFX_EXPLOSION:  // Explosion (channels 10-11)
-            if (mixer_ch_playing(10)) {
-                mixer_ch_stop(10);
-            }
-            wav64_play(&sfx_shiphit, 10);
-            mixer_ch_set_vol(10, 0.9, 0.9);
-            mixer_ch_set_freq(10, 440.0f);
-            break;
     }
 }
 

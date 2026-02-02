@@ -9,7 +9,6 @@
 
 void draw_health_bars(Entity *station, Entity *cursor);
 void draw_resource_bars(void);
-// void draw_info_bars(Entity *station, Entity *cursor);
 
 // =============================================================================
 // Status Indicators
@@ -24,7 +23,7 @@ void draw_station_indicator(int x, int y);
 // FPS Display
 // =============================================================================
 
-void draw_fps_display(float current, float avg, float min, float max, int particle_count);
+void draw_fps_display(float current, float avg, float min, float max);
 
 // =============================================================================
 // Menus

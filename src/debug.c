@@ -45,13 +45,6 @@ void render_debug_ui(T3DVec3 cursor_position, Entity entities[], Entity resource
                      "game_over?: %d", game.game_over ? 1 : 0);
 
 
-   struct mallinfo mem_info = mallinfo();
-    int total_ram_kb = get_memory_size() / 1024;
-    int heap_used_kb = mem_info.uordblks / 1024;
-
-    y += DEBUG_LINE_HEIGHT;
-    rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,
-                     "RAM: %dKB / %dKB", heap_used_kb, total_ram_kb);
 
     y += DEBUG_LINE_HEIGHT;
     rdpq_text_printf(NULL, FONT_BUILTIN_DEBUG_MONO, DEBUG_TEXT_X, y,

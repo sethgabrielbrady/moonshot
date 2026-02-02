@@ -23,7 +23,6 @@ extern bool bgm_playing;
 #define SFX_DRONE_CMD   2
 #define SFX_DRONE_FULL  3
 #define SFX_SHIP_HIT    4
-#define SFX_EXPLOSION   5
 
 // =============================================================================
 // Functions

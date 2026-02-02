@@ -116,13 +116,6 @@ void process_menu_input(void) {
         return;
     }
 
-    // Handle credits screen - B button backs out
-    if (game.show_credits) {
-        if (input.pressed.b) {
-            game.show_credits = false;
-        }
-        return;  // Don't process other menu input while in credits
-    }
 
     // Handle death/game over menu (special 2-option menu)
     if (game.game_over_pause) {
@@ -153,6 +146,8 @@ void process_menu_input(void) {
                 set_bgm_volume(0.5f);
             } else {
                 // Quit to title
+                stop_bgm();
+                play_bgm("rom:/lunramtit.wav64");
                 game.state = STATE_TITLE;
                 game.game_over = false;
                 game.game_over_pause = false;
@@ -190,11 +185,8 @@ void process_menu_input(void) {
                 game.state = STATE_PLAYING;
                 game.game_over = false;
                 if (game.game_over_pause) {
-                    // Reset game state for restart
                     game.game_over_pause = false;
-                    game.reset = true;  // <-- Only in input.c
-
-                    // Call reset function (defined elsewhere)
+                    game.reset = true;
                 }
                 set_bgm_volume(0.5f);
                 break;
@@ -210,27 +202,22 @@ void process_menu_input(void) {
                 break;
 
             case MENU_OPTION_AUDIO:
-                game.bgm_track = (game.bgm_track + 1) % 6;  // 0=OFF, 1-4=tracks, 5=Random
+                game.bgm_track = (game.bgm_track + 1) % 4;  // 0=OFF, 1-4=tracks, 5=Random
                 stop_bgm();
                 if (game.bgm_track == 1) {
                     play_bgm("rom:/nebrunv3.wav64");
                 } else if (game.bgm_track == 2) {
-                    play_bgm("rom:/orboddv2.wav64");
-                } else if (game.bgm_track == 3) {
-                    play_bgm("rom:/lunramv2.wav64");
-                } else if (game.bgm_track == 4) {
                     play_bgm("rom:/coshouv2.wav64");
-                } else if (game.bgm_track == 5) {
-                    // Random - pick 1, 2, 3, or 4
-                    int random_track = (rand() % 4) + 1;
+                } else if (game.bgm_track == 3) {
+                    play_bgm("rom:/lunramtit.wav64");
+                } else if (game.bgm_track == 4) {
+                    int random_track = (rand() % 3) + 1;
                     if (random_track == 1) {
                         play_bgm("rom:/nebrunv3.wav64");
                     } else if (random_track == 2) {
-                        play_bgm("rom:/orboddv2.wav64");
-                    } else if (random_track == 3) {
-                        play_bgm("rom:/lunramv2.wav64");
-                    } else {
                         play_bgm("rom:/coshouv2.wav64");
+                    } else if (random_track == 3) {
+                        play_bgm("rom:/lunramtit.wav64");
                     }
                 }
                 break;
@@ -254,9 +241,6 @@ void process_menu_input(void) {
                 game.show_tutorial = true;
                 break;
 
-            case MENU_OPTION_CREDITS:
-                game.show_credits = true;
-                break;
         }
     }
 }

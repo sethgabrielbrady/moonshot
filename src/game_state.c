@@ -23,12 +23,11 @@ GameStateData game = {
     .render_background_enabled = true,
     .show_controls = false,
     .show_tutorial = false,
-    .show_credits = false,
     .fps_limit = 0,
     .is_pal_system = false,
 
     // Audio
-    .bgm_track = 5,  // 5 = Random
+    .bgm_track = 4,  // 4 = Random
 
     // Blink timer
     .blink_timer = 0,

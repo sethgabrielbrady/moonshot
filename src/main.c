@@ -734,42 +734,83 @@ static void draw_game_timer(void) {
         display_get_height() - 15,
         "%d:%02d.%02d", minutes, seconds, hundredths);
 
-    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_RESOURCE});
+    // Credits display - green with "Cred:" prefix, moved right 15px
+    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
     rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-            x - 30, y, "%d", game.accumulated_credits);
+            x - 15, y, "Cred: %d", game.accumulated_credits);
 
 
     float fuel_percent = game.ship_fuel / CURSOR_MAX_FUEL;
     float health_percent = cursor_entity->value / CURSOR_MAX_HEALTH;
-    // rdpq_sync_pipe();
-    if (fuel_percent < 0.3f)  {
-        snprintf(game.status_message, sizeof(game.status_message), "--LOW FUEL--");
-         game.status_message_timer = 2.0f;
-    }
-    if (health_percent < 0.3f)  {
-        snprintf(game.status_message, sizeof(game.status_message), "--LOW HEALTH--");
-        game.status_message_timer = 2.0f;
-    }
 
-    // if (fuel_percent > 0.3f && health_percent > 0.3f) {
-        if (game.status_message_timer > 0.0f) {
-            rdpq_sync_pipe();
-            rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_ASTEROID });
-            rdpq_text_printf(
-                &(rdpq_textparms_t){
-                    .width = 280,
-                    .height = 40,
-                    .align = ALIGN_CENTER,
-                    .valign = VALIGN_TOP,
-                    .char_spacing = 1
-                },
-                FONT_CUSTOM,
-                display_get_width() / 2 - 140,
-                10,
-                "%s", game.status_message
-            );
+    // Show status message if timer active (other messages like "Credits +X")
+    if (game.status_message_timer > 0.0f) {
+        rdpq_sync_pipe();
+        rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_ASTEROID });
+        rdpq_text_printf(
+            &(rdpq_textparms_t){
+                .width = 280,
+                .height = 40,
+                .align = ALIGN_CENTER,
+                .valign = VALIGN_TOP,
+                .char_spacing = 1
+            },
+            FONT_CUSTOM,
+            display_get_width() / 2 - 140,
+            10,
+            "%s", game.status_message
+        );
+    } else {
+        // Only show low fuel/health warnings when no other message is showing
+        bool low_fuel = fuel_percent < 0.3f;
+        bool low_health = health_percent < 0.3f;
+
+        if (low_fuel || low_health) {
+            bool show_fuel_warning = false;
+
+            if (low_fuel && low_health) {
+                // Both low - alternate between them
+                show_fuel_warning = ((int)(game.blink_timer / 10) % 2 == 0);
+            } else {
+                show_fuel_warning = low_fuel;
+            }
+
+            if ((int)(game.blink_timer / 10) % 2 == 0) {
+                rdpq_sync_pipe();
+                if (show_fuel_warning) {
+                    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_FUEL_BAR});
+                    rdpq_text_printf(
+                        &(rdpq_textparms_t){
+                            .width = 280,
+                            .height = 40,
+                            .align = ALIGN_CENTER,
+                            .valign = VALIGN_TOP,
+                            .char_spacing = 1
+                        },
+                        FONT_CUSTOM,
+                        display_get_width() / 2 - 140,
+                        10,
+                        "%s", "--LOW FUEL--"
+                    );
+                } else {
+                    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
+                    rdpq_text_printf(
+                        &(rdpq_textparms_t){
+                            .width = 280,
+                            .height = 40,
+                            .align = ALIGN_CENTER,
+                            .valign = VALIGN_TOP,
+                            .char_spacing = 1
+                        },
+                        FONT_CUSTOM,
+                        display_get_width() / 2 - 140,
+                        10,
+                        "%s", "--NEED REPAIR--"
+                    );
+                }
+            }
         }
-    //
+    }
 
     rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(255, 255, 255, 255)});
 }
@@ -789,12 +830,12 @@ static void draw_info_bars(void) {
 // update station value to drop resources over time
 static float fuel_drain_accumulated = 0.0f;
 static void update_ship_fuel(float delta_time, bool accelerating) {
-    const float FUEL_DRAIN_RATE = 1.25f; // resources per second
+    const float FUEL_DRAIN_RATE = 1.5f; // resources per second
     if (accelerating) {
         fuel_drain_accumulated += FUEL_DRAIN_RATE * 2.0f * delta_time;
         spawn_ship_trail(entities[ENTITY_CURSOR].position, game.cursor_velocity, COLOR_FUEL_BAR);
     } else {
-        fuel_drain_accumulated += FUEL_DRAIN_RATE * delta_time;
+        fuel_drain_accumulated += FUEL_DRAIN_RATE * 1.25f * delta_time;
     }
 
     // Only drain whole units
@@ -948,7 +989,7 @@ static void render_frame(T3DViewport *viewport, sprite_t *background, float cam_
     game.frame_count++;
 
     if (game.show_fps) {
-        draw_fps_display(fps_stats.current, fps_stats.avg, fps_stats.min, fps_stats.max, debug_particle_count);
+        draw_fps_display(fps_stats.current, fps_stats.avg, fps_stats.min, fps_stats.max);
     }
 
     draw_info_bars();
@@ -1079,7 +1120,6 @@ int main(void) {
     entities[ENTITY_WALL] = create_entity("rom:/wall.t3dm", (T3DVec3){{0, 1000, 0}},
                                            1.0f, RGBA32(255, 237, 41, 175), DRAW_SHADED, 0.0f);
 
-
     init_asteroids_optimized(asteroids, ASTEROID_COUNT);
     init_resources(resources, RESOURCE_COUNT);
 
@@ -1121,6 +1161,12 @@ int main(void) {
             update_audio();
             static float title_cam_yaw = 0.0f;
 
+            // B to quit
+            if (input.pressed.b) {
+                stop_bgm();
+                // Exit the game
+                break;
+            }
 
             if (input.pressed.start) {
                 stop_bgm();
@@ -1133,22 +1179,18 @@ int main(void) {
                 if (game.bgm_track == 1) {
                     play_bgm("rom:/nebrunv3.wav64");
                 } else if (game.bgm_track == 2) {
-                    play_bgm("rom:/orboddv2.wav64");
-                } else if (game.bgm_track == 3) {
-                    play_bgm("rom:/lunramv2.wav64");
-                } else if (game.bgm_track == 4) {
                     play_bgm("rom:/coshouv2.wav64");
-                } else if (game.bgm_track == 5) {
-                    // Random - pick 1, 2, 3, or 4
-                    int random_track = (rand() % 4) + 1;
+                } else if (game.bgm_track == 3) {
+                    play_bgm("rom:/lumramtit.wav64");
+                } else if (game.bgm_track == 4) {
+                    // Random - pick 1, 2, or 3
+                    int random_track = (rand() % 3) + 1;
                     if (random_track == 1) {
                         play_bgm("rom:/nebrunv3.wav64");
                     } else if (random_track == 2) {
-                        play_bgm("rom:/orboddv2.wav64");
-                    } else if (random_track == 3) {
-                        play_bgm("rom:/lunramv2.wav64");
-                    } else {
                         play_bgm("rom:/coshouv2.wav64");
+                    } else if (random_track == 3) {
+                        play_bgm("rom:/lumramtit.wav64");
                     }
                 }
 
@@ -1265,17 +1307,42 @@ int main(void) {
                 SCREEN_HEIGHT / 2 + 10,
                  "%s", "Press Start" );
 
+            // B to Quit option
+            rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(180, 180, 180, 255)});
+            rdpq_text_printf(
+                &(rdpq_textparms_t){
+                    .width = display_get_width(),
+                    .height = 40,
+                    .align = ALIGN_CENTER,
+                    .valign = VALIGN_BOTTOM,
+                    .char_spacing = 1
+                },
+                FONT_CUSTOM,
+                display_get_width() / 2 - 160,
+                SCREEN_HEIGHT / 2 + 25,
+                 "%s", "B to Quit" );
 
-            //draw the rumble icon image 20px from the bottom, middle of the screen
+            // Copyright notice bottom left
+            rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = RGBA32(120, 120, 120, 255)});
+            rdpq_text_printf(
+                &(rdpq_textparms_t){
+                    .char_spacing = 1
+                },
+                FONT_CUSTOM,
+                10,
+                display_get_height() - 15,
+                 "%s", "2026 Brainpan" );
+
+            //draw the rumble icon image - moved left by 15 pixels
             if (rumble_icon) {
                 rdpq_set_prim_color(RGBA32(155, 44, 18, 155));
-                rdpq_sprite_blit(rumble_icon, display_get_width() - 20 - (rumble_icon->width / 2),
+                rdpq_sprite_blit(rumble_icon, display_get_width() - 35 - (rumble_icon->width / 2),
                                  display_get_height() - rumble_icon->height - 10,
                                  &(rdpq_blitparms_t){
                                      .scale_x = 1.0f, .scale_y = 1.0f
                                  });
                 rdpq_set_prim_color(RGBA32(255, 74, 28, 255));
-                rdpq_sprite_blit(rumble_icon, display_get_width() - 21 - (rumble_icon->width / 2),
+                rdpq_sprite_blit(rumble_icon, display_get_width() - 36 - (rumble_icon->width / 2),
                                  display_get_height() - rumble_icon->height - 10,
                                  &(rdpq_blitparms_t){
                                      .scale_x = 1.0f, .scale_y = 1.0f
@@ -1463,6 +1530,7 @@ int main(void) {
                     // 10 seconds reached - show game over menu
                     game.game_over = true;
                     game.game_over_pause = true;
+                    game.menu_selection = 0;  // Reset menu selection for Continue/Quit
                     game.death_timer = 10.0f;
                     stop_rumble();
                     // Don't set reset here - let the menu handle it
@@ -1530,6 +1598,7 @@ int main(void) {
         render_frame(&viewport, background, game.cam_yaw, delta_time);
         update_audio();
         rspq_wait();
+        update_audio();  // Extra call to prevent audio stutter at low framerates
     }
 
     // Cleanup

@@ -162,7 +162,7 @@ void check_cursor_station_collision(Entity *cursor, Entity *station) {
     stored_cursor_resource_val = game.cursor_resource_val;
 
     // Health restoration
-    if (cursor->value < CURSOR_MAX_HEALTH) {
+    if (cursor->value < CURSOR_MAX_HEALTH && stored_cursor_resource_val > 0) {
         if (stored_cursor_resource_val >= 100) {
             cursor->value += 50;
             snprintf(game.status_message, sizeof(game.status_message), "Ship Repaired!");
@@ -178,14 +178,15 @@ void check_cursor_station_collision(Entity *cursor, Entity *station) {
     }
 
     // Fuel restoration
-    if (game.ship_fuel < CURSOR_MAX_FUEL) {
+    if (game.ship_fuel < CURSOR_MAX_FUEL && stored_cursor_resource_val > 0) {
         if (stored_cursor_resource_val >= 70) {
             game.ship_fuel = CURSOR_MAX_FUEL;
             snprintf(game.status_message, sizeof(game.status_message), "Max Fuel!");
             game.status_message_timer = 2.0f;
         } else {
             game.ship_fuel += stored_cursor_resource_val * 0.85f;
-            snprintf(game.status_message, sizeof(game.status_message), "Fuel +%.0f", stored_cursor_resource_val * 0.85f);
+            int stored = stored_cursor_resource_val * 0.85f;
+            snprintf(game.status_message, sizeof(game.status_message), "Fuel +%d", stored);
             game.status_message_timer = 2.0f;
         }
         if (game.ship_fuel > CURSOR_MAX_FUEL) {
@@ -201,7 +202,7 @@ void check_cursor_station_collision(Entity *cursor, Entity *station) {
     } else {
         if (stored_cursor_resource_val > 0){
             game.accumulated_credits += stored_cursor_resource_val;
-            snprintf(game.status_message, sizeof(game.status_message), "Credits +%d", game.accumulated_credits += stored_cursor_resource_val);
+            snprintf(game.status_message, sizeof(game.status_message), "Credits +%d", stored_cursor_resource_val);
             game.status_message_timer = 2.0f;
         }
     }
@@ -437,7 +438,7 @@ void check_drone_cursor_collisions(Entity *drone, Entity *cursor, int count) {
     if (check_entity_intersection(drone, cursor)) {
         cursor->value += game.drone_resource_val;
         game.ship_fuel += game.drone_resource_val * 0.3f;
-        snprintf(game.status_message, sizeof(game.status_message), "Repair/Fuel +%d+%.0f", game.drone_resource_val, game.drone_resource_val * 0.3f);
+        snprintf(game.status_message, sizeof(game.status_message), "Repair +%d/Fuel +%.0f", game.drone_resource_val, game.drone_resource_val * 0.3f);
         game.status_message_timer = 2.0f;
 
         if (game.ship_fuel < 10) {
