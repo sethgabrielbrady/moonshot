@@ -489,7 +489,7 @@ static void draw_cursor_fuel_bar(void) {
     char slashes[32];
     build_gauge_slashes(slashes, fuel_percent);
 
-    int x = 38;  // Offset from health bar on X axis
+    int x = 23;  // Offset from health bar on X axis (moved 15px left)
     int y = SCREEN_HEIGHT - 49;
 
     rdpq_sync_pipe();
@@ -526,7 +526,7 @@ static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset
     char slashes[32];
     build_gauge_slashes(slashes, health_percent);
 
-    int x = 35;
+    int x = 20;  // Moved 15px left
     int y = is_cursor ? (SCREEN_HEIGHT - 51) : (10 + y_offset - 25);
 
     rdpq_sync_pipe();
@@ -549,6 +549,7 @@ static void draw_entity_health_bar(Entity *entity, float max_value, int y_offset
         },
         FONT_CUSTOM, x + 1, y, "%s", slashes);
 }
+
 
 static void draw_entity_resource_bar(int resource_val, float max_value, int y_offset, const char *label, bool show_triangle) {
     int bar_width = 40;
@@ -578,8 +579,8 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
                     .char_spacing = 1
                 },
                 FONT_CUSTOM,
-                16 ,  // X: left edge of box
-                y - 10,
+                20 ,  // X: moved 15px left
+                y - 24,
                  "%d%s", (int)(resource_percent * 100), "%" );
     }
 
@@ -587,7 +588,9 @@ static void draw_entity_resource_bar(int resource_val, float max_value, int y_of
     int icon_y = y - 6;
 
     if (show_triangle) {
-        icon_x = 10;
+        // Position drone icons 6px to right of resource percentage (which is at x=20)
+        // Resource text is roughly 30-40px wide, so place icons at ~60px from left
+        icon_x = 60;  // 6px right of resource percentage text
         int action_x = icon_x;
         int action_y = icon_y + 6;
 
@@ -734,11 +737,14 @@ static void draw_game_timer(void) {
         display_get_height() - 15,
         "%d:%02d.%02d", minutes, seconds, hundredths);
 
-    // Credits display - green with "Cred:" prefix, moved right 15px
-    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
-    rdpq_text_printf(&(rdpq_textparms_t){.char_spacing = 1}, FONT_CUSTOM,
-            x - 15, y, "Cred: %d", game.accumulated_credits);
 
+    rdpq_font_style(custom_font, 0, &(rdpq_fontstyle_t){.color = COLOR_HEALTH});
+    rdpq_text_printf(
+        &(rdpq_textparms_t){.char_spacing = 1},
+        FONT_CUSTOM,
+        display_get_width() - 64,
+        display_get_height() - 25,
+        "c: %d", game.accumulated_credits);
 
     float fuel_percent = game.ship_fuel / CURSOR_MAX_FUEL;
     float health_percent = cursor_entity->value / CURSOR_MAX_HEALTH;
@@ -1181,7 +1187,7 @@ int main(void) {
                 } else if (game.bgm_track == 2) {
                     play_bgm("rom:/coshouv2.wav64");
                 } else if (game.bgm_track == 3) {
-                    play_bgm("rom:/lumramtit.wav64");
+                    play_bgm("rom:/lunramtit.wav64");
                 } else if (game.bgm_track == 4) {
                     // Random - pick 1, 2, or 3
                     int random_track = (rand() % 3) + 1;
@@ -1190,7 +1196,7 @@ int main(void) {
                     } else if (random_track == 2) {
                         play_bgm("rom:/coshouv2.wav64");
                     } else if (random_track == 3) {
-                        play_bgm("rom:/lumramtit.wav64");
+                        play_bgm("rom:/lunramtit.wav64");
                     }
                 }
 
@@ -1356,11 +1362,8 @@ int main(void) {
 
         process_system_input(&viewport);
 
-        if (game.status_message_timer > 0.0f) {
-            game.status_message_timer -= delta_time;
-            if (game.status_message_timer < 0.0f)
-                game.status_message_timer = 0.0f;
-        }
+        // Update message queue (handles timer and cycling through queued messages)
+        update_message_queue(delta_time);
 
         // Handle countdown state
         if (game.state == STATE_COUNTDOWN) {

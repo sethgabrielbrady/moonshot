@@ -1,5 +1,6 @@
 #include "game_state.h"
 #include "constants.h"
+#include <string.h>
 
 
 // =============================================================================
@@ -110,8 +111,13 @@ GameStateData game = {
     .countdown_timer = 3.0f,
     .hauled_resources = false,
     .hauled_resources_timer = 0.0f,
+
+    // Status message queue
     .status_message = "",
-    .status_message_timer = 0.0f
+    .status_message_timer = 0.0f,
+    .message_queue = {{0}},
+    .message_queue_timers = {0},
+    .message_queue_count = 0
 };
 
 // =============================================================================
@@ -193,4 +199,54 @@ void update_difficulty(float delta_time) {
 
 float get_asteroid_speed_for_difficulty(void) {
     return game.difficulty_multiplier;
+}
+
+// =============================================================================
+// Message Queue System
+// =============================================================================
+
+void queue_message(const char *message, float duration) {
+    // Safety check
+    if (!message) return;
+
+    // If no message is currently showing, display immediately
+    if (game.status_message_timer <= 0.0f) {
+        strncpy(game.status_message, message, sizeof(game.status_message) - 1);
+        game.status_message[sizeof(game.status_message) - 1] = '\0';
+        game.status_message_timer = duration;
+        return;
+    }
+
+    // Otherwise add to queue if there's room
+    if (game.message_queue_count < 5) {
+        strncpy(game.message_queue[game.message_queue_count], message, 63);
+        game.message_queue[game.message_queue_count][63] = '\0';
+        game.message_queue_timers[game.message_queue_count] = duration;
+        game.message_queue_count++;
+    }
+}
+
+void update_message_queue(float delta_time) {
+    if (game.status_message_timer > 0.0f) {
+        game.status_message_timer -= delta_time;
+
+        // Current message expired, check queue for next
+        if (game.status_message_timer <= 0.0f) {
+            game.status_message_timer = 0.0f;
+
+            if (game.message_queue_count > 0) {
+                // Pop first message from queue
+                strncpy(game.status_message, game.message_queue[0], sizeof(game.status_message) - 1);
+                game.status_message[sizeof(game.status_message) - 1] = '\0';
+                game.status_message_timer = game.message_queue_timers[0];
+
+                // Shift remaining messages down using memmove (safe for overlapping)
+                for (int i = 0; i < game.message_queue_count - 1; i++) {
+                    memcpy(game.message_queue[i], game.message_queue[i + 1], 64);
+                    game.message_queue_timers[i] = game.message_queue_timers[i + 1];
+                }
+                game.message_queue_count--;
+            }
+        }
+    }
 }

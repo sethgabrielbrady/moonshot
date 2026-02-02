@@ -326,8 +326,8 @@ void draw_pause_menu(void) {
         draw_triangle_indicator(text_x - 20, menu_y + (game.menu_selection * option_height) - 8);
         rdpq_sync_pipe();
 
-        rdpq_text_printf(NULL, FONT_CUSTOM, text_x, menu_y, "Continue");
-        rdpq_text_printf(NULL, FONT_CUSTOM, text_x, menu_y + option_height, "Quit");
+        rdpq_text_printf(NULL, FONT_CUSTOM, text_x, menu_y, "Press A to Continue");
+        // rdpq_text_printf(NULL, FONT_CUSTOM, text_x, menu_y + option_height, "Quit");
 
         return;
     }

@@ -129,8 +129,12 @@ typedef struct {
     bool hauled_resources;
     float hauled_resources_timer;
 
-    char status_message[64];
-    float status_message_timer;
+    // Status message queue
+    char status_message[64];           // Current displayed message
+    float status_message_timer;        // Timer for current message
+    char message_queue[5][64];         // Queue of pending messages
+    float message_queue_timers[5];     // Duration for each queued message
+    int message_queue_count;           // Number of messages in queue
 
 } GameStateData;
 
@@ -169,6 +173,10 @@ void unpause_game(void);
 void set_game_over(void);
 void update_difficulty(float delta_time);
 float get_asteroid_speed_for_difficulty(void);
+
+// Message queue functions
+void queue_message(const char *message, float duration);
+void update_message_queue(float delta_time);
 
 
 
